@@ -18,7 +18,7 @@ def config() -> RuleConfig:
                 "name": "Token value",
                 "category": "secret",
                 "match_type": "regex",
-                "pattern": r"secret=(\\w+)",
+                "pattern": r"secret=(\w+)",
                 "replacement": "token=REDACTED",
                 "priority": 20,
             },
