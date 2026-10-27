@@ -130,7 +130,25 @@ describe("local format detection UI", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Format lokal prüfen" }));
-    expect(await screen.findByText(/Stichprobe: json/)).toBeInTheDocument();
+    expect(await screen.findByText(/Erkannt: JSON/)).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/detect-format`, { method: "POST" });
+  });
+
+  it("saves a manual format override", async () => {
+    const project = { id: "project-override", name: "Override", description: "", status: "draft", created_at: "2026-10-27T10:00:00+00:00", updated_at: "2026-10-27T10:00:00+00:00" };
+    const file = { id: "file-override", project_id: project.id, display_name: "events.log", size_bytes: 10, modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered", format_hint: "text", detected_format: "unknown", format_override: null };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...file, format_override: "json" }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("combobox", { name: "Format für events.log" }), { target: { value: "json" } });
+    expect(await screen.findByText(/Manuelles Format für events.log gespeichert: json/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/format`, expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({ format_override: "json" })
+    }));
   });
 });
