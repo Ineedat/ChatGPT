@@ -32,11 +32,18 @@ Available endpoints:
 
 File registration checks that the project exists and the source path identifies
 an existing regular file. Relative paths, directories, and final-component
-symbolic links are rejected. The API returns only the display name, size, and
-timestamps; it does not return the stored absolute path. Registering a file
-does not open or copy its contents, alter the original, detect its format, or
-start sanitization. Folder import, processing, and the UI file picker are not
-implemented yet.
+symbolic links are rejected. Duplicate registration of the same canonical path
+returns HTTP 409. The API returns only the display name, size, and timestamps;
+it does not return the stored absolute path.
+
+Folder registration is available at `POST /api/projects/{id}/files/import-folder`
+with JSON `{"path": "/absolute/path/to/logs", "recursive": true}`. Recursive
+import is enabled by default; set `recursive` to `false` to include only direct
+children. The endpoint processes at most 5,000 candidate files per request,
+skips symbolic links, reports duplicate/permission/other per-file failures, and
+returns counts plus a per-file issue list. It registers file metadata only: it
+does not read or copy file contents, modify originals, detect formats, or start
+sanitization. A graphical folder picker is not implemented yet.
 
 This scaffold is not approved for real/sensitive logs and must not be exposed to
 a network: authentication, authorization, processing, mapping protection, and
