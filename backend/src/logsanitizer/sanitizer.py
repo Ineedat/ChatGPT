@@ -28,6 +28,7 @@ def sanitize_file(
     destination_path: Path,
     config: RuleConfig,
     profile_id: str | None = None,
+    format_name: str | None = None,
 ) -> dict[str, int | str]:
     """Sanitize UTF-8 text/JSONL one bounded line at a time; never modify the source."""
     source = source_path.expanduser()
@@ -45,8 +46,8 @@ def sanitize_file(
     if profile_id is not None and profile_id not in {p.id for p in config.profiles}:
         raise SanitizationError("Das angegebene Quellprofil ist nicht definiert.")
 
-    effective_format = source.suffix.casefold()
-    if effective_format not in {".log", ".txt", ".out", ".err", ".jsonl", ".ndjson"}:
+    effective_format = format_name or ("jsonl" if source.suffix.casefold() in {".jsonl", ".ndjson"} else "text")
+    if effective_format not in {"text", "jsonl"}:
         raise SanitizationError("Unterstützt werden derzeit Textdateien und JSON Lines (UTF-8).")
 
     rules = [
