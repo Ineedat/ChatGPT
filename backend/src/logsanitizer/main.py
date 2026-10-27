@@ -198,7 +198,7 @@ def detect_format_from_sample(path: Path) -> str:
 
 
 @app.post("/api/projects/{project_id}/files/{file_id}/detect-format", tags=["files"])
-def project_file_detect_format(project_id: str, file_id: str) -> dict[str, str]:
+def project_file_detect_format(project_id: str, file_id: str) -> dict[str, str | int | None]:
     """Inspect a bounded local sample and return only its classification."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
