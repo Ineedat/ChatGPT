@@ -112,7 +112,7 @@ export default function App() {
           <button className="secondary-button" onClick={() => void openProject(project.id)}>Öffnen</button>
         </article>)}</div>}
       </section>
-      {selectedProject && <section className="panel selected-project" aria-live="polite">
+      {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
         <p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         <p className="field-help">Status: Entwurf. Dateiimport und Verarbeitung sind noch nicht verfügbar.</p>

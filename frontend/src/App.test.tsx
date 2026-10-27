@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App";
 
 afterEach(() => {
@@ -46,7 +46,9 @@ describe("LogSanitizer app shell", () => {
     fireEvent.change(screen.getByRole("textbox", { name: /Beschreibung/ }), { target: { value: "Testbeschreibung" } });
     fireEvent.click(screen.getByRole("button", { name: "Projekt anlegen" }));
 
-    expect(await screen.findByRole("heading", { name: "Testprojekt" })).toBeInTheDocument();
+    const openedProject = await screen.findByRole("region", { name: "Geöffnetes Projekt" });
+    expect(within(openedProject).getByRole("heading", { name: "Testprojekt" })).toBeInTheDocument();
+    expect(within(openedProject).getByText("Testbeschreibung")).toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/projects", expect.objectContaining({ method: "POST" })));
   });
 });
