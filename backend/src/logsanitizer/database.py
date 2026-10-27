@@ -16,7 +16,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 APP_DIR_NAME = ".logsanitizer"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def database_path() -> Path:
@@ -117,9 +117,17 @@ def initialize_database() -> None:
                 "CREATE INDEX idx_imported_files_project "
                 "ON imported_files(project_id, imported_at)"
             )
+            connection.execute("UPDATE schema_metadata SET version = 2")
+            current_version = 2
+
+        if current_version < 3:
             connection.execute(
-                "UPDATE schema_metadata SET version = ?", (SCHEMA_VERSION,)
+                "ALTER TABLE imported_files ADD COLUMN detected_format TEXT NOT NULL DEFAULT 'unknown'"
             )
+            connection.execute(
+                "ALTER TABLE imported_files ADD COLUMN format_override TEXT"
+            )
+            connection.execute("UPDATE schema_metadata SET version = 3")
 
 
 class ProjectCreate(BaseModel):
@@ -170,6 +178,8 @@ class ImportedFile(BaseModel):
     imported_at: str
     state: str = "registered"
     format_hint: str = "unknown"
+    detected_format: str = "unknown"
+    format_override: str | None = None
 
 
 def format_hint_for_name(name: str) -> str:
@@ -186,6 +196,18 @@ def format_hint_for_name(name: str) -> str:
     if suffix == ".csv":
         return "csv"
     return "unknown"
+
+
+class FormatOverrideRequest(BaseModel):
+    format_override: str | None
+
+    @field_validator("format_override")
+    @classmethod
+    def validate_format(cls, value: str | None) -> str | None:
+        allowed = {"text", "json", "jsonl", "xml", "csv", "unknown"}
+        if value is not None and value not in allowed:
+            raise ValueError("Ungültiges Dateiformat.")
+        return value
 
 
 class FolderImportRequest(BaseModel):
@@ -269,11 +291,46 @@ def _imported_file_from_row(row: sqlite3.Row) -> ImportedFile:
     return ImportedFile(**values)
 
 
+def update_detected_format(project_id: str, file_id: str, detected_format: str) -> ImportedFile | None:
+    with connect_database() as connection:
+        connection.execute(
+            "UPDATE imported_files SET detected_format = ? WHERE project_id = ? AND id = ?",
+            (detected_format, project_id, file_id),
+        )
+        row = connection.execute(
+            """
+            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+                   detected_format, format_override
+            FROM imported_files WHERE project_id = ? AND id = ?
+            """,
+            (project_id, file_id),
+        ).fetchone()
+    return _imported_file_from_row(row) if row is not None else None
+
+
+def update_format_override(project_id: str, file_id: str, format_override: str | None) -> ImportedFile | None:
+    with connect_database() as connection:
+        connection.execute(
+            "UPDATE imported_files SET format_override = ? WHERE project_id = ? AND id = ?",
+            (format_override, project_id, file_id),
+        )
+        row = connection.execute(
+            """
+            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+                   detected_format, format_override
+            FROM imported_files WHERE project_id = ? AND id = ?
+            """,
+            (project_id, file_id),
+        ).fetchone()
+    return _imported_file_from_row(row) if row is not None else None
+
+
 def list_imported_files(project_id: str) -> list[ImportedFile]:
     with connect_database() as connection:
         rows = connection.execute(
             """
-            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at
+            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+                   detected_format, format_override
             FROM imported_files WHERE project_id = ?
             ORDER BY imported_at ASC, display_name COLLATE NOCASE ASC
             """,
@@ -290,8 +347,8 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
     file_id = str(uuid4())
     with connect_database() as connection:
         existing = connection.execute(
-            "SELECT id, project_id, display_name, size_bytes, modified_at, imported_at "
-            "FROM imported_files WHERE project_id = ? AND source_path = ?",
+            "SELECT id, project_id, display_name, size_bytes, modified_at, imported_at, "
+            "detected_format, format_override FROM imported_files WHERE project_id = ? AND source_path = ?",
             (project_id, absolute_path),
         ).fetchone()
         if existing is not None:
@@ -314,7 +371,8 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
         )
         row = connection.execute(
             """
-            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at
+            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+                   detected_format, format_override
             FROM imported_files WHERE id = ?
             """,
             (file_id,),
