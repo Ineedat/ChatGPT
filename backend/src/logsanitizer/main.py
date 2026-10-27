@@ -14,9 +14,9 @@ from fastapi.responses import JSONResponse
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
+    FolderImportIssue,
     FolderImportRequest,
     FolderImportResult,
-    FolderImportIssue,
     ImportedFile,
     Project,
     ProjectCreate,
