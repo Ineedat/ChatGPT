@@ -7,7 +7,6 @@ the complete document in memory.
 from __future__ import annotations
 
 import csv
-import io
 import json
 import re
 import xml.etree.ElementTree as ET
