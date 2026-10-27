@@ -46,7 +46,7 @@ does not read or copy file contents, modify originals, or start sanitization. Th
 response includes a `format_hint` inferred only from the filename extension (`json`,
 `jsonl`, `text`, `xml`, `csv`, or `unknown`). This is not content validation; an
 unknown extension stays `unknown`, and the hint must not be treated as proof of the
-actual format. A graphical folder picker is not implemented yet.
+actual format. Format detection is a separate explicit action (`POST /api/projects/{id}/files/{file_id}/detect-format`): it samples at most 64 KiB locally and returns only a classification, not source content. Uncertain or binary samples remain `unknown`. The result is a heuristic and is not persisted, not full-file validation, and not approval. A graphical folder picker is not implemented yet.
 
 This scaffold is not approved for real/sensitive logs and must not be exposed to
 a network: authentication, authorization, processing, mapping protection, and
