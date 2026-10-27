@@ -139,5 +139,5 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
         assert response.json()["replacements"] == 2
         assert "secret" not in response.text
 
-    assert (tmp_path / "clean.log").read_bytes() == b"token=REDACTED\n"
+    assert (tmp_path / "clean.log").read_bytes() == b"hidden=REDACTED\n"
     assert source.read_bytes() == original
