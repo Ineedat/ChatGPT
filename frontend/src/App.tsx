@@ -3,7 +3,7 @@ import { HelpTooltip } from "./components/HelpTooltip";
 import { helpTopics } from "./help/content";
 
 type Tab = "overview" | "help";
-type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string };
+type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type Project = {
   id: string;
@@ -129,12 +129,30 @@ export default function App() {
       const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/detect-format`, { method: "POST" });
       const body = await response.json() as { detected_format?: string; detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format konnte nicht erkannt werden.");
-      setImportedFiles(current => current.map(item => item.id === file.id ? { ...item, detected_format: body.detected_format } : item));
-      setImportMessage(`Format-Hinweis für ${file.display_name}: ${body.detected_format}. Es wurden höchstens 64 KiB lokal untersucht.`);
+      setImportedFiles(current => current.map(item => item.id === file.id ? { ...item, detected_format: body.detected_format, format_override: body.format_override ?? item.format_override } : item));
+      setImportMessage(`Format-Erkennung für ${file.display_name}: ${body.detected_format}. Es wurden höchstens 64 KiB lokal untersucht und das Ergebnis lokal gespeichert.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Format konnte nicht erkannt werden.");
     }
   }
+  async function setFileFormatOverride(file: ImportedFile, formatOverride: string) {
+    if (!selectedProject) return;
+    setError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/format`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format_override: formatOverride || null })
+      });
+      const body = await response.json() as ImportedFile & { detail?: string };
+      if (!response.ok) throw new Error(body.detail || "Format-Auswahl konnte nicht gespeichert werden.");
+      setImportedFiles(current => current.map(item => item.id === file.id ? body : item));
+      setImportMessage(formatOverride ? `Manuelles Format für ${file.display_name} gespeichert: ${formatOverride}.` : `Manuelle Format-Auswahl für ${file.display_name} entfernt.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Format-Auswahl konnte nicht gespeichert werden.");
+    }
+  }
+
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!projectName.trim() || saving) return;
@@ -234,7 +252,7 @@ export default function App() {
         {importMessage && <p className="success-message" role="status">{importMessage}</p>}
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
         <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
-        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li key={file.id}><div><strong>{file.display_name}</strong><span>{file.state === "registered" ? "Registriert" : file.state}</span><span>Endungs-Hinweis: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span><span>Stichprobe: {file.detected_format || "noch nicht geprüft"}</span><button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)}>Format lokal prüfen</button></div><span>{file.size_bytes.toLocaleString("de-DE")} Byte</span></li>)}</ul>}
+        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li key={file.id}><div><strong>{file.display_name}</strong><span>{file.state === "registered" ? "Registriert" : file.state}</span><span>Endungs-Hinweis: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span><span>Erkannt: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</span><label>Format manuell festlegen <select aria-label={`Format für ${file.display_name}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)}><option value="">Automatisch (Erkennung verwenden)</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option></select></label><button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)}>Format lokal prüfen</button></div><span>{file.size_bytes.toLocaleString("de-DE")} Byte</span></li>)}</ul>}
       </section>}
       <section className="feature-grid" aria-label="Projektprinzipien">
         <article className="feature-card"><span className="feature-number">01</span><h3>Lokal bleiben</h3><p>Keine Cloud- oder externen API-Abhängigkeiten im vorgesehenen Betrieb.</p></article>
