@@ -3,6 +3,8 @@ import { HelpTooltip } from "./components/HelpTooltip";
 import { helpTopics } from "./help/content";
 
 type Tab = "overview" | "help";
+type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string };
+type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type Project = {
   id: string;
   name: string;
@@ -21,6 +23,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [sourcePath, setSourcePath] = useState("");
+  const [folderPath, setFolderPath] = useState("");
+  const [recursive, setRecursive] = useState(true);
+  const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
+  const [importIssues, setImportIssues] = useState<FolderImportResult["issues"]>([]);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -37,6 +46,81 @@ export default function App() {
   }, []);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
+
+  const loadImportedFiles = useCallback(async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/files`);
+      if (!response.ok) throw new Error("Dateiliste konnte nicht geladen werden.");
+      setImportedFiles(await response.json() as ImportedFile[]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Dateiliste konnte nicht geladen werden.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedProject) void loadImportedFiles(selectedProject.id);
+    else setImportedFiles([]);
+  }, [selectedProject, loadImportedFiles]);
+
+  async function registerSingleFile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject || !sourcePath.trim() || importing) return;
+    setImporting(true);
+    setError("");
+    setImportMessage("");
+    setImportIssues([]);
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: sourcePath })
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(body.detail || "Datei konnte nicht registriert werden.");
+      }
+      const file = await response.json() as ImportedFile;
+      setImportedFiles(current => [...current.filter(item => item.id !== file.id), file]);
+      setSourcePath("");
+      setImportMessage("Datei registriert. Der Inhalt wurde nicht verarbeitet.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Datei konnte nicht registriert werden.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function registerFolder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject || !folderPath.trim() || importing) return;
+    setImporting(true);
+    setError("");
+    setImportMessage("");
+    setImportIssues([]);
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/import-folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: folderPath, recursive })
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(body.detail || "Ordner konnte nicht importiert werden.");
+      }
+      const result = await response.json() as FolderImportResult;
+      setImportedFiles(current => {
+        const byId = new Map(current.map(file => [file.id, file]));
+        result.registered_files.forEach(file => byId.set(file.id, file));
+        return [...byId.values()];
+      });
+      setImportIssues(result.issues);
+      setImportMessage(`Registriert: ${result.registered_count}; übersprungen: ${result.skipped_count}.${result.limit_reached ? " Das Dateilimit wurde erreicht." : ""} Es wurden keine Log-Inhalte gelesen.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ordner konnte nicht importiert werden.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -115,7 +199,29 @@ export default function App() {
       {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
         <p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
-        <p className="field-help">Status: Entwurf. Dateiimport und Verarbeitung sind noch nicht verfügbar.</p>
+        <p className="field-help">Dateien werden nur registriert. Es findet noch keine Verarbeitung oder Bereinigung statt.</p>
+        <div className="import-grid">
+          <form onSubmit={event => void registerSingleFile(event)} aria-label="Einzeldatei registrieren">
+            <h4>Einzelne Datei</h4>
+            <label htmlFor="source-path">Absoluter Dateipfad</label>
+            <input id="source-path" value={sourcePath} onChange={event => setSourcePath(event.target.value)} placeholder="z. B. /var/log/service.log" maxLength={4096} required />
+            <p className="field-help">Der Pfad muss auf dem Rechner des lokalen FastAPI-Backends existieren. Quelldateien bleiben unverändert.</p>
+            <button className="secondary-button" type="submit" disabled={!sourcePath.trim() || importing}>{importing ? "Registriert …" : "Datei registrieren"}</button>
+          </form>
+          <form onSubmit={event => void registerFolder(event)} aria-label="Ordner registrieren">
+            <h4>Ordner importieren</h4>
+            <label htmlFor="folder-path">Absoluter Ordnerpfad</label>
+            <input id="folder-path" value={folderPath} onChange={event => setFolderPath(event.target.value)} placeholder="z. B. /var/log/my-service" maxLength={4096} required />
+            <label className="checkbox-label" htmlFor="recursive"><input id="recursive" type="checkbox" checked={recursive} onChange={event => setRecursive(event.target.checked)} /> Unterordner einbeziehen</label>
+            <p className="field-help">Bis zu 5.000 Dateikandidaten pro Aufruf. Doppelte Dateien und übersprungene Einträge werden angezeigt.</p>
+            <button className="secondary-button" type="submit" disabled={!folderPath.trim() || importing}>{importing ? "Importiert …" : "Ordner registrieren"}</button>
+          </form>
+        </div>
+        <p className="field-help">Hinweis: Dies ist eine Pfadeingabe, noch kein nativer Dateiauswahldialog. Ein Browser-Dateidialog kann dem lokalen Backend nicht sicher den lokalen Dateisystempfad übergeben.</p>
+        {importMessage && <p className="success-message" role="status">{importMessage}</p>}
+        {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
+        <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
+        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li key={file.id}><div><strong>{file.display_name}</strong><span>{file.state === "registered" ? "Registriert" : file.state}</span></div><span>{file.size_bytes.toLocaleString("de-DE")} Byte</span></li>)}</ul>}
       </section>}
       <section className="feature-grid" aria-label="Projektprinzipien">
         <article className="feature-card"><span className="feature-number">01</span><h3>Lokal bleiben</h3><p>Keine Cloud- oder externen API-Abhängigkeiten im vorgesehenen Betrieb.</p></article>
