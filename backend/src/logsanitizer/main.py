@@ -24,6 +24,7 @@ from logsanitizer.database import (
     Project,
     ProjectCreate,
     create_project,
+    connect_database,
     get_project,
     initialize_database,
     list_imported_files,
@@ -191,6 +192,30 @@ def detect_format_from_sample(path: Path) -> str:
     except csv.Error:
         pass
     return "text"
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/detect-format", tags=["files"])
+def project_file_detect_format(project_id: str, file_id: str) -> dict[str, str]:
+    """Inspect a bounded local sample and return only its classification."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path FROM imported_files WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    source = Path(row["source_path"])
+    try:
+        if source.is_symlink() or not source.is_file():
+            raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
+        detected = detect_format_from_sample(source)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Dateiformat konnte nicht geprüft werden.") from exc
+    return {"file_id": file_id, "detected_format": detected, "sample_limit_bytes": str(MAX_FORMAT_SAMPLE_BYTES)}
 
 
 MAX_FOLDER_FILES = 5000
