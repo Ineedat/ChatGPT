@@ -23,7 +23,7 @@ A portable, offline-first application for sanitizing application log files on Wi
 
 ## Current scope
 
-The initial milestone establishes the project structure, API health endpoint, frontend shell, and development instructions. The rule engine, streaming pipeline, persistent mapping store, authentication, review workflow, and packaging are planned work and must not be considered implemented until documented and tested.
+The current development scaffold includes local SQLite project management, source-file registration, heuristic format detection on a sample of at most 64 KiB, manual per-file format selection, and explicit full-file format validation for text, JSON, JSON Lines, CSV, and XML. Validation reports format/syntax errors and byte counts without returning source content. Detection is only a guess based on a bounded sample; full-file syntax validation is not a sanitization scan and does not prove that sensitive values have been found. The rule engine, sanitization streaming pipeline, persistent mapping store, authentication, review workflow, and packaging remain planned work.
 
 ## Requirements
 
