@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
+    FormatOverrideRequest,
     FolderImportIssue,
     FolderImportRequest,
     FolderImportResult,
@@ -30,6 +31,8 @@ from logsanitizer.database import (
     list_imported_files,
     list_projects,
     register_imported_file,
+    update_detected_format,
+    update_format_override,
 )
 
 
@@ -215,7 +218,32 @@ def project_file_detect_format(project_id: str, file_id: str) -> dict[str, str]:
         raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
     except OSError as exc:
         raise HTTPException(status_code=422, detail="Dateiformat konnte nicht geprüft werden.") from exc
-    return {"file_id": file_id, "detected_format": detected, "sample_limit_bytes": str(MAX_FORMAT_SAMPLE_BYTES)}
+    updated = update_detected_format(project_id, file_id, detected)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    return {
+        "file_id": file_id,
+        "detected_format": updated.detected_format,
+        "format_override": updated.format_override,
+        "sample_limit_bytes": MAX_FORMAT_SAMPLE_BYTES,
+    }
+
+
+@app.put(
+    "/api/projects/{project_id}/files/{file_id}/format",
+    response_model=ImportedFile,
+    tags=["files"],
+)
+def project_file_set_format(
+    project_id: str, file_id: str, payload: FormatOverrideRequest
+) -> ImportedFile:
+    """Persist a manual format override, or clear it with null."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    updated = update_format_override(project_id, file_id, payload.format_override)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    return updated
 
 
 MAX_FOLDER_FILES = 5000
