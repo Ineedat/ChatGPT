@@ -10,7 +10,8 @@
 ## Meilenstein 1 — Sicherer lokaler Kern
 - [x] Projektverwaltung: Projekte anlegen, auflisten und öffnen.
 - [x] SQLite-Metadatenschema mit Schema-Versionierung.
-- [ ] Einzeldatei-/Ordnerimport, Originale bleiben unverändert.
+- [x] Einzeldatei registrieren: nur Metadaten speichern, Original unverändert lassen.
+- [ ] Ordnerimport mit expliziter Dateiauswahl und nachvollziehbarer Fehlerliste.
 - [ ] Format-Erkennung mit explizitem Umgang mit unbekannten Formaten.
 - [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
 - [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
