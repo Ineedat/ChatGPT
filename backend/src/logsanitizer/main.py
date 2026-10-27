@@ -3,10 +3,10 @@
 Development scaffold only: sanitization, authentication, and release controls
 are not implemented yet.
 """
-import os
 import csv
 import io
 import json
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -23,8 +23,8 @@ from logsanitizer.database import (
     ImportedFile,
     Project,
     ProjectCreate,
-    create_project,
     connect_database,
+    create_project,
     get_project,
     initialize_database,
     list_imported_files,
