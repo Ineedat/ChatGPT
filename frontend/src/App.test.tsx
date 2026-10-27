@@ -116,3 +116,21 @@ describe("project file registration UI", () => {
     }));
   });
 });
+
+
+describe("local format detection UI", () => {
+  it("requests a bounded format classification explicitly", async () => {
+    const project = { id: "project-format", name: "Format", description: "", status: "draft", created_at: "2026-10-27T10:00:00+00:00", updated_at: "2026-10-27T10:00:00+00:00" };
+    const file = { id: "file-format", project_id: project.id, display_name: "events.json", size_bytes: 25, modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered", format_hint: "json" };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, detected_format: "json", sample_limit_bytes: "65536" }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Format lokal prüfen" }));
+    expect(await screen.findByText(/Stichprobe: json/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/detect-format`, { method: "POST" });
+  });
+});
