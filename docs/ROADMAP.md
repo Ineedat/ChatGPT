@@ -4,10 +4,12 @@
 - [x] Anforderungen v2.7 dokumentieren.
 - [x] FastAPI-Health-Endpunkt und Test.
 - [x] React/TypeScript-Oberfläche mit lokal eingebundener Hilfe.
+- [x] Backend-/Frontend-Tests und Frontend-Build lokal erfolgreich ausgeführt.
 - [ ] Installations- und Testbefehle unter Windows und Linux verifizieren.
 
 ## Meilenstein 1 — Sicherer lokaler Kern
-- [ ] Projektverwaltung und Metadatenschema.
+- [x] Projektverwaltung: Projekte anlegen, auflisten und öffnen.
+- [x] SQLite-Metadatenschema mit Schema-Versionierung.
 - [ ] Einzeldatei-/Ordnerimport, Originale bleiben unverändert.
 - [ ] Format-Erkennung mit explizitem Umgang mit unbekannten Formaten.
 - [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
