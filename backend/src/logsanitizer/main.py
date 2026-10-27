@@ -357,7 +357,7 @@ def project_file_sanitize(
         return {
             "file_id": file_id,
             "output_name": output.name,
-            **sanitize_file(source, output, config, payload.profile_id, selected_format),
+            **sanitize_file(source, output, config, payload.profile_id, selected_format, project_id),
         }
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
