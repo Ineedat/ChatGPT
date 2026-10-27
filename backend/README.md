@@ -12,23 +12,34 @@ uvicorn logsanitizer.main:app --reload --host 127.0.0.1 --port 8000
 
 Health check: http://127.0.0.1:8000/api/health. API docs: http://127.0.0.1:8000/api/docs.
 
-## Project metadata
+## Local metadata and source registration
 
-The first SQLite schema stores project metadata only. By default the database is
-`~/.logsanitizer/logsanitizer.sqlite3`; set `LOGSANITIZER_DATA_DIR` to select a
-different local data directory. On POSIX systems the application attempts to
-restrict the directory to owner-only access and the database file to owner
-read/write access. Filesystem permission behavior may vary by platform.
+The SQLite database stores project and source-file metadata, not log contents.
+By default it is `~/.logsanitizer/logsanitizer.sqlite3`; set
+`LOGSANITIZER_DATA_DIR` to select another local data directory. The database
+schema is versioned and upgrades the previous project-only schema to version 2.
+On POSIX systems, the application attempts owner-only directory and database
+permissions; filesystem behavior may vary by platform.
 
 Available endpoints:
 
 - `GET /api/projects` — list projects.
 - `POST /api/projects` — create a project with `name` and optional `description`.
 - `GET /api/projects/{id}` — retrieve one project.
+- `GET /api/projects/{id}/files` — list registered source-file metadata.
+- `POST /api/projects/{id}/files` — register a local source file using JSON
+  `{"path": "/absolute/path/to/application.log"}`.
 
-Creating a project does not import or process files. Project deletion, file import,
-sanitization, mapping storage, authentication, and release controls are not yet
-implemented. This scaffold is not approved for real/sensitive logs and must not
-be exposed to a network.
+File registration checks that the project exists and the source path identifies
+an existing regular file. Relative paths, directories, and final-component
+symbolic links are rejected. The API returns only the display name, size, and
+timestamps; it does not return the stored absolute path. Registering a file
+does not open or copy its contents, alter the original, detect its format, or
+start sanitization. Folder import, processing, and the UI file picker are not
+implemented yet.
+
+This scaffold is not approved for real/sensitive logs and must not be exposed to
+a network: authentication, authorization, processing, mapping protection, and
+release controls are still missing.
 
 Run tests with `pytest` and lint with `ruff check src tests`.
