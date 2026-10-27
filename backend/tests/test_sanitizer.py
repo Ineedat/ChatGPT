@@ -136,7 +136,7 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
         )
         assert response.status_code == 200
         assert response.json()["status"] == "completed"
-        assert response.json()["replacements"] == 1
+        assert response.json()["replacements"] == 2
         assert "secret" not in response.text
 
     assert (tmp_path / "clean.log").read_bytes() == b"token=REDACTED\n"
