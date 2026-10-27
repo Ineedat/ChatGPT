@@ -36,13 +36,13 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
-from logsanitizer.sanitizer import SanitizationError, sanitize_file
 from logsanitizer.rule_config import (
     RuleConfig,
     find_rule_conflicts,
     load_rule_config,
     save_rule_config,
 )
+from logsanitizer.sanitizer import SanitizationError, sanitize_file
 
 
 @asynccontextmanager
