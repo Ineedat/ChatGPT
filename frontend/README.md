@@ -26,3 +26,6 @@ werden die Hinweise JSON, JSON Lines, Text, XML und CSV; nicht zugeordnete Endun
 werden als „unbekannt“ angezeigt. Dieser Hinweis prüft den Dateiinhalt ausdrücklich
 nicht und ist keine Freigabe zur Verarbeitung. Eine echte Formaterkennung mit
 manueller Auswahl und Validierung folgt später.
+
+
+The file list offers **Format lokal prüfen** as an explicit action. It samples at most 64 KiB on the local backend and shows only a classification. The result is currently transient in the UI; full-file validation and persistent manual format selection are not implemented yet.
