@@ -17,7 +17,7 @@
 - [x] Explizite heuristische Formaterkennung anhand einer lokalen Stichprobe von höchstens 64 KiB; Ergebnis lokal speichern.
 - [x] Manuelle Format-Auswahl pro Datei speichern und wieder entfernen.
 - [x] Explizite vollständige Formatvalidierung für Text, JSON, JSON Lines, CSV und XML über Backend-Endpunkt und UI; unbekannte Formate werden nicht als gültig bestätigt. Die Validierung prüft Syntax, nicht die Erkennung sensibler Daten.
-- [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
+- [x] Versionierte JSON-Regelkonfiguration v1 mit Schema-, Regex-, Profilreferenz- und Konfliktprüfung; lokale atomare Speicherung über API. Die Regeln werden noch nicht auf Logs angewendet.
 - [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
 - [ ] Stabile Projekt-Mappings, getrennt und geschützt gespeichert.
 - [ ] Fortschritt, Abbruch, temporäre Datenbereinigung.
