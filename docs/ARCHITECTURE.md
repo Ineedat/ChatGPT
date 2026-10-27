@@ -29,6 +29,7 @@ React/TypeScript UI -> FastAPI (loopback standardmäßig)
 - GET /api/health: minimaler Liveness-Status ohne lokale Daten offenzulegen.
 - GET /api/projects/{project_id}/files: registrierte Quelldatei-Metadaten.
 - POST /api/projects/{project_id}/files: absolute lokale Quelldatei registrieren, ohne Inhalte zu lesen.
+- POST /api/projects/{project_id}/files/import-folder: Dateien eines absoluten lokalen Ordners registrieren, rekursiv optional, mit per-Datei-Fehlerliste und Limit von 5.000 Kandidaten.
 
 ## Während der Implementierung zu entscheiden
 - Verschlüsselung und Schlüsselverwaltung für persistente Mappings.
