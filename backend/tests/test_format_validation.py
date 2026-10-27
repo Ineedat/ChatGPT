@@ -10,11 +10,11 @@ def test_streaming_validator_accepts_supported_formats(tmp_path) -> None:
         "json": ("events.json", '{"event":"start","items":[1,true,null]}'),
         "jsonl": ("events.jsonl", '{"event":1}\n{"event":2}\n'),
         "xml": ("events.xml", '<?xml version="1.0"?><events><event id="1"/></events>'),
-        "csv": ("events.csv", "name,count\nalpha,1\nbeta,2\n'),
+        "csv": ("events.csv", "name,count\nalpha,1\nbeta,2\n"),
     }
-    for format_name, (filename, content) in examples.items():
+    for format_name, (filename, value) in examples.items():
         path = tmp_path / filename
-        path.write_text(content, encoding="utf-8")
+        path.write_text(value, encoding="utf-8")
         result = validate_file(path, format_name)
         assert result["valid"] is True, (format_name, result)
         assert result["bytes_checked"] == path.stat().st_size
@@ -28,9 +28,9 @@ def test_streaming_validator_rejects_invalid_files_without_echoing_contents(tmp_
         "csv": '"unterminated field',
         "text": b"invalid utf-8: \xff",
     }
-    for format_name, content in cases.items():
+    for format_name, value in cases.items():
         path = tmp_path / f"invalid.{format_name}"
-        path.write_bytes(content if isinstance(content, bytes) else content.encode("utf-8"))
+        path.write_bytes(value if isinstance(value, bytes) else value.encode("utf-8"))
         result = validate_file(path, format_name)
         assert result["valid"] is False
         assert result["error"]
@@ -65,7 +65,6 @@ def test_validation_endpoint_uses_manual_override_and_keeps_original(tmp_path, m
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
         file_id = registered["id"]
-        # Extension-based registration says text, but explicit manual selection chooses JSON.
         selected = client.put(
             f"/api/projects/{project_id}/files/{file_id}/format",
             json={"format_override": "json"},
