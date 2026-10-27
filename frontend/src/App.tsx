@@ -127,7 +127,7 @@ export default function App() {
     setError("");
     try {
       const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/detect-format`, { method: "POST" });
-      const body = await response.json() as { detected_format?: string; detail?: string };
+      const body = await response.json() as { detected_format?: string; format_override?: string | null; detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format konnte nicht erkannt werden.");
       setImportedFiles(current => current.map(item => item.id === file.id ? { ...item, detected_format: body.detected_format, format_override: body.format_override ?? item.format_override } : item));
       setImportMessage(`Format-Erkennung für ${file.display_name}: ${body.detected_format}. Es wurden höchstens 64 KiB lokal untersucht und das Ergebnis lokal gespeichert.`);
