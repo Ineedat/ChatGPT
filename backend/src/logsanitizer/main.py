@@ -14,7 +14,6 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from logsanitizer.format_validation import validate_file
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
@@ -35,6 +34,7 @@ from logsanitizer.database import (
     update_detected_format,
     update_format_override,
 )
+from logsanitizer.format_validation import validate_file
 
 
 @asynccontextmanager
