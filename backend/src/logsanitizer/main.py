@@ -4,6 +4,9 @@ Development scaffold only: sanitization, authentication, and release controls
 are not implemented yet.
 """
 import os
+import csv
+import io
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -140,6 +143,54 @@ def project_file_register(project_id: str, payload: FileImportRequest) -> Import
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Quelldatei kann nicht registriert werden.",
         ) from exc
+
+
+MAX_FORMAT_SAMPLE_BYTES = 64 * 1024
+
+def _is_json_line(line: str) -> bool:
+    try:
+        value = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(value, (dict, list))
+
+
+def detect_format_from_sample(path: Path) -> str:
+    """Classify a bounded local sample without returning source content."""
+    with path.open("rb") as source:
+        sample = source.read(MAX_FORMAT_SAMPLE_BYTES)
+    if not sample:
+        return "unknown"
+    try:
+        text = sample.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return "unknown"
+    stripped = text.lstrip()
+    if not stripped:
+        return "text"
+    if stripped.startswith(("<?xml", "<")):
+        return "xml"
+    if stripped.startswith(("{", "[")):
+        try:
+            _, end = json.JSONDecoder().raw_decode(stripped)
+            if not stripped[end:].strip():
+                return "json"
+        except json.JSONDecodeError:
+            pass
+        lines = [line for line in stripped.splitlines() if line.strip()]
+        if len(lines) > 1 and all(_is_json_line(line) for line in lines):
+            return "jsonl"
+        return "unknown"
+    if chr(0) in text:
+        return "unknown"
+    try:
+        dialect = csv.Sniffer().sniff(stripped[:8192], delimiters=",;\t|")
+        rows = list(csv.reader(io.StringIO(stripped[:8192]), dialect))
+        if len(rows) >= 2 and len(rows[0]) > 1 and all(len(row) == len(rows[0]) for row in rows[:20]):
+            return "csv"
+    except csv.Error:
+        pass
+    return "text"
 
 
 MAX_FOLDER_FILES = 5000
