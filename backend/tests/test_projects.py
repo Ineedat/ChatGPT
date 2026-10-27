@@ -255,7 +255,9 @@ def test_local_format_detection_is_explicit_and_does_not_modify_source(tmp_path,
         detected = client.post(f"/api/projects/{project_id}/files/{file_id}/detect-format")
         assert detected.status_code == 200
         assert detected.json()["detected_format"] == "json"
-        assert detected.json()["sample_limit_bytes"] == "65536"
+        assert detected.json()["sample_limit_bytes"] == 65536
+        listed_after_detection = client.get(f"/api/projects/{project_id}/files").json()
+        assert listed_after_detection[0]["detected_format"] == "json"
         assert "event" not in detected.text
         missing = client.post(f"/api/projects/{project_id}/files/missing/detect-format")
         assert missing.status_code == 404
@@ -271,3 +273,41 @@ def test_format_classifier_marks_jsonl_and_binary_unknown(tmp_path) -> None:
     binary = tmp_path / "opaque.log"
     binary.write_bytes(bytes([255, 0, 254]))
     assert detect_format_from_sample(binary) == "unknown"
+
+
+
+def test_manual_format_override_persists_and_can_be_cleared(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    source = tmp_path / "events.log"
+    source.write_text('{"event":"started"}', encoding="utf-8")
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Manual format"}).json()["id"]
+        registered = client.post(
+            f"/api/projects/{project_id}/files", json={"path": str(source)}
+        ).json()
+        file_id = registered["id"]
+
+        changed = client.put(
+            f"/api/projects/{project_id}/files/{file_id}/format",
+            json={"format_override": "json"},
+        )
+        assert changed.status_code == 200
+        assert changed.json()["format_override"] == "json"
+        assert changed.json()["detected_format"] == "unknown"
+
+        persisted = client.get(f"/api/projects/{project_id}/files").json()[0]
+        assert persisted["format_override"] == "json"
+
+        cleared = client.put(
+            f"/api/projects/{project_id}/files/{file_id}/format",
+            json={"format_override": None},
+        )
+        assert cleared.status_code == 200
+        assert cleared.json()["format_override"] is None
+
+        invalid = client.put(
+            f"/api/projects/{project_id}/files/{file_id}/format",
+            json={"format_override": "executable"},
+        )
+        assert invalid.status_code == 422
