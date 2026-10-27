@@ -1,9 +1,14 @@
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from logsanitizer.main import app
-from logsanitizer.rule_config import RuleConfig, find_rule_conflicts, load_rule_config, save_rule_config
+from logsanitizer.rule_config import (
+    RuleConfig,
+    find_rule_conflicts,
+    load_rule_config,
+    save_rule_config,
+)
 
 
 def sample_config() -> dict:
