@@ -1,6 +1,7 @@
 """Streaming execution for configured text and JSON Lines sanitization rules."""
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -86,9 +87,23 @@ def sanitize_file(
                         raise SanitizationError(
                             "Die Quelldatei ist nicht vollständig UTF-8-kodiert."
                         ) from exc
+                    if effective_format == "jsonl":
+                        try:
+                            json.loads(line)
+                        except json.JSONDecodeError as exc:
+                            raise SanitizationError(
+                                "Eine Eingabezeile ist kein gültiges JSON."
+                            ) from exc
                     for rule, pattern in compiled:
                         line, count = pattern.subn(rule.replacement, line)
                         replacement_count += count
+                    if effective_format == "jsonl":
+                        try:
+                            json.loads(line)
+                        except json.JSONDecodeError as exc:
+                            raise SanitizationError(
+                                "Eine Regel hat eine ungültige JSON-Zeile erzeugt."
+                            ) from exc
                     output_stream.write(line.encode("utf-8"))
                     processed_bytes += len(raw_line)
                     line_count += 1
