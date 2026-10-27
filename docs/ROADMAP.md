@@ -12,7 +12,7 @@
 - [x] SQLite-Metadatenschema mit Schema-Versionierung.
 - [x] Einzeldatei registrieren: nur Metadaten speichern, Original unverändert lassen.
 - [x] Backend-Ordnerregistrierung mit Fehlerliste, Duplikatbehandlung und Begrenzung auf 5.000 Dateien.
-- [ ] Grafische Ordner-/Dateiauswahl mit expliziter Bestätigung und nachvollziehbarer Fehlerliste.
+- [x] UI für Einzeldatei-/Ordnerregistrierung mit expliziter Aktion, rekursiver Option und Fehlerliste (absolute Pfade; nativer Dateiauswahldialog bleibt offen).
 - [ ] Format-Erkennung mit explizitem Umgang mit unbekannten Formaten.
 - [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
 - [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
