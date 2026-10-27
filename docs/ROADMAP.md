@@ -16,7 +16,7 @@
 - [x] Konservativer Dateiendungs-Hinweis (`format_hint`) inklusive `unknown`; keine Inhaltsprüfung bei Registrierung.
 - [x] Explizite heuristische Formaterkennung anhand einer lokalen Stichprobe von höchstens 64 KiB; Ergebnis lokal speichern.
 - [x] Manuelle Format-Auswahl pro Datei speichern und wieder entfernen.
-- [ ] Vollständige Formatvalidierung mit begrenztem Speicherbedarf sowie explizitem Umgang mit unbekannten oder widersprüchlichen Formaten.
+- [x] Explizite vollständige Formatvalidierung für Text, JSON, JSON Lines, CSV und XML über Backend-Endpunkt und UI; unbekannte Formate werden nicht als gültig bestätigt. Die Validierung prüft Syntax, nicht die Erkennung sensibler Daten.
 - [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
 - [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
 - [ ] Stabile Projekt-Mappings, getrennt und geschützt gespeichert.
