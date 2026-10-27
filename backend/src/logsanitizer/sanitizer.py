@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 
+from logsanitizer.mapping_store import get_or_create_indexed_mapping
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
 
 MAX_LINE_BYTES = 1024 * 1024
@@ -30,6 +31,7 @@ def sanitize_file(
     config: RuleConfig,
     profile_id: str | None = None,
     format_name: str | None = None,
+    project_id: str | None = None,
 ) -> dict[str, int | str]:
     """Sanitize UTF-8 text/JSONL one bounded line at a time; never modify the source."""
     source = source_path.expanduser()
@@ -59,6 +61,8 @@ def sanitize_file(
     ]
     rules.sort(key=lambda rule: rule.priority)
     compiled = [(rule, _compiled_rule(rule)) for rule in rules]
+    if project_id is None and any(rule.replacement_mode == "indexed" for rule in rules):
+        raise SanitizationError("Indexierte Ersetzungen benötigen eine Projekt-ID.")
 
     processed_bytes = 0
     replacement_count = 0
@@ -95,7 +99,17 @@ def sanitize_file(
                                 "Eine Eingabezeile ist kein gültiges JSON."
                             ) from exc
                     for rule, pattern in compiled:
-                        line, count = pattern.subn(rule.replacement, line)
+                        if rule.replacement_mode == "indexed":
+                            assert project_id is not None
+                            prefix = rule.mapping_prefix or rule.category
+                            line, count = pattern.subn(
+                                lambda match: get_or_create_indexed_mapping(
+                                    project_id, rule.category, prefix, match.group(0)
+                                ),
+                                line,
+                            )
+                        else:
+                            line, count = pattern.subn(rule.replacement, line)
                         replacement_count += count
                     if effective_format == "jsonl":
                         try:
