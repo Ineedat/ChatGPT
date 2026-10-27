@@ -137,3 +137,79 @@ def test_file_registration_requires_existing_project(tmp_path, monkeypatch) -> N
         )
 
     assert response.status_code == 404
+
+
+def test_folder_import_registers_files_and_reports_duplicates(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    folder = tmp_path / "logs"
+    nested = folder / "nested"
+    nested.mkdir(parents=True)
+    first = folder / "one.log"
+    second = nested / "two.log"
+    first.write_text("token=secret-one", encoding="utf-8")
+    second.write_text("token=secret-two", encoding="utf-8")
+    first_before = first.read_bytes()
+    second_before = second.read_bytes()
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Folder import"}).json()["id"]
+        response = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": str(folder)},
+        )
+        assert response.status_code == 200
+        result = response.json()
+        assert result["registered_count"] == 2
+        assert result["skipped_count"] == 0
+        assert {item["display_name"] for item in result["registered_files"]} == {
+            "one.log",
+            "two.log",
+        }
+        assert all("source_path" not in item for item in result["registered_files"])
+
+        repeated = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": str(folder)},
+        )
+        assert repeated.status_code == 200
+        assert repeated.json()["registered_count"] == 0
+        assert repeated.json()["skipped_count"] == 2
+        assert all("bereits" in issue["reason"] for issue in repeated.json()["issues"])
+
+    assert first.read_bytes() == first_before
+    assert second.read_bytes() == second_before
+
+
+def test_folder_import_nonrecursive_and_invalid_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    folder = tmp_path / "logs"
+    nested = folder / "nested"
+    nested.mkdir(parents=True)
+    (folder / "top.log").write_text("top", encoding="utf-8")
+    (nested / "nested.log").write_text("nested", encoding="utf-8")
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Folder import"}).json()["id"]
+        nonrecursive = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": str(folder), "recursive": False},
+        )
+        relative = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": "relative-folder"},
+        )
+        missing = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": str(tmp_path / "missing")},
+        )
+        file_path = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": str(folder / "top.log")},
+        )
+
+    assert nonrecursive.status_code == 200
+    assert nonrecursive.json()["registered_count"] == 1
+    assert nonrecursive.json()["registered_files"][0]["display_name"] == "top.log"
+    assert relative.status_code == 422
+    assert missing.status_code == 404
+    assert file_path.status_code == 422
