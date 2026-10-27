@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
@@ -35,6 +36,7 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
+from logsanitizer.sanitizer import SanitizationError, sanitize_file
 from logsanitizer.rule_config import (
     RuleConfig,
     find_rule_conflicts,
@@ -315,6 +317,58 @@ def rules_config_put(payload: RuleConfig) -> RuleConfig:
     except OSError as exc:
         raise HTTPException(status_code=500, detail="Regelkonfiguration konnte nicht gespeichert werden.") from exc
     return payload
+
+
+class SanitizationRequest(BaseModel):
+    output_path: str = Field(min_length=1, max_length=4096)
+    profile_id: str | None = Field(default=None, max_length=64)
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/sanitize", tags=["sanitization"])
+def project_file_sanitize(
+    project_id: str, file_id: str, payload: SanitizationRequest
+) -> dict[str, int | str]:
+    """Apply local rules to supported UTF-8 text/JSONL and write a separate output file."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+
+    source = Path(row["source_path"])
+    output = Path(payload.output_path).expanduser()
+    selected_format = row["format_override"] or row["detected_format"]
+    if selected_format not in {"text", "jsonl"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Vor der Bereinigung muss das Format als Text oder JSON Lines ausgewählt bzw. erkannt sein.",
+        )
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    try:
+        config = load_rule_config()
+        if find_rule_conflicts(config):
+            raise HTTPException(status_code=409, detail="Regelkonflikte müssen vor der Bereinigung behoben werden.")
+        return {
+            "file_id": file_id,
+            "output_name": output.name,
+            **sanitize_file(source, output, config, payload.profile_id),
+        }
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
+    except SanitizationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf Quell- oder Zieldatei.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Datei konnte nicht bereinigt werden.") from exc
 
 
 MAX_FOLDER_FILES = 5000
