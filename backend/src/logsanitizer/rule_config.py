@@ -47,7 +47,7 @@ class SanitizationRule(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_regex(self) -> "SanitizationRule":
+    def validate_regex(self) -> SanitizationRule:
         if self.match_type == "regex":
             try:
                 re.compile(self.pattern, 0 if self.case_sensitive else re.IGNORECASE)
@@ -66,7 +66,7 @@ class RuleConfig(BaseModel):
     rules: list[SanitizationRule] = Field(default_factory=list, max_length=2000)
 
     @model_validator(mode="after")
-    def validate_references_and_ids(self) -> "RuleConfig":
+    def validate_references_and_ids(self) -> RuleConfig:
         profile_ids = [profile.id for profile in self.profiles]
         if len(profile_ids) != len(set(profile_ids)):
             raise ValueError("Profil-IDs müssen eindeutig sein.")
