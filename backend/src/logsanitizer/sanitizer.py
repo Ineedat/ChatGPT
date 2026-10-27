@@ -103,8 +103,10 @@ def sanitize_file(
                             assert project_id is not None
                             prefix = rule.mapping_prefix or rule.category
                             line, count = pattern.subn(
-                                lambda match: get_or_create_indexed_mapping(
-                                    project_id, rule.category, prefix, match.group(0)
+                                lambda match, project_id=project_id, category=rule.category, prefix=prefix: (
+                                    get_or_create_indexed_mapping(
+                                        project_id, category, prefix, match.group(0)
+                                    )
                                 ),
                                 line,
                             )
