@@ -46,7 +46,9 @@ def sanitize_file(
     if profile_id is not None and profile_id not in {p.id for p in config.profiles}:
         raise SanitizationError("Das angegebene Quellprofil ist nicht definiert.")
 
-    effective_format = format_name or ("jsonl" if source.suffix.casefold() in {".jsonl", ".ndjson"} else "text")
+    effective_format = format_name or (
+        "jsonl" if source.suffix.casefold() in {".jsonl", ".ndjson"} else "text"
+    )
     if effective_format not in {"text", "jsonl"}:
         raise SanitizationError("Unterstützt werden derzeit Textdateien und JSON Lines (UTF-8).")
 
@@ -57,8 +59,6 @@ def sanitize_file(
     rules.sort(key=lambda rule: rule.priority)
     compiled = [(rule, _compiled_rule(rule)) for rule in rules]
 
-    # Exclusive creation prevents overwriting an existing destination. Failed runs remove
-    # their partial output; the source is opened read-only throughout.
     processed_bytes = 0
     replacement_count = 0
     line_count = 0
@@ -74,27 +74,29 @@ def sanitize_file(
                     pass
                 while True:
                     raw_line = input_stream.readline(MAX_LINE_BYTES + 1)
-                if not raw_line:
-                    break
-                if len(raw_line) > MAX_LINE_BYTES:
-                    raise SanitizationError(
-                        f"Eine Zeile überschreitet das Limit von {MAX_LINE_BYTES} Bytes."
-                    )
-                try:
-                    line = raw_line.decode("utf-8")
-                except UnicodeDecodeError as exc:
-                    raise SanitizationError("Die Quelldatei ist nicht vollständig UTF-8-kodiert.") from exc
-                for rule, pattern in compiled:
-                    line, count = pattern.subn(rule.replacement, line)
-                    replacement_count += count
-                encoded = line.encode("utf-8")
-                output_stream.write(encoded)
-                processed_bytes += len(raw_line)
-                line_count += 1
-            output_stream.flush()
-            os.fsync(output_stream.fileno())
+                    if not raw_line:
+                        break
+                    if len(raw_line) > MAX_LINE_BYTES:
+                        raise SanitizationError(
+                            f"Eine Zeile überschreitet das Limit von {MAX_LINE_BYTES} Bytes."
+                        )
+                    try:
+                        line = raw_line.decode("utf-8")
+                    except UnicodeDecodeError as exc:
+                        raise SanitizationError(
+                            "Die Quelldatei ist nicht vollständig UTF-8-kodiert."
+                        ) from exc
+                    for rule, pattern in compiled:
+                        line, count = pattern.subn(rule.replacement, line)
+                        replacement_count += count
+                    output_stream.write(line.encode("utf-8"))
+                    processed_bytes += len(raw_line)
+                    line_count += 1
+                output_stream.flush()
+                os.fsync(output_stream.fileno())
     except Exception:
-        destination.unlink(missing_ok=True)
+        if output_created:
+            destination.unlink(missing_ok=True)
         raise
 
     return {
