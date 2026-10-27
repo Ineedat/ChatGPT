@@ -35,6 +35,12 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
+from logsanitizer.rule_config import (
+    RuleConfig,
+    find_rule_conflicts,
+    load_rule_config,
+    save_rule_config,
+)
 
 
 @asynccontextmanager
@@ -271,6 +277,44 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
     except OSError as exc:
         raise HTTPException(status_code=422, detail="Quelldatei konnte nicht geprüft werden.") from exc
     return {"file_id": file_id, **result}
+
+
+@app.get("/api/rules/config", response_model=RuleConfig, tags=["rules"])
+def rules_config_get() -> RuleConfig:
+    """Return the local versioned rule configuration."""
+    try:
+        return load_rule_config()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/api/rules/config/validate", tags=["rules"])
+def rules_config_validate(payload: RuleConfig) -> dict[str, object]:
+    """Validate schema and report exact-priority conflicts without saving."""
+    conflicts = find_rule_conflicts(payload)
+    return {
+        "schema_version": payload.schema_version,
+        "valid": not conflicts,
+        "rule_count": len(payload.rules),
+        "profile_count": len(payload.profiles),
+        "conflicts": conflicts,
+    }
+
+
+@app.put("/api/rules/config", response_model=RuleConfig, tags=["rules"])
+def rules_config_put(payload: RuleConfig) -> RuleConfig:
+    """Persist only schema-valid, conflict-free rules using an atomic local write."""
+    conflicts = find_rule_conflicts(payload)
+    if conflicts:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "Regelkonflikte müssen vor dem Speichern behoben werden.", "conflicts": conflicts},
+        )
+    try:
+        save_rule_config(payload)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration konnte nicht gespeichert werden.") from exc
+    return payload
 
 
 MAX_FOLDER_FILES = 5000
