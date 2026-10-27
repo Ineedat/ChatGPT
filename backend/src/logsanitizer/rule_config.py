@@ -34,6 +34,8 @@ class SanitizationRule(BaseModel):
     match_type: Literal["plain", "regex"]
     pattern: str = Field(min_length=1, max_length=2000)
     replacement: str = Field(min_length=1, max_length=200)
+    replacement_mode: Literal["fixed", "indexed"] = "fixed"
+    mapping_prefix: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9]{0,31}$")
     case_sensitive: bool = False
     priority: int = Field(default=100, ge=1, le=10000)
     profile_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
@@ -48,6 +50,11 @@ class SanitizationRule(BaseModel):
 
     @model_validator(mode="after")
     def validate_regex(self) -> SanitizationRule:
+        if self.replacement_mode == "indexed" and self.mapping_prefix is None:
+            normalized = re.sub(r"[^A-Za-z0-9]", "", self.category).upper()
+            if not normalized or not normalized[0].isalpha():
+                raise ValueError("Für indexierte Ersetzungen muss ein gültiger mapping_prefix angegeben werden.")
+            self.mapping_prefix = normalized[:32]
         if self.match_type == "regex":
             try:
                 re.compile(self.pattern, 0 if self.case_sensitive else re.IGNORECASE)
