@@ -66,6 +66,7 @@ def test_register_source_file_keeps_original_unchanged(tmp_path, monkeypatch) ->
         assert metadata["display_name"] == "service.log"
         assert metadata["size_bytes"] == len(original)
         assert metadata["state"] == "registered"
+        assert metadata["format_hint"] == "text"
         assert "source_path" not in metadata
         assert str(source) not in imported.text
 
@@ -213,3 +214,29 @@ def test_folder_import_nonrecursive_and_invalid_paths(tmp_path, monkeypatch) -> 
     assert relative.status_code == 422
     assert missing.status_code == 404
     assert file_path.status_code == 422
+
+
+
+def test_format_hint_uses_extension_and_leaves_unknown_explicit(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    folder = tmp_path / "logs"
+    folder.mkdir()
+    for name in ("events.json", "events.ndjson", "report.xml", "table.csv", "opaque.data"):
+        (folder / name).write_text("contents are not inspected", encoding="utf-8")
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Format hints"}).json()["id"]
+        response = client.post(
+            f"/api/projects/{project_id}/files/import-folder",
+            json={"path": str(folder)},
+        )
+
+    assert response.status_code == 200
+    hints = {item["display_name"]: item["format_hint"] for item in response.json()["registered_files"]}
+    assert hints == {
+        "events.json": "json",
+        "events.ndjson": "jsonl",
+        "report.xml": "xml",
+        "table.csv": "csv",
+        "opaque.data": "unknown",
+    }

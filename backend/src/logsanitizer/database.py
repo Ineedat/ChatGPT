@@ -169,6 +169,23 @@ class ImportedFile(BaseModel):
     modified_at: str
     imported_at: str
     state: str = "registered"
+    format_hint: str = "unknown"
+
+
+def format_hint_for_name(name: str) -> str:
+    """Suggest a format from the extension only; never inspect file contents."""
+    suffix = Path(name).suffix.casefold()
+    if suffix in {".jsonl", ".ndjson"}:
+        return "jsonl"
+    if suffix == ".json":
+        return "json"
+    if suffix in {".log", ".txt", ".out", ".err"}:
+        return "text"
+    if suffix == ".xml":
+        return "xml"
+    if suffix == ".csv":
+        return "csv"
+    return "unknown"
 
 
 class FolderImportRequest(BaseModel):
@@ -247,7 +264,9 @@ def create_project(payload: ProjectCreate) -> Project:
 
 
 def _imported_file_from_row(row: sqlite3.Row) -> ImportedFile:
-    return ImportedFile(**dict(row))
+    values = dict(row)
+    values["format_hint"] = format_hint_for_name(values["display_name"])
+    return ImportedFile(**values)
 
 
 def list_imported_files(project_id: str) -> list[ImportedFile]:

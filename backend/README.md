@@ -42,8 +42,11 @@ import is enabled by default; set `recursive` to `false` to include only direct
 children. The endpoint processes at most 5,000 candidate files per request,
 skips symbolic links, reports duplicate/permission/other per-file failures, and
 returns counts plus a per-file issue list. It registers file metadata only: it
-does not read or copy file contents, modify originals, detect formats, or start
-sanitization. A graphical folder picker is not implemented yet.
+does not read or copy file contents, modify originals, or start sanitization. The
+response includes a `format_hint` inferred only from the filename extension (`json`,
+`jsonl`, `text`, `xml`, `csv`, or `unknown`). This is not content validation; an
+unknown extension stays `unknown`, and the hint must not be treated as proof of the
+actual format. A graphical folder picker is not implemented yet.
 
 This scaffold is not approved for real/sensitive logs and must not be exposed to
 a network: authentication, authorization, processing, mapping protection, and
