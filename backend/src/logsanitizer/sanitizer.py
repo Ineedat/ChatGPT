@@ -62,14 +62,18 @@ def sanitize_file(
     processed_bytes = 0
     replacement_count = 0
     line_count = 0
+    output_created = False
     try:
-        with source.open("rb") as input_stream, destination.open("xb") as output_stream:
-            try:
-                os.chmod(destination, 0o600)
-            except OSError:
-                pass
-            while True:
-                raw_line = input_stream.readline(MAX_LINE_BYTES + 1)
+        with source.open("rb") as input_stream:
+            output_stream = destination.open("xb")
+            output_created = True
+            with output_stream:
+                try:
+                    os.chmod(destination, 0o600)
+                except OSError:
+                    pass
+                while True:
+                    raw_line = input_stream.readline(MAX_LINE_BYTES + 1)
                 if not raw_line:
                     break
                 if len(raw_line) > MAX_LINE_BYTES:
