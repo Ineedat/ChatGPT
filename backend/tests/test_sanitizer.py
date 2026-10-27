@@ -145,20 +145,20 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
 
 def test_jsonl_is_validated_before_and_after_rule_execution(tmp_path: Path) -> None:
     source = tmp_path / "events.jsonl"
-    original = b'{"message":"secret=alpha"}\\n'
+    original = b'{"message":"secret=alpha"}\n'
     source.write_bytes(original)
     destination = tmp_path / "clean.jsonl"
 
     result = sanitize_file(source, destination, config(), format_name="jsonl")
 
-    assert destination.read_bytes() == b'{"message":"hidden=REDACTED"}\\n'
+    assert destination.read_bytes() == b'{"message":"hidden=REDACTED"}\n'
     assert result["replacements"] == 2
     assert source.read_bytes() == original
 
 
 def test_invalid_jsonl_is_rejected_and_partial_output_removed(tmp_path: Path) -> None:
     source = tmp_path / "events.jsonl"
-    original = b'{"message":"ok"}\\nnot-json\\n'
+    original = b'{"message":"ok"}\nnot-json\n'
     source.write_bytes(original)
     destination = tmp_path / "clean.jsonl"
 
