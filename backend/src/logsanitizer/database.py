@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Iterator
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
@@ -24,7 +26,9 @@ def database_path() -> Path:
     return data_dir / "logsanitizer.sqlite3"
 
 
-def connect_database() -> sqlite3.Connection:
+@contextmanager
+def connect_database() -> Iterator[sqlite3.Connection]:
+    """Open one short-lived connection and always close it."""
     path = database_path()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     try:
@@ -32,15 +36,22 @@ def connect_database() -> sqlite3.Connection:
     except OSError:
         # Windows and some filesystems do not support POSIX permission bits.
         pass
+
     connection = sqlite3.connect(path, timeout=5.0)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     try:
-        if path.exists():
+        try:
             os.chmod(path, 0o600)
-    except OSError:
-        pass
-    return connection
+        except OSError:
+            pass
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def initialize_database() -> None:
