@@ -5,13 +5,18 @@ are not implemented yet.
 """
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from logsanitizer.database import (
+    FileAlreadyRegisteredError,
     FileImportRequest,
+    FolderImportRequest,
+    FolderImportResult,
+    FolderImportIssue,
     ImportedFile,
     Project,
     ProjectCreate,
@@ -115,6 +120,11 @@ def project_file_register(project_id: str, payload: FileImportRequest) -> Import
                 detail="Der Quellpfad muss auf eine reguläre Datei zeigen.",
             )
         return register_imported_file(project_id, resolved)
+    except FileAlreadyRegisteredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Diese Quelldatei ist bereits in diesem Projekt registriert.",
+        ) from exc
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -130,3 +140,127 @@ def project_file_register(project_id: str, payload: FileImportRequest) -> Import
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Quelldatei kann nicht registriert werden.",
         ) from exc
+
+
+MAX_FOLDER_FILES = 5000
+
+
+@app.post(
+    "/api/projects/{project_id}/files/import-folder",
+    response_model=FolderImportResult,
+    status_code=status.HTTP_200_OK,
+    tags=["files"],
+)
+def project_folder_import(
+    project_id: str, payload: FolderImportRequest
+) -> FolderImportResult:
+    """Register files under a folder; never reads their contents."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+
+    folder = Path(payload.path).expanduser()
+    if not folder.is_absolute():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Bitte einen absoluten lokalen Ordnerpfad angeben.",
+        )
+    if folder.is_symlink():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Symbolische Links werden nicht als Importordner akzeptiert.",
+        )
+    try:
+        folder = folder.resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Importordner nicht gefunden."
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Kein Zugriff auf den Importordner."
+        ) from exc
+    if not folder.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Der Importpfad muss auf einen Ordner zeigen.",
+        )
+
+    registered: list[ImportedFile] = []
+    issues: list[FolderImportIssue] = []
+    candidates = 0
+
+    def walk_error(error: OSError) -> None:
+        issues.append(
+            FolderImportIssue(
+                file_name=Path(error.filename or folder.name).name,
+                reason="Ordner kann nicht gelesen werden.",
+            )
+        )
+
+    for current_root, dir_names, file_names in os.walk(
+        folder, topdown=True, followlinks=False, onerror=walk_error
+    ):
+        current = Path(current_root)
+        blocked_dirs = []
+        for name in dir_names:
+            path = current / name
+            if path.is_symlink():
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Symbolischer Ordnerlink übersprungen.")
+                )
+            else:
+                blocked_dirs.append(name)
+        dir_names[:] = blocked_dirs if payload.recursive else []
+
+        for name in sorted(file_names, key=str.casefold):
+            candidate = current / name
+            candidates += 1
+            if candidates > MAX_FOLDER_FILES:
+                issues.append(
+                    FolderImportIssue(
+                        file_name=name,
+                        reason=f"Limit von {MAX_FOLDER_FILES} Dateien erreicht; Rest übersprungen.",
+                    )
+                )
+                dir_names[:] = []
+                break
+            if candidate.is_symlink():
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Symbolischer Datei-Link übersprungen.")
+                )
+                continue
+            try:
+                resolved = candidate.resolve(strict=True)
+                if not resolved.is_file():
+                    issues.append(
+                        FolderImportIssue(file_name=name, reason="Keine reguläre Datei.")
+                    )
+                    continue
+                registered.append(register_imported_file(project_id, resolved))
+            except FileAlreadyRegisteredError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Bereits in diesem Projekt registriert.")
+                )
+            except PermissionError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Kein Zugriff auf die Datei.")
+                )
+            except FileNotFoundError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Datei wurde während des Imports entfernt.")
+                )
+            except OSError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Datei kann nicht registriert werden.")
+                )
+
+        if candidates > MAX_FOLDER_FILES:
+            break
+
+    return FolderImportResult(
+        registered_count=len(registered),
+        skipped_count=len(issues),
+        registered_files=registered,
+        issues=issues,
+        limit_reached=candidates > MAX_FOLDER_FILES,
+    )
