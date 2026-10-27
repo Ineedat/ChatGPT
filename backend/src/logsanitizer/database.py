@@ -244,6 +244,13 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
     imported_at = datetime.now(UTC).isoformat(timespec="seconds")
     file_id = str(uuid4())
     with connect_database() as connection:
+        existing = connection.execute(
+            "SELECT id, project_id, display_name, size_bytes, modified_at, imported_at "
+            "FROM imported_files WHERE project_id = ? AND source_path = ?",
+            (project_id, absolute_path),
+        ).fetchone()
+        if existing is not None:
+            raise FileAlreadyRegisteredError
         connection.execute(
             """
             INSERT INTO imported_files
@@ -269,3 +276,7 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
         ).fetchone()
     assert row is not None
     return _imported_file_from_row(row)
+
+
+class FileAlreadyRegisteredError(Exception):
+    """Raised when the same canonical source path is already in the project."""
