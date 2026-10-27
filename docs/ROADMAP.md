@@ -11,7 +11,8 @@
 - [x] Projektverwaltung: Projekte anlegen, auflisten und öffnen.
 - [x] SQLite-Metadatenschema mit Schema-Versionierung.
 - [x] Einzeldatei registrieren: nur Metadaten speichern, Original unverändert lassen.
-- [ ] Ordnerimport mit expliziter Dateiauswahl und nachvollziehbarer Fehlerliste.
+- [x] Backend-Ordnerregistrierung mit Fehlerliste, Duplikatbehandlung und Begrenzung auf 5.000 Dateien.
+- [ ] Grafische Ordner-/Dateiauswahl mit expliziter Bestätigung und nachvollziehbarer Fehlerliste.
 - [ ] Format-Erkennung mit explizitem Umgang mit unbekannten Formaten.
 - [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
 - [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
