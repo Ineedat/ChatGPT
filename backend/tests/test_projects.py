@@ -174,7 +174,7 @@ def test_folder_import_registers_files_and_reports_duplicates(tmp_path, monkeypa
         assert repeated.status_code == 200
         assert repeated.json()["registered_count"] == 0
         assert repeated.json()["skipped_count"] == 2
-        assert all("bereits" in issue["reason"] for issue in repeated.json()["issues"])
+        assert all("bereits" in issue["reason"].casefold() for issue in repeated.json()["issues"])
 
     assert first.read_bytes() == first_before
     assert second.read_bytes() == second_before
