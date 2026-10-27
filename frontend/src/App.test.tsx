@@ -152,3 +152,21 @@ describe("local format detection UI", () => {
     }));
   });
 });
+
+
+describe("full format validation UI", () => {
+  it("validates the selected format and displays only validation metadata", async () => {
+    const project = { id: "project-validation", name: "Validierung", description: "", status: "draft", created_at: "2026-10-27T10:00:00+00:00", updated_at: "2026-10-27T10:00:00+00:00" };
+    const file = { id: "file-validation", project_id: project.id, display_name: "events.json", size_bytes: 25, modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered", format_hint: "json", detected_format: "json", format_override: null };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, format: "json", valid: true, bytes_checked: 25 }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Vollständig validieren" }));
+    expect(await screen.findByText(/Format gültig · json · 25 Byte geprüft/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/validate-format`, { method: "POST" });
+  });
+});
