@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from logsanitizer.database import (
+from logsanitizer.format_validation import validate_file\nfrom logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
     FolderImportIssue,
@@ -244,6 +244,32 @@ def project_file_set_format(
     if updated is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
     return updated
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/validate-format", tags=["files"])
+def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str | int | bool]:
+    """Validate the entire source file locally using the effective selected format."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    source = Path(row["source_path"])
+    if source.is_symlink() or not source.is_file():
+        raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
+    selected_format = row["format_override"] or row["detected_format"]
+    try:
+        result = validate_file(source, selected_format)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Quelldatei konnte nicht geprüft werden.") from exc
+    return {"file_id": file_id, **result}
 
 
 MAX_FOLDER_FILES = 5000
