@@ -245,7 +245,7 @@ def test_format_hint_uses_extension_and_leaves_unknown_explicit(tmp_path, monkey
 def test_local_format_detection_is_explicit_and_does_not_modify_source(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
     source = tmp_path / "events.json"
-    original = b'{"event":"started","count":1}\\n'
+    original = b'{"event":"started","count":1}\n'
     source.write_bytes(original)
 
     with TestClient(app) as client:
@@ -266,7 +266,7 @@ def test_local_format_detection_is_explicit_and_does_not_modify_source(tmp_path,
 def test_format_classifier_marks_jsonl_and_binary_unknown(tmp_path) -> None:
     from logsanitizer.main import detect_format_from_sample
     jsonl = tmp_path / "events.data"
-    jsonl.write_text('{"event":1}\\n{"event":2}\\n', encoding="utf-8")
+    jsonl.write_text('{"event":1}\n{"event":2}\n', encoding="utf-8")
     assert detect_format_from_sample(jsonl) == "jsonl"
     binary = tmp_path / "opaque.log"
     binary.write_bytes(bytes([255, 0, 254]))
