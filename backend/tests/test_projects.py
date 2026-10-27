@@ -240,3 +240,34 @@ def test_format_hint_uses_extension_and_leaves_unknown_explicit(tmp_path, monkey
         "table.csv": "csv",
         "opaque.data": "unknown",
     }
+
+
+def test_local_format_detection_is_explicit_and_does_not_modify_source(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    source = tmp_path / "events.json"
+    original = b'{"event":"started","count":1}\\n'
+    source.write_bytes(original)
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Detection"}).json()["id"]
+        registered = client.post(f"/api/projects/{project_id}/files", json={"path": str(source)})
+        file_id = registered.json()["id"]
+        detected = client.post(f"/api/projects/{project_id}/files/{file_id}/detect-format")
+        assert detected.status_code == 200
+        assert detected.json()["detected_format"] == "json"
+        assert detected.json()["sample_limit_bytes"] == "65536"
+        assert "event" not in detected.text
+        missing = client.post(f"/api/projects/{project_id}/files/missing/detect-format")
+        assert missing.status_code == 404
+
+    assert source.read_bytes() == original
+
+
+def test_format_classifier_marks_jsonl_and_binary_unknown(tmp_path) -> None:
+    from logsanitizer.main import detect_format_from_sample
+    jsonl = tmp_path / "events.data"
+    jsonl.write_text('{"event":1}\\n{"event":2}\\n', encoding="utf-8")
+    assert detect_format_from_sample(jsonl) == "jsonl"
+    binary = tmp_path / "opaque.log"
+    binary.write_bytes(bytes([255, 0, 254]))
+    assert detect_format_from_sample(binary) == "unknown"
