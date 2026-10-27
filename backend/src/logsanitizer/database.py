@@ -171,6 +171,32 @@ class ImportedFile(BaseModel):
     state: str = "registered"
 
 
+class FolderImportRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+    recursive: bool = True
+
+    @field_validator("path")
+    @classmethod
+    def normalize_path(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Ordnerpfad darf nicht leer sein.")
+        return value
+
+
+class FolderImportIssue(BaseModel):
+    file_name: str
+    reason: str
+
+
+class FolderImportResult(BaseModel):
+    registered_count: int
+    skipped_count: int
+    registered_files: list[ImportedFile]
+    issues: list[FolderImportIssue]
+    limit_reached: bool = False
+
+
 def _project_from_row(row: sqlite3.Row) -> Project:
     return Project(**dict(row))
 
