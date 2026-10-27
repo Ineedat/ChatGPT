@@ -13,7 +13,10 @@
 - [x] Einzeldatei registrieren: nur Metadaten speichern, Original unverändert lassen.
 - [x] Backend-Ordnerregistrierung mit Fehlerliste, Duplikatbehandlung und Begrenzung auf 5.000 Dateien.
 - [x] UI für Einzeldatei-/Ordnerregistrierung mit expliziter Aktion, rekursiver Option und Fehlerliste (absolute Pfade; nativer Dateiauswahldialog bleibt offen).
-- [x] Konservativer Dateiendungs-Hinweis (`format_hint`) inklusive `unknown`; keine Inhaltsprüfung bei Registrierung.\n- [ ] Echte Format-Erkennung/-Validierung mit manueller Auswahl und explizitem Umgang mit unbekannten oder widersprüchlichen Formaten.
+- [x] Konservativer Dateiendungs-Hinweis (`format_hint`) inklusive `unknown`; keine Inhaltsprüfung bei Registrierung.
+- [x] Explizite heuristische Formaterkennung anhand einer lokalen Stichprobe von höchstens 64 KiB; Ergebnis lokal speichern.
+- [x] Manuelle Format-Auswahl pro Datei speichern und wieder entfernen.
+- [ ] Vollständige Formatvalidierung mit begrenztem Speicherbedarf sowie explizitem Umgang mit unbekannten oder widersprüchlichen Formaten.
 - [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
 - [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
 - [ ] Stabile Projekt-Mappings, getrennt und geschützt gespeichert.
