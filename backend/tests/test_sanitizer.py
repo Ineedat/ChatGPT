@@ -167,3 +167,52 @@ def test_invalid_jsonl_is_rejected_and_partial_output_removed(tmp_path: Path) ->
 
     assert not destination.exists()
     assert source.read_bytes() == original
+
+
+def indexed_config() -> RuleConfig:
+    data = config().model_dump(mode="json")
+    data["rules"] = [{
+        "id": "indexed-ip",
+        "name": "Indexed IP",
+        "category": "network",
+        "match_type": "plain",
+        "pattern": "192.0.2.10",
+        "replacement": "[IP]",
+        "replacement_mode": "indexed",
+        "mapping_prefix": "IP",
+        "priority": 10,
+    }]
+    return RuleConfig.model_validate(data)
+
+
+def test_indexed_mapping_is_stable_across_files_and_isolated_by_project(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LOGSANITIZER_MAPPINGS_DIR", str(tmp_path / "mappings"))
+    cfg = indexed_config()
+    first = tmp_path / "first.log"
+    second = tmp_path / "second.log"
+    third = tmp_path / "third.log"
+    first.write_text("client=192.0.2.10 other=192.0.2.11\\n", encoding="utf-8")
+    second.write_text("again=192.0.2.10\\n", encoding="utf-8")
+    third.write_text("again=192.0.2.10\\n", encoding="utf-8")
+
+    sanitize_file(first, tmp_path / "first.clean", cfg, project_id="project-a")
+    sanitize_file(second, tmp_path / "second.clean", cfg, project_id="project-a")
+    sanitize_file(third, tmp_path / "third.clean", cfg, project_id="project-b")
+
+    assert (tmp_path / "first.clean").read_text(encoding="utf-8") == (
+        "client=[IP_1] other=[IP_2]\\n"
+    )
+    assert (tmp_path / "second.clean").read_text(encoding="utf-8") == "again=[IP_1]\\n"
+    assert (tmp_path / "third.clean").read_text(encoding="utf-8") == "again=[IP_1]\\n"
+    assert first.read_text(encoding="utf-8") == "client=192.0.2.10 other=192.0.2.11\\n"
+    assert second.read_text(encoding="utf-8") == "again=192.0.2.10\\n"
+
+
+def test_indexed_mapping_requires_project_id(tmp_path: Path) -> None:
+    source = tmp_path / "source.log"
+    source.write_text("192.0.2.10\\n", encoding="utf-8")
+
+    with pytest.raises(SanitizationError, match="Projekt-ID"):
+        sanitize_file(source, tmp_path / "clean.log", indexed_config())
