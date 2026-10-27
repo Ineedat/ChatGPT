@@ -3,9 +3,9 @@
 Development scaffold only: sanitization, authentication, and release controls
 are not implemented yet.
 """
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
