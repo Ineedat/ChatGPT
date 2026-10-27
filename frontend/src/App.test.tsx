@@ -42,8 +42,8 @@ describe("LogSanitizer app shell", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response);
 
     render(<App />);
-    fireEvent.change(screen.getByLabelText("Projektname"), { target: { value: "Testprojekt" } });
-    fireEvent.change(screen.getByLabelText(/Beschreibung/), { target: { value: "Testbeschreibung" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Projektname" }), { target: { value: "Testprojekt" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /Beschreibung/ }), { target: { value: "Testbeschreibung" } });
     fireEvent.click(screen.getByRole("button", { name: "Projekt anlegen" }));
 
     expect(await screen.findByRole("heading", { name: "Testprojekt" })).toBeInTheDocument();

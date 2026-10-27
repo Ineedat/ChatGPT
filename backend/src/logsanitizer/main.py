@@ -3,8 +3,8 @@
 Development scaffold only: sanitization, authentication, and release controls
 are not implemented yet.
 """
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
