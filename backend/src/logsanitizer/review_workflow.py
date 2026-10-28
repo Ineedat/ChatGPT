@@ -15,6 +15,8 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
+from logsanitizer.notifications import notify_returned_run
+
 router = APIRouter(prefix="/api/reviews", tags=["review"])
 VALID_STATUSES = {
     "queued", "running", "pending_review", "returned", "approved",
@@ -513,7 +515,9 @@ def approve_run(run_id: str, payload: ReviewDecision, request: Request) -> dict:
 
 @router.post("/runs/{run_id}/return")
 def return_run(run_id: str, payload: ReviewDecision, request: Request) -> dict:
-    return _decide(run_id, "return", payload, request)
+    result = _decide(run_id, "return", payload, request)
+    notify_returned_run(result)
+    return result
 
 
 @router.post("/runs/{run_id}/stop")
