@@ -16,14 +16,12 @@ describe("LogSanitizer app shell", () => {
   });
 
   it("shows the development-only warning", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     expect(screen.getByText(/Noch nicht für echte Logdaten freigegeben/i)).toBeInTheDocument();
     await screen.findByText(/Noch keine Projekte vorhanden/);
   });
 
   it("offers local help topics", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Hilfe" }));
     expect(await screen.findByRole("heading", { name: "Hilfe und Grundlagen" })).toBeInTheDocument();
@@ -43,7 +41,6 @@ describe("LogSanitizer app shell", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response);
 
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.change(screen.getByRole("textbox", { name: "Projektname" }), { target: { value: "Testprojekt" } });
     fireEvent.change(screen.getByRole("textbox", { name: /Beschreibung/ }), { target: { value: "Testbeschreibung" } });
@@ -77,7 +74,6 @@ describe("project file registration UI", () => {
         modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered"
       }) } as Response);
 
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Dateipfad" }), { target: { value: "/var/log/service.log" } });
@@ -107,7 +103,6 @@ describe("project file registration UI", () => {
         limit_reached: false
       }) } as Response);
 
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Ordnerpfad" }), { target: { value: "/var/log/my-service" } });
@@ -132,7 +127,6 @@ describe("local format detection UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, detected_format: "json", sample_limit_bytes: "65536" }) } as Response));
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Format lokal prüfen" }));
@@ -148,7 +142,6 @@ describe("local format detection UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ...file, format_override: "json" }) } as Response));
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("combobox", { name: "Format für events.log" }), { target: { value: "json" } });
@@ -170,7 +163,6 @@ describe("full format validation UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, format: "json", valid: true, bytes_checked: 25 }) } as Response));
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 1, username: "tester", roles: ["admin", "operator", "reviewer", "approver"] }) } as Response);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Vollständig validieren" }));
