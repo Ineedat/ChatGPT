@@ -1,4 +1,4 @@
-from fastapi.testclient import TestClient
+from test_client import TestClient
 
 from logsanitizer.main import app
 
