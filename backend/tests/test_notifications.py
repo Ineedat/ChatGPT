@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from email.message import EmailMessage
+from typing import ClassVar
 
 from logsanitizer import notifications
 
 
 class FakeSMTP:
-    instances: list["FakeSMTP"] = []
+    instances: ClassVar[list[FakeSMTP]] = []
 
     def __init__(self, host, port, timeout=None, **kwargs):
         self.host = host
