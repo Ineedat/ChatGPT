@@ -129,24 +129,6 @@ def initialize_job_database() -> int:
                 pass
         return recovered
 
-            db.execute(
-                "UPDATE sanitize_jobs SET status='interrupted', phase='interrupted', "
-                "error='Der Prozess wurde vor Abschluss beendet; bitte den Lauf erneut starten.', "
-                "updated_at=? WHERE id=?",
-                (_now(), row["id"]),
-            )
-            output = Path(row["output_path"])
-            # Only remove staging files with the exact private naming convention for this output.
-            try:
-                if output.parent.is_dir() and not output.is_symlink():
-                    for candidate in output.parent.glob(f".{output.name}.logsanitizer-*.tmp"):
-                        if candidate.is_file() and not candidate.is_symlink():
-                            candidate.unlink()
-            except OSError:
-                # Recovery is fail-safe: keep the durable interrupted status even if cleanup fails.
-                pass
-            recovered += 1
-        return recovered
 
 
 def create_job(
