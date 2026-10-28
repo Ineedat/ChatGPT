@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient as BaseTestClient
 
 from logsanitizer.auth import create_user
 
+
 class TestClient(BaseTestClient):
     def __enter__(self):
         super().__enter__()
