@@ -1,5 +1,6 @@
 """Local-only account and server-side session support."""
 from __future__ import annotations
+
 import hashlib
 import hmac
 import os
@@ -8,6 +9,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
