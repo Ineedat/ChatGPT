@@ -307,7 +307,7 @@ function AppInner({ onLogout }: { onLogout: () => void }) {
         <span className="status-pill"><span className="status-dot" /> Entwicklungsgerüst</span>
         <h2>Logs sicher vorbereiten.</h2>
         <p>Die lokale Arbeitsumgebung für die regelbasierte Bereinigung von Anwendungslogs.</p>
-        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Regel-Engine, Streaming-Verarbeitung, geschützte Zuordnungen und Freigabekontrollen sind noch nicht implementiert.</span></div>
+        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt derzeit UTF-8-Text und JSON Lines. Mapping-Verschlüsselung, umfassende Geheimniserkennung und der kontrollierte Prüf-/Freigabeprozess fehlen noch.</span></div>
       </section>
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">ARBEITSBEREICH</p><h3>Projekt vorbereiten</h3></div>
