@@ -22,14 +22,16 @@
 - [x] Persistente projektbezogene Index-Mappings in separater lokaler SQLite-Datei mit eingeschränkten Dateirechten, wo unterstützt; gleiche Werte erhalten dateiübergreifend denselben Platzhalter. Verschlüsselung der Mapping-Daten ist noch offen.
 - [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
 - [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
-- [ ] Persistente Laufhistorie und automatische Bereinigung verwaister temporärer Dateien nach Prozessabsturz.
+- [x] Dauerhafte Lauf-/Prüfhistorie mit Ergebniskennzahlen, Status, Kommentaren, Ausnahmebegründungen und Audit-Ereignissen in einer separaten lokalen SQLite-Datenbank.
+- [ ] Wiederherstellung unterbrochener Hintergrundjobs nach Prozessabsturz und automatische Bereinigung verwaister temporärer Dateien.
 - [x] Pflichtvalidierung nach der Bereinigung: Ausgabe vollständig zeilenweise erneut lesen, UTF-8/JSONL-Syntax prüfen und alle aktiven konfigurierten Muster auf Resttreffer scannen; bei Fehlern Ausgabe löschen und Lauf ablehnen. Gilt nur für unterstützte Text-/JSONL-Ausgabe und ist kein Beweis vollständiger Geheimniserkennung.
 
 ## Meilenstein 2 — Prüfung und kontrollierte Freigabe
 - [ ] Lokale Anmeldung und rollenbasierte Rechte: Backend-Grundlage und Anmeldeoberfläche implementiert; vollständige Sicherheitsprüfung, Regressionstests und CI-Abschluss noch offen.
-- [ ] Prüfer-Warteschlange und sichere Suche.
-- [ ] Freigabe/Rückgabe mit Kommentar, Laufhistorie und Audit.
-- [ ] Begründete, eng begrenzte Ausnahmen.
+- [x] Prüfer-Warteschlange und sichere wörtliche Stichprobensuche ausschließlich in bereinigten Ausgaben; eigene gespeicherte Suchmuster.
+- [x] Freigabe, Rückgabe, Stopp und Kommentare; Laufhistorie und unveränderliche Audit-Ereignisse.
+- [x] Eng begrenzte, ausdrücklich begründete Ausnahmen; fehlgeschlagene Pflichtvalidierungen bleiben nicht freigabefähig.
+- [ ] Vollständige Sicherheitsprüfung der Authentifizierung/Rollenmatrix und Regressionstests vor Produktions- oder Netzwerkbetrieb.
 
 ## Meilenstein 3 — Deployment
 - [ ] Optionale SMTP-Benachrichtigungen und Konfigurationstest.
