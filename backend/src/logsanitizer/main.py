@@ -41,13 +41,6 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
-from logsanitizer.rule_config import (
-    RuleConfig,
-    find_rule_conflicts,
-    load_rule_config,
-    save_rule_config,
-)
-from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 from logsanitizer.review_workflow import (
     create_run as create_review_run,
     fail_run as fail_review_run,
@@ -56,6 +49,13 @@ from logsanitizer.review_workflow import (
     router as review_router,
     set_run_running as set_review_run_running,
 )
+from logsanitizer.rule_config import (
+    RuleConfig,
+    find_rule_conflicts,
+    load_rule_config,
+    save_rule_config,
+)
+from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
 @asynccontextmanager
