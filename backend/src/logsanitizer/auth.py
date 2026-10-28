@@ -108,7 +108,7 @@ class NewUser(BaseModel):
     roles: list[str] = Field(min_length=1)
 
 def _login_attempt_key(username: str, client_host: str) -> str:
-    material = f"{username.strip().casefold()}|{client_host}".encode("utf-8")
+    material = f"{username.strip().casefold()}|{client_host}".encode()
     return hashlib.sha256(material).hexdigest()
 
 
