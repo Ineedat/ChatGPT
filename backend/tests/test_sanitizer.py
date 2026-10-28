@@ -257,10 +257,10 @@ def test_residual_scan_rejects_invalid_jsonl_output_and_removes_it(tmp_path: Pat
     data = config().model_dump(mode="json")
     data["rules"] = [data["rules"][0]]
     data["rules"][0]["pattern"] = "safe"
-    data["rules"][0]["replacement"] = "not-json"
+    data["rules"][0]["replacement"] = 'not-json"'
     unsafe_config = RuleConfig.model_validate(data)
 
-    with pytest.raises(SanitizationError, match="ungültiges JSON"):
+    with pytest.raises(SanitizationError, match="ungültige JSON-Zeile"):
         sanitize_file(source, destination, unsafe_config, format_name="jsonl")
 
     assert not destination.exists()
