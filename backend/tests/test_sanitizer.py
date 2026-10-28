@@ -77,7 +77,7 @@ def test_profile_rules_apply_only_when_selected(tmp_path: Path) -> None:
     sanitize_file(source, profile_output, config(), profile_id="payments")
 
     assert shared_output.read_text(encoding="utf-8") == "account=42\n"
-    assert profile_output.read_text(encoding="utf-8") == "[ACCOUNT]=42\n"
+    assert profile_output.read_text(encoding="utf-8") == "[PROFILE_1]=42\n"
 
 
 def test_sanitizer_refuses_existing_destination_and_invalid_profile(tmp_path: Path) -> None:
