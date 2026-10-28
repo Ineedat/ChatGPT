@@ -398,7 +398,7 @@ def search_sanitized_output(
     try:
         with output_path.open("rb") as stream:
             line_number = 0
-            while len(results) < MAX_SEARCH_RESULTS:
+            while len(results) <= MAX_SEARCH_RESULTS:
                 raw = stream.readline(MAX_LINE_BYTES + 1)
                 if not raw:
                     break
@@ -406,16 +406,21 @@ def search_sanitized_output(
                 if len(raw) > MAX_LINE_BYTES:
                     raise HTTPException(status_code=422, detail="Ausgabe enthält eine Zeile oberhalb des geprüften Limits.")
                 try:
-                    line = raw.decode("utf-8").rstrip("\r\n")
+                    line = raw.decode("utf-8").rstrip("\\r\\n")
                 except UnicodeDecodeError as exc:
                     raise HTTPException(status_code=422, detail="Ausgabe ist nicht gültig UTF-8.") from exc
-                if needle in line.casefold():
-                    results.append({"line_number": line_number, "snippet": line[:300]})
+                match_at = line.casefold().find(needle)
+                if match_at >= 0:
+                    start_at = max(0, match_at - 100)
+                    end_at = min(len(line), start_at + 300)
+                    snippet = ("…" if start_at else "") + line[start_at:end_at] + ("…" if end_at < len(line) else "")
+                    results.append({"line_number": line_number, "snippet": snippet})
     except OSError as exc:
         raise HTTPException(status_code=410, detail="Bereinigte Ausgabe konnte nicht gelesen werden.") from exc
+    truncated = len(results) > MAX_SEARCH_RESULTS
+    results = results[:MAX_SEARCH_RESULTS]
     return {"run_id": run_id, "query": query, "match_count": len(results),
-            "limit": MAX_SEARCH_RESULTS, "truncated": len(results) == MAX_SEARCH_RESULTS,
-            "results": results}
+            "limit": MAX_SEARCH_RESULTS, "truncated": truncated, "results": results}
 
 
 @router.get("/saved-searches")
