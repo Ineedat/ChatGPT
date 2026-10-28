@@ -55,7 +55,7 @@ Die Mapping-Datenbank speichert Originalwerte nicht mehr im Klartext. Die Anwend
 - Datenbank: `mappings.sqlite3`
 - Schlüssel: `mappings.key` im selben Datenverzeichnis (32 zufällige Bytes)
 - Schlüsselableitung: HKDF-SHA-256 trennt Verschlüsselungs- und Suchschlüssel; der Schlüssel wird nicht in Git oder der Datenbank gespeichert.
-- POSIX: Datenverzeichnis möglichst Modus `0700`, Schlüsseldatei `0600`; Windows: die Anwendung entfernt die Vererbung und setzt die ACL der Schlüsseldatei auf den aktuellen Benutzer. Kann Windows die ACL nicht setzen, bricht die Initialisierung ab.
+- POSIX: Datenverzeichnis Modus `0700`, Schlüsseldatei `0600`; Windows: die Anwendung entfernt die ACL-Vererbung und beschränkt das Mapping-Datenverzeichnis sowie die Schlüsseldatei auf den aktuellen Benutzer. Kann Windows die ACL nicht setzen, bricht die Initialisierung ab. Die CI prüft Mapping-Verschlüsselung, Recovery und Windows-ACLs auf einem Windows-Runner; die vollständige Backend-Suite läuft unter Linux.
 - Beim ersten Start wird der Schlüssel lokal erzeugt. Fehlt er später bei einer bereits verschlüsselten Datenbank oder passt er nicht, startet die Mapping-Verarbeitung nicht mit einem Ersatzschlüssel.
 - Ältere Mapping-Datenbanken mit Klartextwerten werden beim ersten Zugriff migriert. Die Anwendung verschlüsselt die Werte, entfernt die alte Tabelle und führt `VACUUM` aus, um zurückgebliebene Seiten nach Möglichkeit zu bereinigen.
 
