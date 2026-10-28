@@ -48,9 +48,7 @@ response includes a `format_hint` inferred only from the filename extension (`js
 unknown extension stays `unknown`, and the hint must not be treated as proof of the
 actual format. Format detection is a separate explicit action (`POST /api/projects/{id}/files/{file_id}/detect-format`): it samples at most 64 KiB locally and returns only a classification, not source content. Uncertain or binary samples remain `unknown`. The detected classification is persisted in SQLite. A separate `PUT /api/projects/{id}/files/{file_id}/format` endpoint stores a manual override from `text`, `json`, `jsonl`, `xml`, `csv`, or `unknown`; sending `null` clears the override. The override is stored separately from the detected classification. Detection remains heuristic, is not full-file validation, and is not approval. A graphical folder picker is not implemented yet.
 
-This scaffold is not approved for real/sensitive logs and must not be exposed to
-a network: authentication, authorization, processing, mapping protection, and
-release controls are still missing.
+This scaffold is not approved for real/sensitive logs or network exposure. Local authentication and basic role checks are implemented but still require full security verification. Mapping encryption, comprehensive sensitive-data detection, and release controls remain incomplete.
 
 Run tests with `pytest` and lint with `ruff check src tests`.
 
@@ -65,4 +63,4 @@ python -m logsanitizer.auth_cli
 
 Das Kommando fragt Benutzername und Passwort verdeckt ab. Es gibt keinen öffentlichen Bootstrap-Endpunkt und kein eingebautes Standardpasswort. Passwörter werden mit scrypt gehasht; Sitzungen verwenden zufällige opaque Tokens, deren SHA-256-Digests gespeichert werden. Sitzungen laufen nach acht Stunden ab. Benutzer können mehrere Rollen erhalten: `admin`, `operator`, `reviewer` und `approver`. Benutzerverwaltung ist Administratoren vorbehalten. Änderungen an API-Daten benötigen zusätzlich den CSRF-Header `X-CSRF-Token`, passend zum `logsanitizer_csrf`-Cookie.
 
-Für HTTPS-Bereitstellungen `LOGSANITIZER_COOKIE_SECURE=1` setzen. Bei lokalem HTTP ist das Secure-Attribut standardmäßig aus; die Anwendung sollte dann nur an Loopback gebunden sein. Die derzeitige Rollenmatrix ist eine Grundlage und muss vor Netzwerkbetrieb weitergehend geprüft werden. Es gibt noch keine Passwortwiederherstellung, keine Administrationsoberfläche für Benutzer und keine Begrenzung wiederholter fehlgeschlagener Anmeldungen. Authentifizierung allein macht die Anwendung noch nicht produktionsreif.
+Für HTTPS-Bereitstellungen `LOGSANITIZER_COOKIE_SECURE=1` setzen. Bei lokalem HTTP ist das Secure-Attribut standardmäßig aus; die Anwendung sollte dann nur an Loopback gebunden sein. Die derzeitige Rollenmatrix ist eine Grundlage und muss vor Netzwerkbetrieb weitergehend geprüft werden. Es gibt noch keinen Selbstbedienungsprozess für Passwortänderung oder -wiederherstellung, keine Administrationsoberfläche für Benutzer und keine Begrenzung wiederholter fehlgeschlagener Anmeldungen. Authentifizierung allein macht die Anwendung noch nicht produktionsreif.
