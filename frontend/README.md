@@ -24,7 +24,7 @@ The current UI can create/open projects and register a single file or folder by 
 Die Dateiliste zeigt einen vorläufigen Format-Hinweis aus der Dateiendung. Unterstützt
 werden die Hinweise JSON, JSON Lines, Text, XML und CSV; nicht zugeordnete Endungen
 werden als „unbekannt“ angezeigt. Dieser Hinweis prüft den Dateiinhalt ausdrücklich
-nicht und ist keine Freigabe zur Verarbeitung. Eine lokale Stichproben-Erkennung und manuelle Auswahl sind jetzt verfügbar; eine vollständige Inhaltsvalidierung folgt weiterhin später.
+nicht und ist keine Freigabe zur Verarbeitung. Eine lokale Stichproben-Erkennung, manuelle Auswahl und vollständige Syntaxvalidierung des ausgewählten Formats sind verfügbar. Diese Validierung prüft keine vollständige Erkennung sensibler Inhalte.
 
 
 The file list offers **Format lokal prüfen** as an explicit action. It samples at most 64 KiB on the local backend and shows only a classification. The detected classification is persisted in SQLite. A per-file manual override can be saved or cleared independently of the detection result. Detection samples at most 64 KiB and is not full-file validation or approval.
