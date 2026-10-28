@@ -6,6 +6,16 @@ type Tab = "overview" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type FormatValidationResult = { file_id: string; format: string; valid: boolean; bytes_checked: number; error?: string };
+type SanitizationJob = {
+  id: string;
+  status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
+  phase: string;
+  processed_bytes: number;
+  total_bytes: number;
+  lines_processed: number;
+  error?: string;
+  result?: { output_name: string; output_bytes: number; replacements: number; validated: boolean };
+};
 type Project = {
   id: string;
   name: string;
@@ -33,6 +43,8 @@ export default function App() {
   const [importIssues, setImportIssues] = useState<FolderImportResult["issues"]>([]);
   const [validatingFiles, setValidatingFiles] = useState<string[]>([]);
   const [validationResults, setValidationResults] = useState<Record<string, FormatValidationResult>>({});
+  const [outputPaths, setOutputPaths] = useState<Record<string, string>>({});
+  const [sanitizationJobs, setSanitizationJobs] = useState<Record<string, SanitizationJob>>({});
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -160,6 +172,62 @@ export default function App() {
     }
   }
 
+  async function startSanitization(file: ImportedFile) {
+    if (!selectedProject || !outputPaths[file.id]?.trim() || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return;
+    setError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ output_path: outputPaths[file.id] })
+      });
+      const body = await response.json() as { id?: string; detail?: string };
+      if (!response.ok || !body.id) throw new Error(body.detail || "Bereinigung konnte nicht gestartet werden.");
+      setSanitizationJobs(current => ({ ...current, [file.id]: { id: body.id!, status: "queued", phase: "queued", processed_bytes: 0, total_bytes: file.size_bytes, lines_processed: 0 } }));
+      void pollSanitizationJob(file, body.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Bereinigung konnte nicht gestartet werden.");
+    }
+  }
+
+  async function pollSanitizationJob(file: ImportedFile, jobId: string): Promise<void> {
+    if (!selectedProject) return;
+    try {
+      const url = `/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(jobId)}`;
+      const response = await fetch(url);
+      const body = await response.json() as SanitizationJob & { detail?: string };
+      if (!response.ok) throw new Error(body.detail || "Fortschritt konnte nicht gelesen werden.");
+      setSanitizationJobs(current => ({ ...current, [file.id]: body }));
+      if (["queued", "running", "cancelling"].includes(body.status)) {
+        await new Promise(resolve => window.setTimeout(resolve, 500));
+        return pollSanitizationJob(file, jobId);
+      }
+      if (body.status === "completed") {
+        setImportMessage(`Bereinigung für ${file.display_name} abgeschlossen und validiert: ${body.result?.output_bytes.toLocaleString("de-DE")} Byte Ausgabe, ${body.result?.replacements} Ersetzungen.`);
+      } else if (body.status === "cancelled") {
+        setImportMessage(`Bereinigung für ${file.display_name} abgebrochen. Temporäre Ausgabe wurde verworfen.`);
+      } else if (body.error) {
+        setError(body.error);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Fortschritt konnte nicht gelesen werden.");
+    }
+  }
+
+  async function cancelSanitization(file: ImportedFile) {
+    if (!selectedProject) return;
+    const job = sanitizationJobs[file.id];
+    if (!job || !["queued", "running"].includes(job.status)) return;
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
+      const body = await response.json() as { status?: string; detail?: string };
+      if (!response.ok) throw new Error(body.detail || "Abbruch konnte nicht angefordert werden.");
+      setSanitizationJobs(current => ({ ...current, [file.id]: { ...job, status: "cancelling" } }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Abbruch konnte nicht angefordert werden.");
+    }
+  }
+
   async function setFileFormatOverride(file: ImportedFile, formatOverride: string) {
     if (!selectedProject) return;
     setError("");
@@ -277,7 +345,10 @@ export default function App() {
         {importMessage && <p className="success-message" role="status">{importMessage}</p>}
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
         <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
-        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li key={file.id}><div><strong>{file.display_name}</strong><span>{file.state === "registered" ? "Registriert" : file.state}</span><span>Endungs-Hinweis: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span><span>Erkannt: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</span><label>Format manuell festlegen <select aria-label={`Format für ${file.display_name}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)}><option value="">Automatisch (Erkennung verwenden)</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option></select></label><button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)}>Format lokal prüfen</button><button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Validiert …" : "Vollständig validieren"}</button>{validationResults[file.id] && <p className={validationResults[file.id].valid ? "success-message" : "error-message"} role="status">{validationResults[file.id].valid ? "Format gültig" : "Format ungültig"} · {validationResults[file.id].format} · {validationResults[file.id].bytes_checked.toLocaleString("de-DE")} Byte geprüft{validationResults[file.id].error ? ` · ${validationResults[file.id].error}` : ""}</p>}</div><span>{file.size_bytes.toLocaleString("de-DE")} Byte</span></li>)}</ul>}
+        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li key={file.id}><div><strong>{file.display_name}</strong><span>{file.state === "registered" ? "Registriert" : file.state}</span><span>Endungs-Hinweis: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span><span>Erkannt: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</span><label>Format manuell festlegen <select aria-label={`Format für ${file.display_name}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)}><option value="">Automatisch (Erkennung verwenden)</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option></select></label><button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)}>Format lokal prüfen</button><button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Validiert …" : "Vollständig validieren"}</button>{validationResults[file.id] && <p className={validationResults[file.id].valid ? "success-message" : "error-message"} role="status">{validationResults[file.id].valid ? "Format gültig" : "Format ungültig"} · {validationResults[file.id].format} · {validationResults[file.id].bytes_checked.toLocaleString("de-DE")} Byte geprüft{validationResults[file.id].error ? ` · ${validationResults[file.id].error}` : ""}</p>}
+          <label>Ausgabepfad für Bereinigung <input aria-label={`Ausgabepfad für ${file.display_name}`} value={outputPaths[file.id] || ""} onChange={event => setOutputPaths(current => ({ ...current, [file.id]: event.target.value }))} placeholder="Absoluter neuer Zielpfad" maxLength={4096} /></label>
+          <button className="secondary-button" type="button" onClick={() => void startSanitization(file)} disabled={!outputPaths[file.id]?.trim() || !["text", "jsonl"].includes(file.format_override || file.detected_format || "") || Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))}>Bereinigung starten</button>
+          {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}</div>}</div><span>{file.size_bytes.toLocaleString("de-DE")} Byte</span></li>)}</ul>}
       </section>}
       <section className="feature-grid" aria-label="Projektprinzipien">
         <article className="feature-card"><span className="feature-number">01</span><h3>Lokal bleiben</h3><p>Keine Cloud- oder externen API-Abhängigkeiten im vorgesehenen Betrieb.</p></article>
