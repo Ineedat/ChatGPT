@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+from test_client import TestClient
 
 from logsanitizer.main import app
 from logsanitizer.rule_config import RuleConfig, save_rule_config
