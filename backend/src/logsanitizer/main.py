@@ -9,6 +9,7 @@ import json
 import os
 import threading
 import uuid
+from datetime import datetime, timezone
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -382,7 +383,7 @@ def project_file_sanitize_start(
             "processed_bytes": 0,
             "total_bytes": source.stat().st_size,
             "lines_processed": 0,
-            "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         _SANITIZATION_CANCEL[job_id] = threading.Event()
     background_tasks.add_task(
