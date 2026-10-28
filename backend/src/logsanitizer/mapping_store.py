@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -158,7 +159,7 @@ def _decrypt_value(encryption_key: bytes, ciphertext: bytes) -> str:
             _ENCRYPTION_CONTEXT,
         )
         return plaintext.decode("utf-8")
-    except (ValueError, UnicodeDecodeError) as exc:
+    except (InvalidTag, ValueError, UnicodeDecodeError) as exc:
         raise MappingEncryptionError(
             "Mapping-Daten konnten nicht authentifiziert oder entschlüsselt werden."
         ) from exc
@@ -304,12 +305,19 @@ def get_or_create_indexed_mapping(
         value_hash = _value_hash(lookup_key, original_value)
         row = connection.execute(
             """
-            SELECT replacement FROM indexed_mappings
+            SELECT replacement, encrypted_value FROM indexed_mappings
             WHERE project_id = ? AND category = ? AND prefix = ? AND value_hash = ?
             """,
             (project_id, category, prefix, value_hash),
         ).fetchone()
         if row is not None:
+            # Authenticate ciphertext on every hit; a lookup fingerprint alone must not
+            # make corrupted or tampered mapping records appear healthy.
+            decrypted_value = _decrypt_value(encryption_key, bytes(row["encrypted_value"]))
+            if not hmac.compare_digest(decrypted_value, original_value):
+                raise MappingEncryptionError(
+                    "Der verschlüsselte Mapping-Wert stimmt nicht mit dem Suchwert überein."
+                )
             connection.commit()
             return str(row["replacement"])
 
