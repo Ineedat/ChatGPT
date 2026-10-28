@@ -11,6 +11,7 @@ from typing import Any
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
 ACTIVE = {"queued", "running", "cancelling"}
+_RECOVERED_JOB_IDS: list[str] = []
 
 
 def _directory() -> Path:
@@ -96,6 +97,7 @@ def initialize_job_database() -> int:
             if _pid_alive(int(row["process_id"])):
                 continue
             stale_outputs.add(Path(row["output_path"]))
+            _RECOVERED_JOB_IDS.append(str(row["id"]))
             db.execute(
                 "UPDATE sanitize_jobs SET status='interrupted', phase='interrupted', "
                 "error='Der Prozess wurde vor Abschluss beendet; bitte den Lauf erneut starten.', "
@@ -129,6 +131,13 @@ def initialize_job_database() -> int:
                 pass
         return recovered
 
+
+
+def pop_recovered_job_ids() -> list[str]:
+    """Return IDs recovered during the most recent initialization pass."""
+    recovered = list(dict.fromkeys(_RECOVERED_JOB_IDS))
+    _RECOVERED_JOB_IDS.clear()
+    return recovered
 
 
 def create_job(
