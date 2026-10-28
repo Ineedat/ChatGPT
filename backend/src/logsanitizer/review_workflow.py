@@ -56,7 +56,7 @@ def _db():
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="microseconds")
 
 
 def initialize_review_database() -> None:
@@ -270,7 +270,7 @@ def list_runs(status: str | None = None, limit: int = 100, owner_user_id: int | 
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         values.append(min(limit, 200))
         rows = db.execute(
-            f"SELECT * FROM review_runs{where} ORDER BY created_at DESC LIMIT ?",
+            f"SELECT * FROM review_runs{where} ORDER BY created_at DESC, rowid DESC LIMIT ?",
             values,
         ).fetchall()
         return [_public_run(row) for row in rows]
