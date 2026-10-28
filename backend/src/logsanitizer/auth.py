@@ -59,7 +59,12 @@ def initialize_auth_database():
             locked_until INTEGER NOT NULL DEFAULT 0
         );
         """)
-        db.execute("DELETE FROM sessions WHERE expires_at<=?", (int(time.time()),))
+        now = int(time.time())
+        db.execute("DELETE FROM sessions WHERE expires_at<=?", (now,))
+        db.execute(
+            "DELETE FROM login_attempts WHERE window_started<=?",
+            (now - 2 * LOGIN_WINDOW_SECONDS,),
+        )
     try: os.chmod(_path(), 0o600)
     except OSError: pass
 
