@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-import re
+import regex as re
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -12,6 +12,7 @@ from logsanitizer.mapping_store import get_or_create_indexed_mapping
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
 
 MAX_LINE_BYTES = 1024 * 1024
+REGEX_TIMEOUT_SECONDS = 0.1
 
 
 class SanitizationError(ValueError):
@@ -82,7 +83,13 @@ def _validate_sanitized_output(
                     "lines_processed": line_number,
                 })
             for rule, pattern in compiled:
-                if pattern.search(line):
+                try:
+                    matched = pattern.search(line, timeout=REGEX_TIMEOUT_SECONDS)
+                except TimeoutError as exc:
+                    raise SanitizationError(
+                        "Die Restmusterprüfung hat das Zeitlimit überschritten."
+                    ) from exc
+                if matched:
                     raise SanitizationError(
                         f"Restmusterprüfung fehlgeschlagen: Regel '{rule.id}' trifft in Ausgabezeile {line_number}."
                     )
@@ -168,19 +175,27 @@ def sanitize_file(
                                 "Eine Eingabezeile ist kein gültiges JSON."
                             ) from exc
                     for rule, pattern in compiled:
-                        if rule.replacement_mode == "indexed":
-                            assert project_id is not None
-                            prefix = rule.mapping_prefix or rule.category
-                            line, count = pattern.subn(
-                                lambda match, project_id=project_id, category=rule.category, prefix=prefix: (
-                                    get_or_create_indexed_mapping(
-                                        project_id, category, prefix, match.group(0)
-                                    )
-                                ),
-                                line,
-                            )
-                        else:
-                            line, count = pattern.subn(rule.replacement, line)
+                        try:
+                            if rule.replacement_mode == "indexed":
+                                assert project_id is not None
+                                prefix = rule.mapping_prefix or rule.category
+                                line, count = pattern.subn(
+                                    lambda match, project_id=project_id, category=rule.category, prefix=prefix: (
+                                        get_or_create_indexed_mapping(
+                                            project_id, category, prefix, match.group(0)
+                                        )
+                                    ),
+                                    line,
+                                    timeout=REGEX_TIMEOUT_SECONDS,
+                                )
+                            else:
+                                line, count = pattern.subn(
+                                    rule.replacement, line, timeout=REGEX_TIMEOUT_SECONDS
+                                )
+                        except TimeoutError as exc:
+                            raise SanitizationError(
+                                "Die Regelausführung hat das Zeitlimit überschritten."
+                            ) from exc
                         replacement_count += count
                     if effective_format == "jsonl":
                         try:
