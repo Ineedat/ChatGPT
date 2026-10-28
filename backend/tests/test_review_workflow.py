@@ -92,7 +92,18 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         )
         assert saved_matches.json()["match_count"] == 1
 
-        # The audit database is durable and contains no output paths or log contents.
+        # Replacing the output after validation must block both further sampling and approval.
+        output.write_text("secret=alpha\\n", encoding="utf-8")
+        changed_search = client.get(
+            f"/api/reviews/runs/{run['id']}/search", params={"q": "secret"}
+        )
+        assert changed_search.status_code == 409
+        changed_approval = client.post(
+            f"/api/reviews/runs/{run['id']}/approve", json={"comment": "Must remain blocked"}
+        )
+        assert changed_approval.status_code == 409
+
+        # The API omits paths; the private local database keeps the output path internally for verification.
         audit_db = sqlite3.connect(tmp_path / "data" / "review.sqlite3")
         stored = audit_db.execute(
             "SELECT status, output_path FROM review_runs WHERE id=?",
