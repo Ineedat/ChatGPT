@@ -37,7 +37,7 @@ def config() -> RuleConfig:
                 "category": "secret",
                 "match_type": "plain",
                 "pattern": "account",
-                "replacement": "[ACCOUNT]",
+                "replacement": "[PROFILE_1]",
                 "priority": 10,
                 "profile_id": "payments",
             },
@@ -61,6 +61,9 @@ def test_streaming_sanitizer_orders_rules_and_preserves_source(tmp_path: Path) -
         "output_bytes": len(destination.read_bytes()),
         "lines_processed": 3,
         "replacements": 2,
+        "validated": True,
+        "residual_matches": 0,
+        "validation_scope": "configured_rules_and_format",
     }
 
 
@@ -216,3 +219,48 @@ def test_indexed_mapping_requires_project_id(tmp_path: Path) -> None:
 
     with pytest.raises(SanitizationError, match="Projekt-ID"):
         sanitize_file(source, tmp_path / "clean.log", indexed_config())
+
+def test_residual_rule_match_rejects_and_removes_output_without_echoing_value(tmp_path: Path) -> None:
+    source = tmp_path / "service.log"
+    original = b"secret=alpha\\n"
+    source.write_bytes(original)
+    destination = tmp_path / "clean.log"
+    data = config().model_dump(mode="json")
+    data["rules"] = [data["rules"][0]]
+    data["rules"][0]["replacement"] = "secret=still-present"
+    unsafe_config = RuleConfig.model_validate(data)
+
+    with pytest.raises(SanitizationError, match="Restmusterprüfung fehlgeschlagen") as error:
+        sanitize_file(source, destination, unsafe_config)
+
+    assert "alpha" not in str(error.value)
+    assert not destination.exists()
+    assert source.read_bytes() == original
+
+
+def test_successful_scan_reports_validation_scope_and_zero_residuals(tmp_path: Path) -> None:
+    source = tmp_path / "service.log"
+    source.write_text("secret=alpha\\n", encoding="utf-8")
+    destination = tmp_path / "clean.log"
+
+    result = sanitize_file(source, destination, config())
+
+    assert result["validated"] is True
+    assert result["residual_matches"] == 0
+    assert result["validation_scope"] == "configured_rules_and_format"
+
+
+def test_residual_scan_rejects_invalid_jsonl_output_and_removes_it(tmp_path: Path) -> None:
+    source = tmp_path / "events.jsonl"
+    source.write_text('{"message":"safe"}\\n', encoding="utf-8")
+    destination = tmp_path / "clean.jsonl"
+    data = config().model_dump(mode="json")
+    data["rules"] = [data["rules"][0]]
+    data["rules"][0]["pattern"] = "safe"
+    data["rules"][0]["replacement"] = "not-json"
+    unsafe_config = RuleConfig.model_validate(data)
+
+    with pytest.raises(SanitizationError, match="ungültiges JSON"):
+        sanitize_file(source, destination, unsafe_config, format_name="jsonl")
+
+    assert not destination.exists()
