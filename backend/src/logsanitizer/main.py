@@ -500,14 +500,14 @@ def project_file_sanitize(
             "review_status": review_run["status"],
             **result,
         }
+    except SanitizationError as exc:
+        fail_review_run(run_id, "failed", "Sanitisierung oder Pflichtvalidierung fehlgeschlagen.")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileExistsError as exc:
         fail_review_run(run_id, "failed", "Die Zieldatei existiert bereits.")
         raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
-    except SanitizationError as exc:
-        fail_review_run(run_id, "failed", "Sanitisierung oder Pflichtvalidierung fehlgeschlagen.")
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except PermissionError as exc:
         fail_review_run(run_id, "failed", "Kein Zugriff auf Quell- oder Zieldatei.")
         raise HTTPException(status_code=403, detail="Kein Zugriff auf Quell- oder Zieldatei.") from exc
