@@ -133,7 +133,7 @@ def add_user(payload: NewUser):
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path,method=request.url.path,request.method.upper()
-        if not path.startswith("/api/") or path in {"/api/health","/api/auth/login"}: return await call_next(request)
+        if not path.startswith("/api/") or path in {"/api/health","/api/auth/login","/api/docs","/api/openapi.json"}: return await call_next(request)
         token=request.cookies.get(COOKIE)
         user=_user(token) if token else None
         if user is None: return JSONResponse({"detail":"Anmeldung erforderlich."},status_code=401)
