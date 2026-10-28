@@ -9,8 +9,8 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 DEFAULT_DATA_DIR = ".logsanitizer"
