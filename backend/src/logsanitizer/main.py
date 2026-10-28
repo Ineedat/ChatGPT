@@ -525,6 +525,7 @@ def project_file_sanitize(
 
 
 _SANITIZATION_CANCEL: dict[str, threading.Event] = {}
+_SANITIZATION_LAST_PERSISTED: dict[str, tuple[int, str]] = {}
 _SANITIZATION_LOCK = threading.Lock()
 
 
@@ -534,6 +535,14 @@ def _set_job(job_id: str, **changes: object) -> None:
 
 
 def _job_progress(job_id: str, progress: dict[str, int | str]) -> None:
+    # Persist at phase boundaries and in 1 MiB increments, not on every log line.
+    processed = int(progress.get("processed_bytes", 0))
+    phase = str(progress.get("phase", ""))
+    with _SANITIZATION_LOCK:
+        previous_bytes, previous_phase = _SANITIZATION_LAST_PERSISTED.get(job_id, (0, ""))
+        if phase == previous_phase and processed - previous_bytes < 1024 * 1024:
+            return
+        _SANITIZATION_LAST_PERSISTED[job_id] = (processed, phase)
     _set_job(job_id, **progress)
 
 
@@ -588,6 +597,7 @@ def _run_sanitization_job(
     finally:
         with _SANITIZATION_LOCK:
             _SANITIZATION_CANCEL.pop(job_id, None)
+            _SANITIZATION_LAST_PERSISTED.pop(job_id, None)
 
 
 MAX_FOLDER_FILES = 5000
