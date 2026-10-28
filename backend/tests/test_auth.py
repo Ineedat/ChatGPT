@@ -35,3 +35,17 @@ def test_password_hash_is_not_stored_as_plaintext(tmp_path, monkeypatch):
     db.close()
     assert stored.startswith("scrypt$")
     assert stored != "long-password-123"
+
+def test_expired_session_is_rejected(tmp_path, monkeypatch):
+    import hashlib
+    import sqlite3
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("expiry-user", "expiry-password-123", ["operator", "reviewer"])
+    with TestClient(app) as client:
+        client.post("/api/auth/login", json={"username":"expiry-user","password":"expiry-password-123"})
+        token = client.cookies.get("logsanitizer_session")
+        db = sqlite3.connect(tmp_path / "data" / "auth.sqlite3")
+        db.execute("UPDATE sessions SET expires_at=0 WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),))
+        db.commit()
+        db.close()
+        assert client.get("/api/auth/me").status_code == 401
