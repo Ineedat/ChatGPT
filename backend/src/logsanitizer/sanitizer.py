@@ -25,6 +25,43 @@ def _compiled_rule(rule: SanitizationRule) -> re.Pattern[str]:
         raise SanitizationError("Eine Regel kann nicht kompiliert werden.") from exc
 
 
+
+def _validate_sanitized_output(
+    path: Path,
+    compiled: list[tuple[SanitizationRule, re.Pattern[str]]],
+    format_name: str,
+) -> int:
+    """Re-read output in bounded lines and reject syntax errors or configured residuals."""
+    with path.open("rb") as output_stream:
+        line_number = 0
+        while True:
+            raw_line = output_stream.readline(MAX_LINE_BYTES + 1)
+            if not raw_line:
+                break
+            line_number += 1
+            if len(raw_line) > MAX_LINE_BYTES:
+                raise SanitizationError(
+                    f"Die Ausgabe überschreitet in Zeile {line_number} das Limit von {MAX_LINE_BYTES} Bytes."
+                )
+            try:
+                line = raw_line.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise SanitizationError("Die Ausgabe ist nicht vollständig UTF-8-kodiert.") from exc
+            if format_name == "jsonl":
+                try:
+                    json.loads(line)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    raise SanitizationError(
+                        f"Die Ausgabe enthält ungültiges JSON in Zeile {line_number}."
+                    ) from exc
+            for rule, pattern in compiled:
+                if pattern.search(line):
+                    raise SanitizationError(
+                        f"Restmusterprüfung fehlgeschlagen: Regel '{rule.id}' trifft in Ausgabezeile {line_number}."
+                    )
+    return 0
+
+
 def sanitize_file(
     source_path: Path,
     destination_path: Path,
@@ -125,6 +162,7 @@ def sanitize_file(
                     line_count += 1
                 output_stream.flush()
                 os.fsync(output_stream.fileno())
+        residual_matches = _validate_sanitized_output(destination, compiled, effective_format)
     except Exception:
         if output_created:
             destination.unlink(missing_ok=True)
@@ -136,4 +174,7 @@ def sanitize_file(
         "output_bytes": destination.stat().st_size,
         "lines_processed": line_count,
         "replacements": replacement_count,
+        "validated": True,
+        "residual_matches": residual_matches,
+        "validation_scope": "configured_rules_and_format",
     }
