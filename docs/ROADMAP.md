@@ -20,7 +20,9 @@
 - [x] Versionierte JSON-Regelkonfiguration v1 mit Schema-, Regex-, Profilreferenz- und Konfliktprüfung; lokale atomare Speicherung über API. Die Regeln werden auf unterstützte Text- und JSONL-Dateien angewendet.
 - [x] Erste zeilenweise Streaming-Ausführung für UTF-8-Text und JSON Lines mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung; maximale Eingabezeile 1 MiB. Vollständige JSON-Dokumente und weitere Formate bleiben offen.
 - [x] Persistente projektbezogene Index-Mappings in separater lokaler SQLite-Datei mit eingeschränkten Dateirechten, wo unterstützt; gleiche Werte erhalten dateiübergreifend denselben Platzhalter. Verschlüsselung der Mapping-Daten ist noch offen.
-- [ ] Fortschritt, Abbruch, temporäre Datenbereinigung.
+- [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
+- [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
+- [ ] Persistente Laufhistorie und automatische Bereinigung verwaister temporärer Dateien nach Prozessabsturz.
 - [x] Pflichtvalidierung nach der Bereinigung: Ausgabe vollständig zeilenweise erneut lesen, UTF-8/JSONL-Syntax prüfen und alle aktiven konfigurierten Muster auf Resttreffer scannen; bei Fehlern Ausgabe löschen und Lauf ablehnen. Gilt nur für unterstützte Text-/JSONL-Ausgabe und ist kein Beweis vollständiger Geheimniserkennung.
 
 ## Meilenstein 2 — Prüfung und kontrollierte Freigabe
