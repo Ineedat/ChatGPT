@@ -578,10 +578,10 @@ def _run_sanitization_job(
             cancel_check=cancel_event.is_set,
         )
         review_run = finish_review_run(job_id, result)
-        notify_pending_review(review_run)
         _set_job(job_id, status="completed", phase="completed", result={
             "file_id": file_id, "output_name": output.name, "review_status": review_run["status"], **result,
         })
+        notify_pending_review(review_run)
     except SanitizationCancelled:
         fail_review_run(job_id, "cancelled", "Bereinigung wurde abgebrochen.")
         _set_job(job_id, status="cancelled", phase="cancelled", error="Bereinigung wurde abgebrochen.")
