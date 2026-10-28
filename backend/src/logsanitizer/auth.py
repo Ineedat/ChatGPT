@@ -150,8 +150,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not a or not b or not hmac.compare_digest(a,b) or not hmac.compare_digest(a,user["csrf_token"]):
                 return JSONResponse({"detail":"CSRF-Prüfung fehlgeschlagen."},status_code=403)
         roles=set(user["roles"])
-        if path.startswith("/api/auth/users") and "admin" not in roles: return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if path.startswith("/api/rules/config") and method!="GET" and not roles.intersection({"admin","operator"}): return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if "/sanitize" in path and not roles.intersection({"admin","operator"}): return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if method in {"POST","PUT","PATCH","DELETE"} and path.startswith("/api/projects") and not roles.intersection({"admin","operator"}): return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        if path.startswith("/api/auth/users") and "admin" not in roles:
+            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        if path.startswith("/api/rules/config") and method!="GET" and not roles.intersection({"admin","operator"}):
+            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        if "/sanitize" in path and not roles.intersection({"admin","operator"}):
+            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        if method in {"POST","PUT","PATCH","DELETE"} and path.startswith("/api/projects") and not roles.intersection({"admin","operator"}):
+            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        if path.startswith("/api/reviews"):
+            review_reader = path == "/api/reviews/runs" and method == "GET"
+            if not review_reader and not roles.intersection({"admin","reviewer","approver"}):
+                return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
         return await call_next(request)
