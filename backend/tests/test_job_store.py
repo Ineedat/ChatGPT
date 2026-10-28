@@ -11,7 +11,7 @@ def test_job_state_is_persisted_and_paths_are_not_exposed(tmp_path, monkeypatch)
     source = tmp_path / "source.log"
     output = tmp_path / "clean.log"
     source.write_text("source", encoding="utf-8")
-    job = create_job("job-1", "project-1", "file-1", source, output, 6)
+    create_job("job-1", "project-1", "file-1", source, output, 6)
 
     update_job("job-1", status="running", phase="sanitizing", processed_bytes=3, lines_processed=1)
     update_job("job-1", status="completed", phase="completed", result={"status": "completed"})
