@@ -32,6 +32,16 @@ type AuditEvent = {
   created_at: string;
 };
 
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    queued: "Wartet", running: "In Bearbeitung", pending_review: "Prüfung ausstehend",
+    returned: "Zur Überarbeitung zurückgegeben", approved: "Freigegeben",
+    approved_with_exception: "Mit begründeter Ausnahme freigegeben",
+    stopped: "Gestoppt", failed: "Fehlgeschlagen", cancelled: "Abgebrochen"
+  };
+  return labels[status] || status;
+}
+
 async function reviewFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const method = (init.method || "GET").toUpperCase();
   const csrf = document.cookie.split("; ").find(item => item.startsWith("logsanitizer_csrf="))?.split("=").slice(1).join("=");
@@ -289,7 +299,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
     {selectedRun && <section className="review-section" aria-label="Laufdetails">
       <h3>Ausgewählter Lauf</h3>
       <dl className="review-details">
-        <div><dt>Status</dt><dd>{selectedRun.status}</dd></div>
+        <div><dt>Status</dt><dd>{statusLabel(selectedRun.status)}</dd></div>
         <div><dt>Quelle</dt><dd>{selectedRun.display_name}</dd></div>
         <div><dt>Bereinigte Ausgabe</dt><dd>{selectedRun.output_name}</dd></div>
         <div><dt>Validierung</dt><dd>{selectedRun.validated ? "Bestanden" : "Nicht bestanden"} · Resttreffer: {selectedRun.residual_matches}</dd></div>
@@ -308,7 +318,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
       <h3>Laufhistorie ({history.length})</h3>
       {history.length === 0 ? <p className="muted-message">Noch keine Bereinigungsläufe gespeichert.</p> : <ul className="review-run-list">{history.map(run =>
         <li key={run.id} className={selectedId === run.id ? "selected" : ""}>
-          <div><strong>{run.display_name}</strong><span>{run.output_name} · {run.status}</span><span>{new Date(run.created_at).toLocaleString("de-DE")}</span>{run.last_comment && <span>Kommentar: {run.last_comment}</span>}</div>
+          <div><strong>{run.display_name}</strong><span>{run.output_name} · {statusLabel(run.status)}</span><span>{new Date(run.created_at).toLocaleString("de-DE")}</span>{run.last_comment && <span>Kommentar: {run.last_comment}</span>}</div>
           <button className="secondary-button" type="button" onClick={() => { setSelectedId(run.id); setMatches([]); setMessage(""); }}>Details</button>
         </li>)}</ul>}
     </section>
