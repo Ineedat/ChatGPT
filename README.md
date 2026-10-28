@@ -63,3 +63,8 @@ Keep the backend bound to `127.0.0.1` during development. Do not expose it to a 
 ## License
 
 No license has been selected yet. All rights reserved by default until a license is explicitly chosen.
+
+
+## Local sign-in (development milestone)
+
+Create the first local administrator from the backend directory with `python -m logsanitizer.auth_cli`. The interactive command prompts for a username and password and assigns the initial roles. No public bootstrap endpoint or default password is provided. The first authentication milestone is still under verification; do not expose the app to a network or use real confidential logs until the milestone is complete and security limitations are reviewed. See `backend/README.md` for session, cookie, role, and configuration details.
