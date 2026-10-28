@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 
 from logsanitizer.job_store import create_job, get_job, initialize_job_database, update_job
 
