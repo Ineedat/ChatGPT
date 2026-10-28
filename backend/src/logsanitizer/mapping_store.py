@@ -243,7 +243,10 @@ def _initialize_encrypted_schema(
         "SELECT value FROM mapping_meta WHERE name='key_check'"
     ).fetchone()
     if existing is None:
-        if connection.execute("SELECT COUNT(*) FROM indexed_mappings").fetchone()[0]:
+        if (
+            connection.execute("SELECT COUNT(*) FROM indexed_mappings").fetchone()[0]
+            and not migrated_plaintext
+        ):
             raise MappingEncryptionError(
                 "Verschlüsselungsmetadaten fehlen bei vorhandenen Mapping-Einträgen; "
                 "die Datenbank wird nicht automatisch verändert."
