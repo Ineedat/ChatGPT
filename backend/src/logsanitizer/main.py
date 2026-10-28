@@ -41,6 +41,7 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
+from logsanitizer.job_store import create_job, get_job, initialize_job_database, update_job
 from logsanitizer.review_workflow import create_run as create_review_run
 from logsanitizer.review_workflow import fail_run as fail_review_run
 from logsanitizer.review_workflow import finish_run as finish_review_run
@@ -61,6 +62,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     initialize_database()
     initialize_auth_database()
     initialize_review_database()
+    initialize_job_database()
     yield
 
 
@@ -393,18 +395,12 @@ def project_file_sanitize_start(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        create_job(job_id, project_id, file_id, source, output, source.stat().st_size)
+    except (OSError, RuntimeError) as exc:
+        fail_review_run(job_id, "failed", "Der Laufstatus konnte nicht dauerhaft gespeichert werden.")
+        raise HTTPException(status_code=500, detail="Laufstatus konnte nicht gespeichert werden.") from exc
     with _SANITIZATION_LOCK:
-        _SANITIZATION_JOBS[job_id] = {
-            "id": job_id,
-            "project_id": project_id,
-            "file_id": file_id,
-            "status": "queued",
-            "phase": "queued",
-            "processed_bytes": 0,
-            "total_bytes": source.stat().st_size,
-            "lines_processed": 0,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
         _SANITIZATION_CANCEL[job_id] = threading.Event()
     background_tasks.add_task(
         _run_sanitization_job, job_id, project_id, file_id, source, output,
@@ -421,11 +417,10 @@ def project_file_sanitize_status(project_id: str, file_id: str, job_id: str) -> 
     """Return progress and status without exposing source paths or log contents."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
-    with _SANITIZATION_LOCK:
-        job = _SANITIZATION_JOBS.get(job_id)
-        if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
-            raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
-        return {key: value for key, value in job.items() if key not in {"project_id", "file_id"}}
+    job = get_job(job_id)
+    if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
+        raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+    return {key: value for key, value in job.items() if key not in {"project_id", "file_id"}}
 
 
 @app.post(
@@ -436,16 +431,16 @@ def project_file_sanitize_cancel(project_id: str, file_id: str, job_id: str) -> 
     """Request cooperative cancellation; the worker removes its staging file."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    job = get_job(job_id)
+    if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
+        raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+    if job["status"] in {"completed", "failed", "cancelled", "interrupted"}:
+        return {"id": job_id, "status": job["status"]}
     with _SANITIZATION_LOCK:
-        job = _SANITIZATION_JOBS.get(job_id)
-        if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
-            raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
-        if job["status"] in {"completed", "failed", "cancelled"}:
-            return {"id": job_id, "status": job["status"]}
         event = _SANITIZATION_CANCEL.get(job_id)
         if event is not None:
             event.set()
-            job["status"] = "cancelling"
+            update_job(job_id, status="cancelling", phase="cancelling")
     return {"id": job_id, "status": "cancelling"}
 
 
@@ -524,9 +519,8 @@ _SANITIZATION_LOCK = threading.Lock()
 
 
 def _set_job(job_id: str, **changes: object) -> None:
-    with _SANITIZATION_LOCK:
-        if job_id in _SANITIZATION_JOBS:
-            _SANITIZATION_JOBS[job_id].update(changes)
+    # Durable state is authoritative; the in-memory dictionary only holds cancellation events.
+    update_job(job_id, **changes)
 
 
 def _job_progress(job_id: str, progress: dict[str, int | str]) -> None:
@@ -543,7 +537,12 @@ def _run_sanitization_job(
     profile_id: str | None,
     selected_format: str,
 ) -> None:
-    cancel_event = _SANITIZATION_CANCEL[job_id]
+    with _SANITIZATION_LOCK:
+        cancel_event = _SANITIZATION_CANCEL.get(job_id)
+    if cancel_event is None:
+        fail_review_run(job_id, "failed", "Abbruchsteuerung des Laufs ist nicht verfügbar.")
+        _set_job(job_id, status="failed", phase="failed", error="Abbruchsteuerung des Laufs ist nicht verfügbar.")
+        return
     _set_job(job_id, status="running", phase="sanitizing")
     set_review_run_running(job_id)
     try:
