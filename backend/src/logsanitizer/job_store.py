@@ -30,7 +30,6 @@ def _db():
     path = _directory() / "sanitize_jobs.sqlite3"
     connection = sqlite3.connect(path, timeout=10)
     connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA foreign_keys=ON")
     try:
         try:
@@ -67,6 +66,7 @@ def _pid_alive(pid: int | None) -> bool:
 def initialize_job_database() -> int:
     """Create the job ledger, recover stale runs, and remove their staging files."""
     with _db() as db:
+        db.execute("PRAGMA journal_mode=WAL")
         db.execute("""
             CREATE TABLE IF NOT EXISTS sanitize_jobs (
                 id TEXT PRIMARY KEY,
