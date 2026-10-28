@@ -1,8 +1,9 @@
 """Test client that authenticates existing feature tests as a local operator."""
 import secrets
+
 from fastapi.testclient import TestClient as BaseTestClient
+
 from logsanitizer.auth import create_user
-from logsanitizer.main import app
 
 class TestClient(BaseTestClient):
     def __enter__(self):
