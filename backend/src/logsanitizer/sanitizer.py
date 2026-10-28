@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from logsanitizer.mapping_store import get_or_create_indexed_mapping
@@ -14,6 +16,19 @@ MAX_LINE_BYTES = 1024 * 1024
 
 class SanitizationError(ValueError):
     """Input cannot be processed safely by the initial streaming engine."""
+
+
+class SanitizationCancelled(SanitizationError):
+    """Raised when a caller requests cancellation of an active sanitization run."""
+
+
+ProgressCallback = Callable[[dict[str, int | str]], None]
+CancelCheck = Callable[[], bool]
+
+
+def _check_cancelled(cancel_check: CancelCheck | None) -> None:
+    if cancel_check is not None and cancel_check():
+        raise SanitizationCancelled("Bereinigung wurde abgebrochen.")
 
 
 def _compiled_rule(rule: SanitizationRule) -> re.Pattern[str]:
@@ -30,6 +45,10 @@ def _validate_sanitized_output(
     path: Path,
     compiled: list[tuple[SanitizationRule, re.Pattern[str]]],
     format_name: str,
+    cancel_check: CancelCheck | None = None,
+    progress_callback: ProgressCallback | None = None,
+    total_bytes: int = 0,
+    initial_bytes: int = 0,
 ) -> int:
     """Re-read output in bounded lines and reject syntax errors or configured residuals."""
     with path.open("rb") as output_stream:
@@ -38,6 +57,7 @@ def _validate_sanitized_output(
             raw_line = output_stream.readline(MAX_LINE_BYTES + 1)
             if not raw_line:
                 break
+            _check_cancelled(cancel_check)
             line_number += 1
             if len(raw_line) > MAX_LINE_BYTES:
                 raise SanitizationError(
@@ -54,6 +74,13 @@ def _validate_sanitized_output(
                     raise SanitizationError(
                         f"Die Ausgabe enthält ungültiges JSON in Zeile {line_number}."
                     ) from exc
+            if progress_callback is not None:
+                progress_callback({
+                    "phase": "validating",
+                    "processed_bytes": initial_bytes + output_stream.tell(),
+                    "total_bytes": total_bytes,
+                    "lines_processed": line_number,
+                })
             for rule, pattern in compiled:
                 if pattern.search(line):
                     raise SanitizationError(
@@ -69,6 +96,8 @@ def sanitize_file(
     profile_id: str | None = None,
     format_name: str | None = None,
     project_id: str | None = None,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
 ) -> dict[str, int | str]:
     """Sanitize UTF-8 text/JSONL one bounded line at a time; never modify the source."""
     source = source_path.expanduser()
@@ -101,14 +130,17 @@ def sanitize_file(
     if project_id is None and any(rule.replacement_mode == "indexed" for rule in rules):
         raise SanitizationError("Indexierte Ersetzungen benötigen eine Projekt-ID.")
 
+    total_bytes = source.stat().st_size
     processed_bytes = 0
     replacement_count = 0
     line_count = 0
-    output_created = False
+    staging = destination.with_name(f".{destination.name}.logsanitizer-{uuid.uuid4().hex}.tmp")
+    staging_created = False
     try:
         with source.open("rb") as input_stream:
-            output_stream = destination.open("xb")
-            output_created = True
+            _check_cancelled(cancel_check)
+            output_stream = staging.open("xb")
+            staging_created = True
             with output_stream:
                 try:
                     os.chmod(destination, 0o600)
@@ -160,12 +192,28 @@ def sanitize_file(
                     output_stream.write(line.encode("utf-8"))
                     processed_bytes += len(raw_line)
                     line_count += 1
+                    if progress_callback is not None:
+                        progress_callback({
+                            "phase": "sanitizing",
+                            "processed_bytes": processed_bytes,
+                            "total_bytes": total_bytes,
+                            "lines_processed": line_count,
+                        })
                 output_stream.flush()
                 os.fsync(output_stream.fileno())
-        residual_matches = _validate_sanitized_output(destination, compiled, effective_format)
+        _check_cancelled(cancel_check)
+        residual_matches = _validate_sanitized_output(
+            staging, compiled, effective_format, cancel_check, progress_callback,
+            total_bytes, processed_bytes,
+        )
+        _check_cancelled(cancel_check)
+        if destination.exists() or destination.is_symlink():
+            raise FileExistsError("Die Zieldatei existiert bereits oder ist ein symbolischer Link.")
+        os.replace(staging, destination)
+        staging_created = False
     except Exception:
-        if output_created:
-            destination.unlink(missing_ok=True)
+        if staging_created:
+            staging.unlink(missing_ok=True)
         raise
 
     return {
