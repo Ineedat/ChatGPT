@@ -40,7 +40,6 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
-from logsanitizer.notifications import notify_pending_review
 from logsanitizer.job_store import (
     create_job,
     get_job,
@@ -48,6 +47,7 @@ from logsanitizer.job_store import (
     pop_recovered_job_ids,
     update_job,
 )
+from logsanitizer.notifications import notify_pending_review
 from logsanitizer.review_workflow import create_run as create_review_run
 from logsanitizer.review_workflow import fail_run as fail_review_run
 from logsanitizer.review_workflow import finish_run as finish_review_run
