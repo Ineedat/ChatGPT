@@ -45,6 +45,8 @@ def test_expired_session_is_rejected(tmp_path, monkeypatch):
     create_user("expiry-user", "expiry-password-123", ["operator", "reviewer"])
     with TestClient(app) as client:
         client.post("/api/auth/login", json={"username":"expiry-user","password":"expiry-password-123"})
+        roles = client.get("/api/auth/me").json()["roles"]
+        assert set(roles) == {"operator", "reviewer"}
         token = client.cookies.get("logsanitizer_session")
         db = sqlite3.connect(tmp_path / "data" / "auth.sqlite3")
         db.execute("UPDATE sessions SET expires_at=0 WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),))
