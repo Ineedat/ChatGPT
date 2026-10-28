@@ -53,7 +53,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
             "username": "reviewer", "password": "reviewer-password-123"
         })
         assert login.status_code == 200
-        response, project, file, output = _sanitized_run(client, tmp_path)
+        response, _, _, output = _sanitized_run(client, tmp_path)
         assert response.status_code == 200
         result = response.json()
         assert result["review_status"] == "pending_review"
