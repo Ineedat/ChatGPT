@@ -391,12 +391,16 @@ def search_sanitized_output(
             raise HTTPException(status_code=422, detail="Ungültiger Suchbegriff.")
         output_path = Path(row["output_path"])
         expected_signature = row["output_signature"]
-    if not expected_signature or _file_signature(output_path) != expected_signature:
-        raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
+    if not expected_signature:
+        raise HTTPException(status_code=409, detail="Keine validierte Ausgabe für diesen Lauf gespeichert.")
     results = []
     needle = query.casefold()
     try:
         with output_path.open("rb") as stream:
+            info = os.fstat(stream.fileno())
+            actual_signature = f"{info.st_dev}:{info.st_ino}:{info.st_size}:{info.st_mtime_ns}"
+            if actual_signature != expected_signature:
+                raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
             line_number = 0
             while len(results) <= MAX_SEARCH_RESULTS:
                 raw = stream.readline(MAX_LINE_BYTES + 1)
