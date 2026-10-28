@@ -18,7 +18,8 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from logsanitizer.auth import AuthMiddleware, initialize_auth_database, router as auth_router
+from logsanitizer.auth import AuthMiddleware, initialize_auth_database
+from logsanitizer.auth import router as auth_router
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
