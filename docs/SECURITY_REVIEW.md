@@ -14,14 +14,14 @@ These controls reduce risk but do not establish production readiness. Verify the
 
 ## Findings still open
 
-### LS-SEC-001 — Original-value mappings are stored in plaintext
+### LS-SEC-001 — Original-value mapping encryption
 
-- **Severity:** High
-- **Location:** `backend/src/logsanitizer/mapping_store.py`, `get_or_create_indexed_mapping`
-- **Evidence:** The `indexed_mappings.original_value` column stores each original matched value. File permissions are restricted where the platform supports POSIX modes, but the database itself is not encrypted.
-- **Impact:** Anyone who obtains a copy of the mapping database or runs under the same OS account can recover values that sanitization replaced, potentially including identifiers or secrets.
-- **Required fix:** Design and implement encryption at rest with an explicit local key-provisioning and recovery model. Do not hard-code or commit a key. Document what happens if the key is lost, rotated, or unavailable offline.
-- **Release gate:** Do not use real confidential logs until this is addressed and tested on Windows and Linux.
+- **Status:** Implemented in the current branch; pending final CI confirmation and Windows-specific ACL verification.
+- **Location:** `backend/src/logsanitizer/mapping_store.py`.
+- **Change:** Original values are encrypted with AES-256-GCM. A separate 32-byte random key file is created locally; HKDF-SHA-256 derives distinct encryption and keyed-lookup keys. A keyed HMAC fingerprint preserves stable lookup without storing the source value in plaintext. POSIX key-file permissions are set to `0600`; on Windows the application applies an explicit current-user ACL and fails closed if that operation fails. A key-check record prevents silently using a wrong replacement key. Missing keys for an already encrypted database fail closed.
+- **Migration:** Existing plaintext mappings are migrated on first use, the old table is dropped, and SQLite `VACUUM` is run to compact the database. This cannot guarantee erasure of SSD blocks, filesystem snapshots, or old backups.
+- **Backup limitation:** Database and key must be backed up together for recovery. Anyone who obtains both can recover mappings; protect the key separately and keep a secure offline recovery copy. Losing the key makes mapping recovery impossible.
+- **Residual release gate:** Verify Windows ACL behavior on supported Windows versions and validate migration/recovery in isolated Windows/Linux tests before confidential-data use.
 
 ### LS-SEC-002 — User-configured regex execution timeout
 
