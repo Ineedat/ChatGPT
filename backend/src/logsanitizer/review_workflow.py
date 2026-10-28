@@ -446,9 +446,9 @@ def _decide(run_id: str, action: str, payload: ReviewDecision, request: Request)
             "stop": "stopped",
         }[action]
         db.execute(
-            """UPDATE review_runs SET status=?, reviewer_user_id=?, completed_at=?,
+            """UPDATE review_runs SET status=?, reviewer_user_id=?,
                last_comment=?, exception_reason=? WHERE id=? AND status='pending_review'""",
-            (status, actor_id, _now(), payload.comment, payload.exception_reason if payload.exception else "", run_id),
+            (status, actor_id, payload.comment, payload.exception_reason if payload.exception else "", run_id),
         )
         if db.execute("SELECT changes()").fetchone()[0] != 1:
             raise HTTPException(status_code=409, detail="Der Lauf wurde parallel bereits entschieden.")
