@@ -18,7 +18,8 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from logsanitizer.auth import AuthMiddleware, initialize_auth_database, router as auth_router\nfrom logsanitizer.database import (
+from logsanitizer.auth import AuthMiddleware, initialize_auth_database, router as auth_router
+from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
     FolderImportIssue,
@@ -51,6 +52,7 @@ from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, san
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     initialize_database()
+    initialize_auth_database()
     yield
 
 
@@ -655,4 +657,8 @@ def project_folder_import(
         issues=issues,
         limit_reached=candidates > MAX_FOLDER_FILES,
     )
-\n\n# All API routes except liveness and login require a valid local session.\napp.include_router(auth_router)\napp.add_middleware(AuthMiddleware)\n
+
+
+# All API routes except liveness and login require a valid local session.
+app.include_router(auth_router)
+app.add_middleware(AuthMiddleware)
