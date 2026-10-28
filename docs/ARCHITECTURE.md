@@ -32,7 +32,7 @@ React/TypeScript UI -> FastAPI (loopback standardmäßig)
 - POST /api/projects/{project_id}/files/import-folder: Dateien eines absoluten lokalen Ordners registrieren, rekursiv optional, mit per-Datei-Fehlerliste und Limit von 5.000 Kandidaten.
 
 ## Während der Implementierung zu entscheiden
-- Verschlüsselung und Schlüsselverwaltung für persistente Mappings.
+- Mapping-Verschlüsselung mit separater Schlüsseldatei ist implementiert; Windows/Linux-ACL-, Backup- und Recovery-Verifikation bleibt offen.
 - Unterstützte Encodings und Umgang mit fehlerhaften Bytes.
 - Grenzen für Regex-Ausführung.
 - Umgang mit sehr großen einzelnen JSON-Dokumenten.
