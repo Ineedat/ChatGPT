@@ -1,11 +1,11 @@
 import sqlite3
 
 from fastapi.testclient import TestClient as BaseTestClient
+from test_client import TestClient
 
 from logsanitizer.auth import create_user
 from logsanitizer.main import app
 from logsanitizer.rule_config import RuleConfig, save_rule_config
-from test_client import TestClient
 
 
 def _config():
