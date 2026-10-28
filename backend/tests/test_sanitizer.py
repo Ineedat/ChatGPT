@@ -335,3 +335,27 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
     assert output.read_bytes() == b"hidden=REDACTED\\n"
     assert source.read_bytes() == original
     assert list(tmp_path.glob(".job-clean.log.logsanitizer-*.tmp")) == []
+
+
+def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Path) -> None:
+    source = tmp_path / "pathological.log"
+    source.write_text("a" * 100_000 + "!\\n", encoding="utf-8")
+    destination = tmp_path / "clean.log"
+    unsafe_config = RuleConfig.model_validate({
+        "schema_version": 1,
+        "rules": [{
+            "id": "pathological",
+            "name": "Pathological regex",
+            "category": "test",
+            "match_type": "regex",
+            "pattern": r"(a+)+$",
+            "replacement": "REDACTED",
+            "priority": 1,
+        }],
+    })
+
+    with pytest.raises(SanitizationError, match="Zeitlimit"):
+        sanitize_file(source, destination, unsafe_config)
+
+    assert not destination.exists()
+    assert list(tmp_path.glob(".clean.log.logsanitizer-*.tmp")) == []
