@@ -18,6 +18,7 @@ DEFAULT_DATA_DIR = ".logsanitizer"
 KEY_FILE_NAME = "mappings.key"
 KEY_BYTES = 32
 FORMAT_VERSION = 1
+_WINDOWS_ACL_VERIFIED: set[tuple[str, bool]] = set()
 _KEY_CHECK_CONTEXT = b"logsanitizer:mappings:key-check:v1"
 _LOOKUP_CONTEXT = b"logsanitizer:mappings:lookup:v1"
 _ENCRYPTION_CONTEXT = b"logsanitizer:mappings:encryption:v1"
@@ -51,6 +52,9 @@ def _windows_identity() -> str:
 
 
 def _restrict_windows_acl(path: Path, *, directory: bool) -> None:
+    cache_key = (str(path.resolve()).casefold(), directory)
+    if cache_key in _WINDOWS_ACL_VERIFIED:
+        return
     inheritance = ":(OI)(CI)(F)" if directory else ":(F)"
     try:
         subprocess.run(
@@ -59,6 +63,7 @@ def _restrict_windows_acl(path: Path, *, directory: bool) -> None:
             capture_output=True,
             timeout=10,
         )
+        _WINDOWS_ACL_VERIFIED.add(cache_key)
     except (OSError, subprocess.SubprocessError) as exc:
         raise MappingEncryptionError(
             "Zugriffsrechte für Mapping-Daten konnten unter Windows nicht eingeschränkt werden."
