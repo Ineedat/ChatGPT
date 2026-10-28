@@ -92,6 +92,18 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         )
         assert saved_matches.json()["match_count"] == 1
 
+        create_user("second-reviewer", "second-reviewer-password-123", ["reviewer"])
+        second_login = client.post("/api/auth/login", json={
+            "username": "second-reviewer", "password": "second-reviewer-password-123"
+        })
+        assert second_login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        assert client.get("/api/reviews/saved-searches").json() == []
+        foreign_search = client.get(
+            f"/api/reviews/runs/{run['id']}/search", params={"saved_search_id": saved_id}
+        )
+        assert foreign_search.status_code == 404
+
         # Replacing the output after validation must block both further sampling and approval.
         output.write_text("secret=alpha\\n", encoding="utf-8")
         changed_search = client.get(
