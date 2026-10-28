@@ -1,6 +1,6 @@
 import pytest
-from test_client import TestClient
 from pydantic import ValidationError
+from test_client import TestClient
 
 from logsanitizer.main import app
 from logsanitizer.rule_config import (
