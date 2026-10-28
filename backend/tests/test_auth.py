@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+
 from logsanitizer.auth import create_user
 from logsanitizer.main import app
 
