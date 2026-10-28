@@ -41,6 +41,40 @@ def mapping_key_path() -> Path:
     return mapping_database_path().with_name(KEY_FILE_NAME)
 
 
+def _windows_identity() -> str:
+    domain = os.environ.get("USERDOMAIN")
+    username = os.environ.get("USERNAME")
+    identity = f"{domain}\\{username}" if domain and username else username
+    if not identity:
+        raise MappingEncryptionError("Windows-Benutzer konnte für Dateirechte nicht ermittelt werden.")
+    return identity
+
+
+def _restrict_windows_acl(path: Path, *, directory: bool) -> None:
+    inheritance = ":(OI)(CI)(F)" if directory else ":(F)"
+    try:
+        subprocess.run(
+            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{_windows_identity()}{inheritance}"],
+            check=True,
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise MappingEncryptionError(
+            "Zugriffsrechte für Mapping-Daten konnten unter Windows nicht eingeschränkt werden."
+        ) from exc
+
+
+def _restrict_data_directory(path: Path) -> None:
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        if os.name != "nt":
+            raise MappingEncryptionError("Verzeichnisrechte für Mapping-Daten konnten nicht gesetzt werden.")
+    if os.name == "nt":
+        _restrict_windows_acl(path, directory=True)
+
+
 def _restrict_key_file(path: Path) -> None:
     """Restrict key-file access on supported platforms; fail closed on Windows ACL errors."""
     try:
@@ -49,23 +83,7 @@ def _restrict_key_file(path: Path) -> None:
         if os.name != "nt":
             raise MappingEncryptionError("Schlüsseldatei-Berechtigungen konnten nicht gesetzt werden.")
     if os.name == "nt":
-        domain = os.environ.get("USERDOMAIN")
-        username = os.environ.get("USERNAME")
-        identity = f"{domain}\\{username}" if domain and username else username
-        if not identity:
-            raise MappingEncryptionError("Windows-Benutzer konnte für die Schlüsselrechte nicht ermittelt werden.")
-        try:
-            subprocess.run(
-                ["icacls", str(path), "/inheritance:r", "/grant:r", f"{identity}:(F)"],
-                check=True,
-                capture_output=True,
-                timeout=10,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise MappingEncryptionError(
-                "Zugriffsrechte der Schlüsseldatei konnten unter Windows nicht eingeschränkt werden."
-            ) from exc
-
+        _restrict_windows_acl(path, directory=False)
 
 def _load_or_create_key(path: Path, encrypted_schema_exists: bool) -> bytes:
     key_path = path.with_name(KEY_FILE_NAME)
@@ -269,11 +287,9 @@ def get_or_create_indexed_mapping(
     """Return a stable project-scoped placeholder without storing source values in plaintext."""
     path = mapping_database_path()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    try:
-        os.chmod(path.parent, 0o700)
-    except OSError:
-        if os.name != "nt":
-            raise MappingEncryptionError("Verzeichnisrechte für Mapping-Daten konnten nicht gesetzt werden.")
+    _restrict_data_directory(path.parent)
+    if path.exists() and os.name == "nt":
+        _restrict_windows_acl(path, directory=False)
 
     connection = sqlite3.connect(path, timeout=10.0)
     connection.row_factory = sqlite3.Row
