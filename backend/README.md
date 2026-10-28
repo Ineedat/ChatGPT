@@ -53,3 +53,16 @@ a network: authentication, authorization, processing, mapping protection, and
 release controls are still missing.
 
 Run tests with `pytest` and lint with `ruff check src tests`.
+
+
+## Lokale Anmeldung und Rollen
+
+Vor dem ersten Start einen Administrator interaktiv anlegen:
+
+```bash
+python -m logsanitizer.auth_cli
+```
+
+Das Kommando fragt Benutzername und Passwort verdeckt ab. Es gibt keinen öffentlichen Bootstrap-Endpunkt und kein eingebautes Standardpasswort. Passwörter werden mit scrypt gehasht; Sitzungen verwenden zufällige opaque Tokens, deren SHA-256-Digests gespeichert werden. Sitzungen laufen nach acht Stunden ab. Benutzer können mehrere Rollen erhalten: `admin`, `operator`, `reviewer` und `approver`. Benutzerverwaltung ist Administratoren vorbehalten. Änderungen an API-Daten benötigen zusätzlich den CSRF-Header `X-CSRF-Token`, passend zum `logsanitizer_csrf`-Cookie.
+
+Für HTTPS-Bereitstellungen `LOGSANITIZER_COOKIE_SECURE=1` setzen. Bei lokalem HTTP ist das Secure-Attribut standardmäßig aus; die Anwendung sollte dann nur an Loopback gebunden sein. Die derzeitige Rollenmatrix ist eine Grundlage und muss vor Netzwerkbetrieb weitergehend geprüft werden. Es gibt noch keine Passwortwiederherstellung, keine Administrationsoberfläche für Benutzer und keine Begrenzung wiederholter fehlgeschlagener Anmeldungen. Authentifizierung allein macht die Anwendung noch nicht produktionsreif.
