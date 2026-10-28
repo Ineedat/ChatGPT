@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient as BaseTestClient
 from logsanitizer.auth import create_user
 from logsanitizer.main import app
 from logsanitizer.rule_config import RuleConfig, save_rule_config
+from test_client import TestClient
 
 
 def _config():
@@ -108,7 +109,7 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(_config())
 
-    with BaseTestClient(app) as client:
+    with TestClient(app) as client:
         response, _, _, _ = _sanitized_run(client, tmp_path)
         run_id = response.json()["review_run_id"]
 
@@ -136,7 +137,7 @@ def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, mo
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(_config())
 
-    with BaseTestClient(app) as client:
+    with TestClient(app) as client:
         response, _, _, _ = _sanitized_run(client, tmp_path)
         run_id = response.json()["review_run_id"]
         approved = client.post(
@@ -178,7 +179,7 @@ def test_failed_sanitization_is_persisted_but_never_queued_for_approval(tmp_path
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(_config())
 
-    with BaseTestClient(app) as client:
+    with TestClient(app) as client:
         response, _, _, _ = _sanitized_run(
             client, tmp_path, name="invalid.log", contents=b"secret=alpha\ninvalid=\xff\n"
         )
