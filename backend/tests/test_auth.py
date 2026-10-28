@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from logsanitizer.auth import create_user
 from logsanitizer.main import app
 
+
 def test_login_rejects_invalid_credentials_and_protects_projects(tmp_path, monkeypatch):
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
     create_user("operator", "correct-horse-battery", ["operator"])
