@@ -1,4 +1,4 @@
-from fastapi.testclient import TestClient
+from test_client import TestClient
 
 from logsanitizer.format_validation import validate_file
 from logsanitizer.main import app
