@@ -53,3 +53,23 @@ def test_expired_session_is_rejected(tmp_path, monkeypatch):
         db.commit()
         db.close()
         assert client.get("/api/auth/me").status_code == 401
+
+
+
+def test_login_attempts_are_rate_limited_and_docs_require_auth(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("rate-limited", "rate-limit-password-123", ["operator"])
+    with TestClient(app) as client:
+        assert client.get("/api/docs").status_code == 401
+        assert client.get("/api/openapi.json").status_code == 401
+        for _ in range(5):
+            response = client.post(
+                "/api/auth/login",
+                json={"username": "rate-limited", "password": "wrong-password"},
+            )
+            assert response.status_code == 401
+        locked = client.post(
+            "/api/auth/login",
+            json={"username": "rate-limited", "password": "rate-limit-password-123"},
+        )
+        assert locked.status_code == 429
