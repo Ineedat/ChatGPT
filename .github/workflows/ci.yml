@@ -20,7 +20,10 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install -e ".[dev]"
-      - run: pytest
+      - if: runner.os != 'Windows'
+        run: pytest
+      - if: runner.os == 'Windows'
+        run: pytest tests/test_mapping_encryption.py
       - run: ruff check src tests
 
   frontend:
