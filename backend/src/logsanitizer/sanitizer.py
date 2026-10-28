@@ -204,7 +204,7 @@ def sanitize_file(
         _check_cancelled(cancel_check)
         residual_matches = _validate_sanitized_output(
             staging, compiled, effective_format, cancel_check, progress_callback,
-            total_bytes, processed_bytes,
+            staging.stat().st_size, 0,
         )
         _check_cancelled(cancel_check)
         if destination.exists() or destination.is_symlink():
