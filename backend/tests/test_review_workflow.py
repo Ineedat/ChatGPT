@@ -210,3 +210,23 @@ def test_failed_sanitization_is_persisted_but_never_queued_for_approval(tmp_path
         assert history.status_code == 200
         assert history.json()[0]["status"] == "failed"
         assert client.get("/api/reviews/queue").json() == []
+
+
+def test_review_search_bounds_results_and_shows_match_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+
+    with TestClient(app) as client:
+        response, _, _, _ = _sanitized_run(
+            client, tmp_path, contents=b"prefix-" + b"x" * 350 + b"secret=alpha-suffix\\n" * 25
+        )
+        run_id = response.json()["review_run_id"]
+        results = client.get(
+            f"/api/reviews/runs/{run_id}/search", params={"q": "REDACTED"}
+        )
+        assert results.status_code == 200
+        body = results.json()
+        assert body["match_count"] == 20
+        assert body["truncated"] is True
+        assert len(body["results"]) == 20
