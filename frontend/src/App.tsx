@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { HelpTooltip } from "./components/HelpTooltip";
 import { helpTopics } from "./help/content";
 import { LoginGate } from "./LoginGate";
+import { ReviewPanel } from "./ReviewPanel";
 
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const method = (init.method || "GET").toUpperCase();
@@ -11,7 +12,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-type Tab = "overview" | "help";
+type Tab = "overview" | "review" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type FormatValidationResult = { file_id: string; format: string; valid: boolean; bytes_checked: number; error?: string };
@@ -34,7 +35,7 @@ type Project = {
   updated_at: string;
 };
 
-function AppInner({ onLogout }: { onLogout: () => void }) {
+function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -298,6 +299,7 @@ function AppInner({ onLogout }: { onLogout: () => void }) {
       <div><p className="eyebrow">LOKAL · OFFLINE-FIRST</p><h1>LogSanitizer</h1></div>
       <nav aria-label="Hauptnavigation" className="nav-tabs">
         <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Übersicht</button>
+        <button className={tab === "review" ? "active" : ""} onClick={() => setTab("review")}>Prüfung &amp; Verlauf</button>
         <button className={tab === "help" ? "active" : ""} onClick={() => setTab("help")}>Hilfe</button>
       </nav>
       <button type="button" onClick={async () => { await apiFetch("/api/auth/logout", { method: "POST" }); onLogout(); }}>Abmelden</button>
@@ -365,7 +367,7 @@ function AppInner({ onLogout }: { onLogout: () => void }) {
         <article className="feature-card"><span className="feature-number">02</span><h3>Originale schützen</h3><p>Quelldateien bleiben unverändert. Verarbeitung erfolgt in getrennten Arbeitsbereichen.</p></article>
         <article className="feature-card"><span className="feature-number">03</span><h3>Freigabe kontrollieren</h3><p>Unvollständige Läufe dürfen später nicht exportiert oder freigegeben werden.</p></article>
       </section>
-    </> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist lokal eingebunden. Die Themen werden während der Entwicklung erweitert.</p>
+    </> : tab === "review" ? <ReviewPanel roles={user.roles} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist lokal eingebunden. Die Themen werden während der Entwicklung erweitert.</p>
       <div className="help-list">{helpTopics.map(topic => <article className="help-topic" key={topic.id}><h3>{topic.title}</h3><p>{topic.summary}</p><ul>{topic.steps.map(step => <li key={step}>{step}</li>)}</ul></article>)}</div>
     </section>}
     <footer><span>LogSanitizer · 0.1.0-dev</span><span>Keine echten oder vertraulichen Logs in diesem Entwicklungsstand verarbeiten.</span></footer>
@@ -388,5 +390,5 @@ export default function App() {
   }, []);
   if (checking) return <main className="app-shell"><p role="status">Anmeldestatus wird geprüft …</p></main>;
   if (!user) return <LoginGate onLogin={setUser} />;
-  return <AppInner onLogout={() => setUser(null)} />;
+  return <AppInner onLogout={() => setUser(null)} user={user} />;
 }
