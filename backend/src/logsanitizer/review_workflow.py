@@ -406,7 +406,7 @@ def search_sanitized_output(
                 if len(raw) > MAX_LINE_BYTES:
                     raise HTTPException(status_code=422, detail="Ausgabe enthält eine Zeile oberhalb des geprüften Limits.")
                 try:
-                    line = raw.decode("utf-8").rstrip("\\r\\n")
+                    line = raw.decode("utf-8").rstrip("\r\n")
                 except UnicodeDecodeError as exc:
                     raise HTTPException(status_code=422, detail="Ausgabe ist nicht gültig UTF-8.") from exc
                 match_at = line.casefold().find(needle)
