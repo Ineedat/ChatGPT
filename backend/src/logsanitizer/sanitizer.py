@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import json
 import os
-import regex as re
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+
+import regex as re
 
 from logsanitizer.mapping_store import get_or_create_indexed_mapping
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
