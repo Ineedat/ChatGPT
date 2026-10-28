@@ -99,3 +99,58 @@ def test_posix_key_file_permissions_are_owner_only(tmp_path, monkeypatch) -> Non
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path))
     get_or_create_indexed_mapping("project-1", "host", "Host", "host.internal")
     assert stat.S_IMODE(mapping_key_path().stat().st_mode) == 0o600
+
+
+
+def test_mapping_backup_requires_and_recovers_with_database_and_key_pair(tmp_path, monkeypatch) -> None:
+    import shutil
+
+    original_dir = tmp_path / "original"
+    recovery_dir = tmp_path / "recovery"
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(original_dir))
+    expected = get_or_create_indexed_mapping("project-1", "ip", "IP", "192.0.2.25")
+    recovery_dir.mkdir()
+    shutil.copy2(mapping_database_path(), recovery_dir / "mappings.sqlite3")
+    shutil.copy2(mapping_key_path(), recovery_dir / "mappings.key")
+
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(recovery_dir))
+    assert get_or_create_indexed_mapping("project-1", "ip", "IP", "192.0.2.25") == expected
+    assert get_or_create_indexed_mapping("project-1", "ip", "IP", "192.0.2.26") == "[IP_2]"
+
+
+def test_tampered_ciphertext_fails_closed(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path))
+    get_or_create_indexed_mapping("project-1", "token", "Token", "secret-token")
+    with sqlite3.connect(mapping_database_path()) as db:
+        ciphertext = db.execute(
+            "SELECT encrypted_value FROM indexed_mappings WHERE project_id='project-1'"
+        ).fetchone()[0]
+        altered = bytearray(ciphertext)
+        altered[-1] ^= 0x01
+        db.execute(
+            "UPDATE indexed_mappings SET encrypted_value=? WHERE project_id='project-1'",
+            (bytes(altered),),
+        )
+
+    with pytest.raises(MappingEncryptionError, match="authentifiziert oder entschlüsselt"):
+        get_or_create_indexed_mapping("project-1", "token", "Token", "secret-token")
+
+
+def test_windows_key_file_acl_is_restricted_to_current_user(tmp_path, monkeypatch) -> None:
+    import os
+    import subprocess
+
+    if os.name != "nt":
+        pytest.skip("Windows-ACL-Prüfung läuft nur unter Windows.")
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path))
+    get_or_create_indexed_mapping("project-1", "host", "Host", "host.internal")
+    result = subprocess.run(
+        ["icacls", str(mapping_key_path())],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    # Inherited entries are a failure: the key should have an explicit user ACL.
+    assert "(I)" not in result.stdout
+    assert "(F)" in result.stdout
