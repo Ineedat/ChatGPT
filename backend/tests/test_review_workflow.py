@@ -53,6 +53,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
             "username": "reviewer", "password": "reviewer-password-123"
         })
         assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
         response, _, _, output = _sanitized_run(client, tmp_path)
         assert response.status_code == 200
         result = response.json()
@@ -164,6 +165,7 @@ def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(t
             "username": "operator-only", "password": "operator-password-123"
         })
         assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
         response, _, _, _ = _sanitized_run(client, tmp_path)
         assert response.status_code == 200
         assert response.json()["review_status"] == "approved"
