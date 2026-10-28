@@ -1,7 +1,7 @@
 """FastAPI application entry point.
 
-Development scaffold only: sanitization, authentication, and release controls
-are not implemented yet.
+Local project management and sanitization are development features. Release
+controls and production security hardening remain incomplete.
 """
 import csv
 import io
