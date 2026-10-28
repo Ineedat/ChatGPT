@@ -252,7 +252,7 @@ def test_successful_scan_reports_validation_scope_and_zero_residuals(tmp_path: P
 
 def test_residual_scan_rejects_invalid_jsonl_output_and_removes_it(tmp_path: Path) -> None:
     source = tmp_path / "events.jsonl"
-    source.write_text('{"message":"safe"}\\n', encoding="utf-8")
+    source.write_text('{"message":"safe"}\n', encoding="utf-8")
     destination = tmp_path / "clean.jsonl"
     data = config().model_dump(mode="json")
     data["rules"] = [data["rules"][0]]
