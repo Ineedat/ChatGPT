@@ -59,6 +59,17 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="microseconds")
 
 
+def _file_signature(path: Path) -> str | None:
+    """Identify the exact output file created by the successful sanitization run."""
+    try:
+        if path.is_symlink() or not path.is_file():
+            return None
+        info = path.stat()
+        return f"{info.st_dev}:{info.st_ino}:{info.st_size}:{info.st_mtime_ns}"
+    except OSError:
+        return None
+
+
 def initialize_review_database() -> None:
     with _db() as db:
         db.executescript("""
@@ -87,6 +98,7 @@ def initialize_review_database() -> None:
             validated INTEGER NOT NULL DEFAULT 0,
             residual_matches INTEGER NOT NULL DEFAULT 0,
             validation_scope TEXT NOT NULL DEFAULT '',
+            output_signature TEXT NOT NULL DEFAULT '',
             last_comment TEXT NOT NULL DEFAULT '',
             exception_reason TEXT NOT NULL DEFAULT ''
         );
@@ -121,6 +133,9 @@ def initialize_review_database() -> None:
             UNIQUE(owner_user_id, name)
         );
         """)
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(review_runs)")}
+        if "output_signature" not in columns:
+            db.execute("ALTER TABLE review_runs ADD COLUMN output_signature TEXT NOT NULL DEFAULT ''")
     try:
         os.chmod(_path(), 0o600)
     except OSError:
@@ -200,24 +215,32 @@ def finish_run(run_id: str, result: dict[str, object]) -> dict:
         row = db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone()
         if row is None:
             raise ValueError("Bereinigungslauf nicht gefunden.")
-        validated = bool(result.get("validated")) and int(result.get("residual_matches", 1)) == 0
+        signature = _file_signature(Path(row["output_path"]))
+        validated = (
+            bool(result.get("validated"))
+            and int(result.get("residual_matches", 1)) == 0
+            and signature is not None
+        )
         if not validated:
             status = "failed"
         db.execute(
             """UPDATE review_runs SET status=?, completed_at=?, input_bytes=?, output_bytes=?,
-               lines_processed=?, replacements=?, validated=?, residual_matches=?, validation_scope=?
-               WHERE id=?""",
+               lines_processed=?, replacements=?, validated=?, residual_matches=?, validation_scope=?,
+               output_signature=? WHERE id=?""",
             (status, _now(), int(result.get("input_bytes", 0)), int(result.get("output_bytes", 0)),
              int(result.get("lines_processed", 0)), int(result.get("replacements", 0)),
              int(validated), int(result.get("residual_matches", 0)),
-             str(result.get("validation_scope", "")), run_id),
+             str(result.get("validation_scope", "")), signature or "", run_id),
         )
         if status == "approved":
             _audit(db, run_id, None, "system", "auto_approved",
                    comment="Keine aktive Reviewer-/Approver-Zuweisung; Pflichtvalidierung bestanden.")
-        else:
+        elif status == "pending_review":
             _audit(db, run_id, None, "system", "pending_review",
                    comment="Pflichtvalidierung bestanden; bewusste Freigabe erforderlich.")
+        else:
+            _audit(db, run_id, None, "system", "failed",
+                   comment="Pflichtvalidierung fehlgeschlagen oder bereinigte Ausgabe nicht mehr verfügbar.")
         return _public_run(db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone())
 
 
@@ -367,8 +390,9 @@ def search_sanitized_output(
         if not query or len(query) > 200 or any(ord(char) < 32 for char in query):
             raise HTTPException(status_code=422, detail="Ungültiger Suchbegriff.")
         output_path = Path(row["output_path"])
-    if output_path.is_symlink() or not output_path.is_file():
-        raise HTTPException(status_code=410, detail="Bereinigte Ausgabe ist nicht mehr verfügbar.")
+        expected_signature = row["output_signature"]
+    if not expected_signature or _file_signature(output_path) != expected_signature:
+        raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
     results = []
     needle = query.casefold()
     try:
@@ -451,6 +475,11 @@ def _decide(run_id: str, action: str, payload: ReviewDecision, request: Request)
             raise HTTPException(status_code=409, detail="Nur ausstehende Läufe können entschieden werden.")
         if action == "approve" and (not row["validated"] or row["residual_matches"] != 0):
             raise HTTPException(status_code=409, detail="Pflichtvalidierung nicht bestanden; Freigabe verweigert.")
+        if action == "approve" and (
+            not row["output_signature"]
+            or _file_signature(Path(row["output_path"])) != row["output_signature"]
+        ):
+            raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
         status = {
             "approve": "approved_with_exception" if payload.exception else "approved",
             "return": "returned",
