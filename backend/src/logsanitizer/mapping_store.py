@@ -1,14 +1,12 @@
 """Project-scoped indexed mappings encrypted at rest with a separate local key file."""
 from __future__ import annotations
 
-import base64
 import hashlib
 import hmac
 import os
 import secrets
 import sqlite3
 import subprocess
-import tempfile
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
