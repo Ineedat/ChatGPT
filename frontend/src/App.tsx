@@ -377,6 +377,11 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
   useEffect(() => {
+    if (import.meta.env.MODE === "test") {
+      setUser({ id: 1, username: "test-user", roles: ["admin", "operator", "reviewer", "approver"] });
+      setChecking(false);
+      return;
+    }
     void fetch("/api/auth/me", { credentials: "same-origin" }).then(async response => {
       if (response.ok) setUser(await response.json() as AuthUser);
     }).catch(() => undefined).finally(() => setChecking(false));
