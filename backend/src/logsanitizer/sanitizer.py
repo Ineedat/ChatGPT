@@ -143,7 +143,7 @@ def sanitize_file(
             staging_created = True
             with output_stream:
                 try:
-                    os.chmod(destination, 0o600)
+                    os.chmod(staging, 0o600)
                 except OSError:
                     pass
                 while True:
@@ -209,7 +209,8 @@ def sanitize_file(
         _check_cancelled(cancel_check)
         if destination.exists() or destination.is_symlink():
             raise FileExistsError("Die Zieldatei existiert bereits oder ist ein symbolischer Link.")
-        os.replace(staging, destination)
+        os.link(staging, destination)
+        staging.unlink()
         staging_created = False
     except Exception:
         if staging_created:
