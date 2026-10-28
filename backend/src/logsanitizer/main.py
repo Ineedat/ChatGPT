@@ -41,7 +41,13 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
-from logsanitizer.job_store import create_job, get_job, initialize_job_database, update_job
+from logsanitizer.job_store import (
+    create_job,
+    get_job,
+    initialize_job_database,
+    pop_recovered_job_ids,
+    update_job,
+)
 from logsanitizer.review_workflow import create_run as create_review_run
 from logsanitizer.review_workflow import fail_run as fail_review_run
 from logsanitizer.review_workflow import finish_run as finish_review_run
@@ -63,6 +69,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     initialize_auth_database()
     initialize_review_database()
     initialize_job_database()
+    for recovered_job_id in pop_recovered_job_ids():
+        fail_review_run(
+            recovered_job_id,
+            "failed",
+            "Der Backend-Prozess wurde vor Abschluss beendet; bitte den Lauf erneut starten.",
+        )
     yield
 
 
