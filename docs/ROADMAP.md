@@ -26,7 +26,7 @@
 - [x] Pflichtvalidierung nach der Bereinigung: Ausgabe vollständig zeilenweise erneut lesen, UTF-8/JSONL-Syntax prüfen und alle aktiven konfigurierten Muster auf Resttreffer scannen; bei Fehlern Ausgabe löschen und Lauf ablehnen. Gilt nur für unterstützte Text-/JSONL-Ausgabe und ist kein Beweis vollständiger Geheimniserkennung.
 
 ## Meilenstein 2 — Prüfung und kontrollierte Freigabe
-- [x] Lokale Benutzerkonten, scrypt-Passworthashes, serverseitige Sitzungen, CSRF-Schutz und rollenbasierte API-Prüfung implementiert; Abschlussprüfung und UI-Integration noch offen.
+- [ ] Lokale Anmeldung und rollenbasierte Rechte: Backend-Grundlage und Anmeldeoberfläche implementiert; vollständige Sicherheitsprüfung, Regressionstests und CI-Abschluss noch offen.
 - [ ] Prüfer-Warteschlange und sichere Suche.
 - [ ] Freigabe/Rückgabe mit Kommentar, Laufhistorie und Audit.
 - [ ] Begründete, eng begrenzte Ausnahmen.
