@@ -1,5 +1,6 @@
 """Create the first local administrator interactively; never expose bootstrap over HTTP."""
 from getpass import getpass
+
 from logsanitizer.auth import create_user, initialize_auth_database
 
 def main() -> None:
