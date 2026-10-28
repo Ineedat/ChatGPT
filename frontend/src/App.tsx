@@ -1,6 +1,15 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { HelpTooltip } from "./components/HelpTooltip";
 import { helpTopics } from "./help/content";
+import { LoginGate } from "./LoginGate";
+
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const method = (init.method || "GET").toUpperCase();
+  const csrf = document.cookie.split("; ").find(item => item.startsWith("logsanitizer_csrf="))?.split("=").slice(1).join("=");
+  const headers = new Headers(init.headers);
+  if (!["GET", "HEAD", "OPTIONS"].includes(method) && csrf) headers.set("X-CSRF-Token", decodeURIComponent(csrf));
+  return window.fetch(input, { ...init, headers, credentials: "same-origin" });
+}
 
 type Tab = "overview" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
@@ -25,7 +34,7 @@ type Project = {
   updated_at: string;
 };
 
-export default function App() {
+function AppInner() {
   const [tab, setTab] = useState<Tab>("overview");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -49,7 +58,7 @@ export default function App() {
   const loadProjects = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/projects");
+      const response = await apiFetch("/api/projects");
       if (!response.ok) throw new Error("Projektliste konnte nicht geladen werden.");
       setProjects(await response.json() as Project[]);
       setError("");
@@ -64,7 +73,7 @@ export default function App() {
 
   const loadImportedFiles = useCallback(async (projectId: string) => {
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/files`);
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/files`);
       if (!response.ok) throw new Error("Dateiliste konnte nicht geladen werden.");
       setImportedFiles(await response.json() as ImportedFile[]);
     } catch (cause) {
@@ -85,7 +94,7 @@ export default function App() {
     setImportMessage("");
     setImportIssues([]);
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files`, {
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: sourcePath })
@@ -113,7 +122,7 @@ export default function App() {
     setImportMessage("");
     setImportIssues([]);
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/import-folder`, {
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/import-folder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: folderPath, recursive })
@@ -141,7 +150,7 @@ export default function App() {
     if (!selectedProject) return;
     setError("");
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/detect-format`, { method: "POST" });
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/detect-format`, { method: "POST" });
       const body = await response.json() as { detected_format?: string; format_override?: string | null; detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format konnte nicht erkannt werden.");
       setImportedFiles(current => current.map(item => item.id === file.id ? { ...item, detected_format: body.detected_format, format_override: body.format_override ?? item.format_override } : item));
@@ -160,7 +169,7 @@ export default function App() {
       return next;
     });
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/validate-format`, { method: "POST" });
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/validate-format`, { method: "POST" });
       const body = await response.json() as FormatValidationResult & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Vollständige Formatvalidierung fehlgeschlagen.");
       setValidationResults(current => ({ ...current, [file.id]: body }));
@@ -176,7 +185,7 @@ export default function App() {
     if (!selectedProject || !outputPaths[file.id]?.trim() || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return;
     setError("");
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ output_path: outputPaths[file.id] })
@@ -194,7 +203,7 @@ export default function App() {
     if (!selectedProject) return;
     try {
       const url = `/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(jobId)}`;
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       const body = await response.json() as SanitizationJob & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Fortschritt konnte nicht gelesen werden.");
       setSanitizationJobs(current => ({ ...current, [file.id]: body }));
@@ -219,7 +228,7 @@ export default function App() {
     const job = sanitizationJobs[file.id];
     if (!job || !["queued", "running"].includes(job.status)) return;
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
       const body = await response.json() as { status?: string; detail?: string };
       if (!response.ok) throw new Error(body.detail || "Abbruch konnte nicht angefordert werden.");
       setSanitizationJobs(current => ({ ...current, [file.id]: { ...job, status: "cancelling" } }));
@@ -232,7 +241,7 @@ export default function App() {
     if (!selectedProject) return;
     setError("");
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/format`, {
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/format`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format_override: formatOverride || null })
@@ -252,7 +261,7 @@ export default function App() {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch("/api/projects", {
+      const response = await apiFetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: projectName, description: projectDescription })
@@ -276,7 +285,7 @@ export default function App() {
   async function openProject(id: string) {
     setError("");
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(id)}`);
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(id)}`);
       if (!response.ok) throw new Error("Projekt konnte nicht geöffnet werden.");
       setSelectedProject(await response.json() as Project);
     } catch (cause) {
@@ -360,4 +369,18 @@ export default function App() {
     </section>}
     <footer><span>LogSanitizer · 0.1.0-dev</span><span>Keine echten oder vertraulichen Logs in diesem Entwicklungsstand verarbeiten.</span></footer>
   </main>;
+}
+
+type AuthUser = { id: number; username: string; roles: string[] };
+export default function App() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checking, setChecking] = useState(true);
+  useEffect(() => {
+    void window.fetch("/api/auth/me", { credentials: "same-origin" }).then(async response => {
+      if (response.ok) setUser(await response.json() as AuthUser);
+    }).catch(() => undefined).finally(() => setChecking(false));
+  }, []);
+  if (checking) return <main className="app-shell"><p role="status">Anmeldestatus wird geprüft …</p></main>;
+  if (!user) return <LoginGate onLogin={setUser} />;
+  return <AppInner />;
 }
