@@ -63,7 +63,7 @@ Die Mapping-Datenbank speichert Originalwerte nicht mehr im Klartext. Die Anwend
 
 Dies ist Verschlüsselung auf Anwendungsebene für die Mapping-Werte, keine vollständige Verschlüsselung aller SQLite-Metadaten oder des gesamten Datenträgers. Für zusätzlichen Schutz gegen Geräteverlust wird weiterhin vollständige Datenträgerverschlüsselung empfohlen. Die Schlüsseldatei liegt standardmäßig neben der Datenbank, sodass Dateiberechtigungen und Backup-Verfahren Teil des Sicherheitsmodells sind.
 
-This scaffold is not approved for real/sensitive logs or network exposure. Local authentication and basic role checks are implemented but still require full security verification. Mapping encryption, comprehensive sensitive-data detection, and release controls remain incomplete.
+This scaffold is not approved for real/sensitive logs or network exposure. Local authentication and basic role checks are implemented but still require full security verification. Mapping-value encryption with a separate local key file is implemented in this branch; Windows ACL and recovery behavior still require cross-platform verification. Comprehensive sensitive-data detection and release controls remain incomplete.
 
 Run tests with `pytest` and lint with `ruff check src tests`.
 
