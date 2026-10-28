@@ -34,7 +34,7 @@
 - [ ] Vollständige Sicherheitsprüfung der Authentifizierung/Rollenmatrix vor Produktions- oder Netzwerkbetrieb.
 
 ## Meilenstein 3 — Deployment
-- [ ] Optionale SMTP-Benachrichtigungen und Konfigurationstest.
+- [x] Optionale SMTP-Benachrichtigungen für ausstehende Prüffreigaben und zurückgegebene Läufe; Konfiguration über lokale Umgebungsvariablen und automatisierte Tests.
 - [ ] Optionale LDAP/AD-Integration.
 - [ ] Geschützte Darksite-Netzwerkbindung.
 - [ ] Portable Windows-/Linux-Paketierung und Offline-Handbuch.
