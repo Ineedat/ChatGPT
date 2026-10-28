@@ -8,7 +8,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const csrf = document.cookie.split("; ").find(item => item.startsWith("logsanitizer_csrf="))?.split("=").slice(1).join("=");
   const headers = new Headers(init.headers);
   if (!["GET", "HEAD", "OPTIONS"].includes(method) && csrf) headers.set("X-CSRF-Token", decodeURIComponent(csrf));
-  return window.fetch(input, { ...init, headers, credentials: "same-origin" });
+  return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
 type Tab = "overview" | "help";
@@ -377,7 +377,7 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
   useEffect(() => {
-    void window.fetch("/api/auth/me", { credentials: "same-origin" }).then(async response => {
+    void fetch("/api/auth/me", { credentials: "same-origin" }).then(async response => {
       if (response.ok) setUser(await response.json() as AuthUser);
     }).catch(() => undefined).finally(() => setChecking(false));
   }, []);
