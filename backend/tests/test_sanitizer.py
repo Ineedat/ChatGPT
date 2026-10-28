@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from logsanitizer.main import app
 from logsanitizer.rule_config import RuleConfig, save_rule_config
-from logsanitizer.sanitizer import SanitizationError, sanitize_file
+from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
 def config() -> RuleConfig:
@@ -264,3 +264,74 @@ def test_residual_scan_rejects_invalid_jsonl_output_and_removes_it(tmp_path: Pat
         sanitize_file(source, destination, unsafe_config, format_name="jsonl")
 
     assert not destination.exists()
+
+
+
+def test_sanitizer_reports_progress_and_cleans_staging_file_on_cancel(tmp_path: Path) -> None:
+    source = tmp_path / "large.log"
+    source.write_text("first line\\nsecond line\\nthird line\\n", encoding="utf-8")
+    destination = tmp_path / "clean.log"
+    progress: list[dict[str, int | str]] = []
+
+    def cancel_after_first_line(update: dict[str, int | str]) -> None:
+        progress.append(update)
+
+    def should_cancel() -> bool:
+        return any(update.get("phase") == "sanitizing" for update in progress)
+
+    with pytest.raises(SanitizationCancelled):
+        sanitize_file(
+            source,
+            destination,
+            config(),
+            progress_callback=cancel_after_first_line,
+            cancel_check=should_cancel,
+        )
+
+    assert progress
+    assert progress[0]["processed_bytes"] > 0
+    assert not destination.exists()
+    assert list(tmp_path.glob(".clean.log.logsanitizer-*.tmp")) == []
+    assert source.read_text(encoding="utf-8") == "first line\\nsecond line\\nthird line\\n"
+
+
+def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(config())
+    source = tmp_path / "service.log"
+    original = b"secret=alpha\\n"
+    source.write_bytes(original)
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Background sanitize"}).json()["id"]
+        file = client.post(
+            f"/api/projects/{project_id}/files", json={"path": str(source)}
+        ).json()
+        client.put(
+            f"/api/projects/{project_id}/files/{file['id']}/format",
+            json={"format_override": "text"},
+        )
+        output = tmp_path / "job-clean.log"
+        started = client.post(
+            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
+            json={"output_path": str(output)},
+        )
+        assert started.status_code == 202
+        job_id = started.json()["id"]
+        status_response = client.get(
+            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs/{job_id}"
+        )
+        assert status_response.status_code == 200
+        state = status_response.json()
+        assert state["status"] == "completed"
+        assert state["phase"] == "completed"
+        assert state["processed_bytes"] == len(original)
+        assert state["total_bytes"] == len(original)
+        assert state["result"]["validated"] is True
+        assert "source_path" not in status_response.text
+        assert "secret=alpha" not in status_response.text
+
+    assert output.read_bytes() == b"hidden=REDACTED\\n"
+    assert source.read_bytes() == original
+    assert list(tmp_path.glob(".job-clean.log.logsanitizer-*.tmp")) == []
