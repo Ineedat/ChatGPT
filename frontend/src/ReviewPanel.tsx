@@ -39,7 +39,12 @@ function statusLabel(status: string) {
     approved_with_exception: "Mit begründeter Ausnahme freigegeben",
     stopped: "Gestoppt", failed: "Fehlgeschlagen", cancelled: "Abgebrochen"
   };
-  return labels[status] || status;
+  const actions: Record<string, string> = {
+    queued: "Zur Prüfung vorgemerkt", started: "Bereinigung gestartet", pending_review: "Prüfung angefordert",
+    auto_approved: "Automatisch freigegeben", approve: "Freigegeben", return: "Zur Überarbeitung zurückgegeben",
+    stop: "Gestoppt", failed: "Fehlgeschlagen", cancelled: "Abgebrochen", commented: "Kommentar hinzugefügt"
+  };
+  return labels[status] || actions[status] || status;
 }
 
 async function reviewFetch(input: RequestInfo | URL, init: RequestInit = {}) {
@@ -291,9 +296,9 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
       <label className="review-exception-toggle"><input type="checkbox" checked={exception} onChange={event => setException(event.target.checked)} /> Begründete Ausnahme freigeben</label>
       {exception && <label className="review-comment-label">Ausnahmebegründung (Pflichtfeld)<textarea value={exceptionReason} maxLength={1000} onChange={event => setExceptionReason(event.target.value)} rows={3} required placeholder="Warum ist diese dokumentierte Ausnahme vertretbar?" /></label>}
       <div className="review-actions">
-        <button className="primary-button" type="button" disabled={busy || (exception && !exceptionReason.trim())} onClick={() => void decide("approve")}>Freigeben</button>
-        <button className="secondary-button" type="button" disabled={busy} onClick={() => void decide("return")}>Zur Überarbeitung zurückgeben</button>
-        <button className="secondary-button" type="button" disabled={busy} onClick={() => void decide("stop")}>Vorgang stoppen</button>
+        <button className="primary-button" type="button" disabled={busy || (exception && !exceptionReason.trim())} onClick={() => void decide("approve")}>{exception ? "Mit Ausnahme freigeben" : "Freigeben"}</button>
+        <button className="secondary-button" type="button" disabled={busy || exception} onClick={() => void decide("return")}>Zur Überarbeitung zurückgeben</button>
+        <button className="secondary-button" type="button" disabled={busy || exception} onClick={() => void decide("stop")}>Vorgang stoppen</button>
       </div>
     </section>}
     {selectedRun && <section className="review-section" aria-label="Laufdetails">
@@ -325,7 +330,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
     {canReview && <section className="review-section" aria-label="Audit-Protokoll">
       <h3>Audit-Protokoll (letzte {audit.length} Ereignisse)</h3>
       {audit.length === 0 ? <p className="muted-message">Noch keine Audit-Ereignisse.</p> : <ul className="audit-list">{audit.map(event =>
-        <li key={event.id}><div><strong>{event.action}</strong><span>{event.actor_username} · Lauf {event.run_id}</span><span>{new Date(event.created_at).toLocaleString("de-DE")}</span>{event.comment && <p>{event.comment}</p>}{event.exception_reason && <p>Ausnahme: {event.exception_reason}</p>}</div></li>)}</ul>}
+        <li key={event.id}><div><strong>{statusLabel(event.action)}</strong><span>{event.actor_username} · Lauf {event.run_id}</span><span>{new Date(event.created_at).toLocaleString("de-DE")}</span>{event.comment && <p>{event.comment}</p>}{event.exception_reason && <p>Ausnahme: {event.exception_reason}</p>}</div></li>)}</ul>}
     </section>}
   </section>;
 }
