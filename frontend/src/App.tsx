@@ -34,7 +34,7 @@ type Project = {
   updated_at: string;
 };
 
-function AppInner() {
+function AppInner({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -300,6 +300,7 @@ function AppInner() {
         <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Übersicht</button>
         <button className={tab === "help" ? "active" : ""} onClick={() => setTab("help")}>Hilfe</button>
       </nav>
+      <button type="button" onClick={async () => { await apiFetch("/api/auth/logout", { method: "POST" }); onLogout(); }}>Abmelden</button>
     </header>
     {tab === "overview" ? <>
       <section className="hero">
@@ -382,5 +383,5 @@ export default function App() {
   }, []);
   if (checking) return <main className="app-shell"><p role="status">Anmeldestatus wird geprüft …</p></main>;
   if (!user) return <LoginGate onLogin={setUser} />;
-  return <AppInner />;
+  return <AppInner onLogout={() => setUser(null)} />;
 }
