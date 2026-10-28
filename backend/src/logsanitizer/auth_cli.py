@@ -3,6 +3,7 @@ from getpass import getpass
 
 from logsanitizer.auth import create_user, initialize_auth_database
 
+
 def main() -> None:
     initialize_auth_database()
     username = input("Administrator username: ").strip()
