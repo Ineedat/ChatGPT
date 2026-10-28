@@ -154,3 +154,24 @@ def test_windows_key_file_acl_is_restricted_to_current_user(tmp_path, monkeypatc
     # Inherited entries are a failure: the key should have an explicit user ACL.
     assert "(I)" not in result.stdout
     assert "(F)" in result.stdout
+
+
+
+def test_windows_mapping_directory_acl_is_restricted(tmp_path, monkeypatch) -> None:
+    import os
+    import subprocess
+
+    if os.name != "nt":
+        pytest.skip("Windows-ACL-Prüfung läuft nur unter Windows.")
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    get_or_create_indexed_mapping("project-1", "host", "Host", "host.internal")
+    directory = mapping_database_path().parent
+    result = subprocess.run(
+        ["icacls", str(directory)],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert "(I)" not in result.stdout
+    assert "(OI)(CI)(F)" in result.stdout
