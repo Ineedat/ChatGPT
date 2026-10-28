@@ -110,7 +110,7 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
     save_rule_config(_config())
 
     with TestClient(app) as client:
-        response, _, _, _ = _sanitized_run(client, tmp_path)
+        response, project, file, _ = _sanitized_run(client, tmp_path)
         run_id = response.json()["review_run_id"]
 
         invalid = client.post(
@@ -130,6 +130,17 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
         assert client.get("/api/reviews/queue").json() == []
         events = client.get("/api/reviews/audit").json()
         assert any(event["action"] == "return" and event["comment"] for event in events)
+
+        retry_output = tmp_path / "reworked.log"
+        retried = client.post(
+            f"/api/projects/{project['id']}/files/{file['id']}/sanitize-jobs",
+            json={"output_path": str(retry_output), "retry_of_run_id": run_id},
+        )
+        assert retried.status_code == 202
+        assert retry_output.read_bytes() == b"REDACTED\n"
+        latest = client.get("/api/reviews/runs").json()[0]
+        assert latest["parent_run_id"] == run_id
+        assert latest["status"] == "pending_review"
 
 
 def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, monkeypatch):
