@@ -1,5 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
+from test_client import TestClient
 from pydantic import ValidationError
 
 from logsanitizer.main import app
