@@ -1,0 +1,87 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { ReviewPanel } from "./ReviewPanel";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const run = {
+  id: "run-1",
+  project_id: "project-1",
+  file_id: "file-1",
+  display_name: "app.log",
+  output_name: "clean-app.log",
+  status: "pending_review",
+  actor_username: "operator",
+  parent_run_id: null,
+  created_at: "2026-10-28T10:00:00+00:00",
+  completed_at: "2026-10-28T10:01:00+00:00",
+  input_bytes: 100,
+  output_bytes: 80,
+  lines_processed: 2,
+  replacements: 1,
+  validated: 1,
+  residual_matches: 0,
+  last_comment: "",
+  exception_reason: ""
+};
+
+function stubReviewFetch() {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+    if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
+    if (url === "/api/reviews/saved-searches") return { ok: true, json: async () => [] } as Response;
+    if (url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+    if (url.includes("/search?")) return { ok: true, json: async () => ({ query: "REDACTED", match_count: 1, truncated: false, results: [{ line_number: 2, snippet: "token=REDACTED" }] }) } as Response;
+    if (url.endsWith("/approve")) return { ok: true, json: async () => ({ status: "approved" }) } as Response;
+    return { ok: true, json: async () => ({}) } as Response;
+  }));
+}
+
+describe("review workflow UI", () => {
+  it("shows a pending run and searches the sanitized output", async () => {
+    stubReviewFetch();
+    render(<ReviewPanel roles={["reviewer"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Prüfen" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Suchbegriff/ }), { target: { value: "REDACTED" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabe durchsuchen" }));
+    expect(await screen.findByText("token=REDACTED")).toBeInTheDocument();
+    expect(screen.getByText("Zeile 2")).toBeInTheDocument();
+  });
+
+  it("submits an explicit approval decision", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+      if (url.endsWith("/approve")) return { ok: true, json: async () => ({ status: "approved" }) } as Response;
+      return { ok: true, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["approver"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Prüfen" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Kommentar/ }), { target: { value: "Stichprobe geprüft" } });
+    fireEvent.click(screen.getByRole("button", { name: "Freigeben" }));
+    expect(await screen.findByText(/Prüfentscheidung gespeichert: approved/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/reviews/runs/run-1/approve", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ comment: "Stichprobe geprüft", exception: false, exception_reason: "" })
+    }));
+  });
+
+  it("does not show reviewer controls to an operator", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      return { ok: false, json: async () => ({ detail: "Forbidden" }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["operator"]} />);
+    expect(await screen.findByText(/Laufhistorie/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Warteschlange/ })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/reviews/queue", expect.anything());
+  });
+});
