@@ -48,6 +48,21 @@ response includes a `format_hint` inferred only from the filename extension (`js
 unknown extension stays `unknown`, and the hint must not be treated as proof of the
 actual format. Format detection is a separate explicit action (`POST /api/projects/{id}/files/{file_id}/detect-format`): it samples at most 64 KiB locally and returns only a classification, not source content. Uncertain or binary samples remain `unknown`. The detected classification is persisted in SQLite. A separate `PUT /api/projects/{id}/files/{file_id}/format` endpoint stores a manual override from `text`, `json`, `jsonl`, `xml`, `csv`, or `unknown`; sending `null` clears the override. The override is stored separately from the detected classification. Detection remains heuristic, is not full-file validation, and is not approval. A graphical folder picker is not implemented yet.
 
+## Verschlüsselung der Mapping-Datenbank
+
+Die Mapping-Datenbank speichert Originalwerte nicht mehr im Klartext. Die Anwendung verwendet AES-256-GCM für die Originalwerte, einen separaten HMAC-basierten Suchfingerabdruck zur Wiedererkennung und eine lokale Schlüsseldatei:
+
+- Datenbank: `mappings.sqlite3`
+- Schlüssel: `mappings.key` im selben Datenverzeichnis (32 zufällige Bytes)
+- Schlüsselableitung: HKDF-SHA-256 trennt Verschlüsselungs- und Suchschlüssel; der Schlüssel wird nicht in Git oder der Datenbank gespeichert.
+- POSIX: Datenverzeichnis möglichst Modus `0700`, Schlüsseldatei `0600`; Windows: die Anwendung entfernt die Vererbung und setzt die ACL der Schlüsseldatei auf den aktuellen Benutzer. Kann Windows die ACL nicht setzen, bricht die Initialisierung ab.
+- Beim ersten Start wird der Schlüssel lokal erzeugt. Fehlt er später bei einer bereits verschlüsselten Datenbank oder passt er nicht, startet die Mapping-Verarbeitung nicht mit einem Ersatzschlüssel.
+- Ältere Mapping-Datenbanken mit Klartextwerten werden beim ersten Zugriff migriert. Die Anwendung verschlüsselt die Werte, entfernt die alte Tabelle und führt `VACUUM` aus, um zurückgebliebene Seiten nach Möglichkeit zu bereinigen.
+
+**Backup und Wiederherstellung:** Datenbank und Schlüssel müssen gemeinsam und unverändert gesichert werden. Ein Backup nur der Datenbank kann nicht entschlüsselt werden; ein verlorener oder beschädigter Schlüssel bedeutet Verlust der Zuordnung. Wer Datenbank und Schlüssel zusammen erhält, kann die Werte weiterhin entschlüsseln. Die Schlüsseldatei ist daher getrennt von normalen Backups der Datenbank zu schützen; bewahre eine geschützte Wiederherstellungskopie offline auf. Sichere Löschung alter Klartext-Backups oder physischer SSD-Blöcke kann die Anwendung nicht garantieren. Die Migration kann solche alten Kopien nicht nachträglich verschlüsseln.
+
+Dies ist Verschlüsselung auf Anwendungsebene für die Mapping-Werte, keine vollständige Verschlüsselung aller SQLite-Metadaten oder des gesamten Datenträgers. Für zusätzlichen Schutz gegen Geräteverlust wird weiterhin vollständige Datenträgerverschlüsselung empfohlen. Die Schlüsseldatei liegt standardmäßig neben der Datenbank, sodass Dateiberechtigungen und Backup-Verfahren Teil des Sicherheitsmodells sind.
+
 This scaffold is not approved for real/sensitive logs or network exposure. Local authentication and basic role checks are implemented but still require full security verification. Mapping encryption, comprehensive sensitive-data detection, and release controls remain incomplete.
 
 Run tests with `pytest` and lint with `ruff check src tests`.
