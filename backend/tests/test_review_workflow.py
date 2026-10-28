@@ -219,7 +219,7 @@ def test_review_search_bounds_results_and_shows_match_context(tmp_path, monkeypa
 
     with TestClient(app) as client:
         response, _, _, _ = _sanitized_run(
-            client, tmp_path, contents=b"prefix-" + b"x" * 350 + b"secret=alpha-suffix\\n" * 25
+            client, tmp_path, contents=b"prefix-" + b"x" * 350 + b"secret=alpha-suffix\n" * 25
         )
         run_id = response.json()["review_run_id"]
         results = client.get(
