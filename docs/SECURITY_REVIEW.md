@@ -7,7 +7,8 @@
 
 - Login attempts are throttled per normalized username and direct client address: five failed attempts in a five-minute window trigger a five-minute lock. The key is hashed; stale throttle records are pruned.
 - The API documentation and OpenAPI schema now pass through authentication middleware instead of being public. The health endpoint and login endpoint remain public by design.
-- Regression tests cover lockout behavior and unauthenticated access to the docs/schema.
+- Regex substitutions and residual scans now use the timeout-capable `regex` engine with a 100 ms per-operation limit; timeout failures reject the run and remove partial output.
+- Regression tests cover lockout behavior, unauthenticated access to the docs/schema, and pathological regex timeout cleanup.
 
 These controls reduce risk but do not establish production readiness. Verify the CI run for the current commit before relying on the changes.
 
@@ -22,14 +23,12 @@ These controls reduce risk but do not establish production readiness. Verify the
 - **Required fix:** Design and implement encryption at rest with an explicit local key-provisioning and recovery model. Do not hard-code or commit a key. Document what happens if the key is lost, rotated, or unavailable offline.
 - **Release gate:** Do not use real confidential logs until this is addressed and tested on Windows and Linux.
 
-### LS-SEC-002 — User-configured regular expressions have no execution timeout
+### LS-SEC-002 — User-configured regex execution timeout
 
-- **Severity:** High
-- **Location:** `backend/src/logsanitizer/rule_config.py`, regex validation; `backend/src/logsanitizer/sanitizer.py`, rule compilation, substitution, and residual scanning
-- **Evidence:** Patterns are compiled with Python's standard `re` engine and executed against input lines without a time budget. The line-size cap limits each line to 1 MiB but does not prevent catastrophic backtracking.
-- **Impact:** A pathological rule and crafted input can consume excessive CPU and stall a sanitization worker, including during the mandatory residual scan.
-- **Required fix:** Use a regex engine with enforceable timeouts, or a conservative supported-pattern subset with rejection of risky constructs and tests. Keep limits on pattern length, input line length, and concurrent jobs. A heuristic alone must not be represented as a complete defense.
-- **Release gate:** Do not permit untrusted users to import/edit regex rules on a network-accessible instance until a timeout or equivalent robust control exists.
+- **Status:** Mitigated in the current branch; regression-tested, pending final CI confirmation.
+- **Location:** `backend/src/logsanitizer/sanitizer.py`, rule substitution and residual scanning.
+- **Change:** Runtime execution now uses the `regex` package with a 100 ms timeout for each substitution/search operation. A timeout raises a sanitization error, and partial output is removed. A pathological-pattern regression test exercises this behavior.
+- **Residual caution:** This is a per-operation limit, not a global job deadline or concurrency limit. Keep pattern/input limits and add a global resource budget before network deployment.
 
 ### LS-SEC-003 — Output destination is selected as an arbitrary absolute path
 
