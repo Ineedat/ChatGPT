@@ -525,7 +525,6 @@ def project_file_sanitize(
 
 
 
-_SANITIZATION_JOBS: dict[str, dict[str, object]] = {}
 _SANITIZATION_CANCEL: dict[str, threading.Event] = {}
 _SANITIZATION_LOCK = threading.Lock()
 
