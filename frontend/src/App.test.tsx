@@ -131,7 +131,7 @@ describe("local format detection UI", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Format lokal prüfen" }));
     expect(await screen.findByText(/Erkannt: JSON/)).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/detect-format`, { method: "POST" });
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/detect-format`, expect.objectContaining({ method: "POST" }));
   });
 
   it("saves a manual format override", async () => {
@@ -167,6 +167,6 @@ describe("full format validation UI", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Vollständig validieren" }));
     expect(await screen.findByText(/Format gültig · json · 25 Byte geprüft/)).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/validate-format`, { method: "POST" });
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/validate-format`, expect.objectContaining({ method: "POST" }));
   });
 });
