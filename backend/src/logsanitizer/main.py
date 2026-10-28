@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -48,12 +48,21 @@ from logsanitizer.rule_config import (
     save_rule_config,
 )
 from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
+from logsanitizer.review_workflow import (
+    create_run as create_review_run,
+    fail_run as fail_review_run,
+    finish_run as finish_review_run,
+    initialize_review_database,
+    router as review_router,
+    set_run_running as set_review_run_running,
+)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     initialize_database()
     initialize_auth_database()
+    initialize_review_database()
     yield
 
 
@@ -268,7 +277,7 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
             "WHERE project_id = ? AND id = ?",
             (project_id, file_id),
         ).fetchone()
@@ -328,6 +337,7 @@ def rules_config_put(payload: RuleConfig) -> RuleConfig:
 class SanitizationRequest(BaseModel):
     output_path: str = Field(min_length=1, max_length=4096)
     profile_id: str | None = Field(default=None, max_length=64)
+    retry_of_run_id: str | None = Field(default=None, max_length=80)
 
 
 
@@ -341,13 +351,14 @@ def project_file_sanitize_start(
     file_id: str,
     payload: SanitizationRequest,
     background_tasks: BackgroundTasks,
+    request: Request,
 ) -> dict[str, object]:
     """Start a cancellable local sanitization job and return immediately."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
             "WHERE project_id = ? AND id = ?",
             (project_id, file_id),
         ).fetchone()
@@ -376,6 +387,14 @@ def project_file_sanitize_start(
         raise HTTPException(status_code=422, detail="Das angegebene Quellprofil ist nicht definiert.")
 
     job_id = uuid.uuid4().hex
+    user = request.state.user
+    try:
+        create_review_run(
+            job_id, project_id, file_id, row["display_name"], output,
+            int(user["id"]), str(user["username"]), payload.retry_of_run_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     with _SANITIZATION_LOCK:
         _SANITIZATION_JOBS[job_id] = {
             "id": job_id,
@@ -434,8 +453,8 @@ def project_file_sanitize_cancel(project_id: str, file_id: str, job_id: str) -> 
 
 @app.post("/api/projects/{project_id}/files/{file_id}/sanitize", tags=["sanitization"])
 def project_file_sanitize(
-    project_id: str, file_id: str, payload: SanitizationRequest
-) -> dict[str, int | str]:
+    project_id: str, file_id: str, payload: SanitizationRequest, request: Request
+) -> dict[str, int | str | bool]:
     """Apply local rules to supported UTF-8 text/JSONL and write a separate output file."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
@@ -462,20 +481,41 @@ def project_file_sanitize(
         config = load_rule_config()
         if find_rule_conflicts(config):
             raise HTTPException(status_code=409, detail="Regelkonflikte müssen vor der Bereinigung behoben werden.")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
+    user = request.state.user
+    run_id = uuid.uuid4().hex
+    try:
+        create_review_run(
+            run_id, project_id, file_id, row["display_name"], output,
+            int(user["id"]), str(user["username"]), payload.retry_of_run_id,
+        )
+        set_review_run_running(run_id)
+        result = sanitize_file(source, output, config, payload.profile_id, selected_format, project_id)
+        review_run = finish_review_run(run_id, result)
         return {
             "file_id": file_id,
             "output_name": output.name,
-            **sanitize_file(source, output, config, payload.profile_id, selected_format, project_id),
+            "review_run_id": run_id,
+            "review_status": review_run["status"],
+            **result,
         }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileExistsError as exc:
+        fail_review_run(run_id, "failed", "Die Zieldatei existiert bereits.")
         raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
     except SanitizationError as exc:
+        fail_review_run(run_id, "failed", "Sanitisierung oder Pflichtvalidierung fehlgeschlagen.")
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except PermissionError as exc:
+        fail_review_run(run_id, "failed", "Kein Zugriff auf Quell- oder Zieldatei.")
         raise HTTPException(status_code=403, detail="Kein Zugriff auf Quell- oder Zieldatei.") from exc
     except RuntimeError as exc:
+        fail_review_run(run_id, "failed", "Datei konnte nicht sicher verarbeitet werden.")
         raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
     except OSError as exc:
+        fail_review_run(run_id, "failed", "Datei konnte nicht sicher verarbeitet werden.")
         raise HTTPException(status_code=422, detail="Datei konnte nicht bereinigt werden.") from exc
 
 
@@ -507,6 +547,7 @@ def _run_sanitization_job(
 ) -> None:
     cancel_event = _SANITIZATION_CANCEL[job_id]
     _set_job(job_id, status="running", phase="sanitizing")
+    set_review_run_running(job_id)
     try:
         result = sanitize_file(
             source,
@@ -518,18 +559,24 @@ def _run_sanitization_job(
             progress_callback=lambda progress: _job_progress(job_id, progress),
             cancel_check=cancel_event.is_set,
         )
+        review_run = finish_review_run(job_id, result)
         _set_job(job_id, status="completed", phase="completed", result={
-            "file_id": file_id, "output_name": output.name, **result,
+            "file_id": file_id, "output_name": output.name, "review_status": review_run["status"], **result,
         })
     except SanitizationCancelled:
+        fail_review_run(job_id, "cancelled", "Bereinigung wurde abgebrochen.")
         _set_job(job_id, status="cancelled", phase="cancelled", error="Bereinigung wurde abgebrochen.")
     except FileExistsError:
+        fail_review_run(job_id, "failed", "Die Zieldatei existiert bereits.")
         _set_job(job_id, status="failed", phase="failed", error="Die Zieldatei existiert bereits.")
     except SanitizationError as exc:
+        fail_review_run(job_id, "failed", "Sanitisierung oder Pflichtvalidierung fehlgeschlagen.")
         _set_job(job_id, status="failed", phase="failed", error=str(exc))
     except PermissionError:
+        fail_review_run(job_id, "failed", "Kein Zugriff auf Quell- oder Zieldatei.")
         _set_job(job_id, status="failed", phase="failed", error="Kein Zugriff auf Quell- oder Zieldatei.")
     except (OSError, RuntimeError):
+        fail_review_run(job_id, "failed", "Datei konnte nicht sicher verarbeitet werden.")
         _set_job(job_id, status="failed", phase="failed", error="Datei konnte nicht bereinigt werden.")
     finally:
         with _SANITIZATION_LOCK:
@@ -661,5 +708,6 @@ def project_folder_import(
 
 
 # All API routes except liveness and login require a valid local session.
+app.include_router(review_router)
 app.include_router(auth_router)
 app.add_middleware(AuthMiddleware)
