@@ -12,8 +12,8 @@ import tempfile
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 DEFAULT_DATA_DIR = ".logsanitizer"
 KEY_FILE_NAME = "mappings.key"
@@ -175,8 +175,9 @@ def _columns(connection: sqlite3.Connection) -> set[str]:
 
 def _initialize_encrypted_schema(
     connection: sqlite3.Connection, encryption_key: bytes, lookup_key: bytes
-) -> None:
+) -> bool:
     columns = _columns(connection)
+    migrated_plaintext = False
     if not columns:
         connection.execute(
             """
@@ -232,8 +233,7 @@ def _initialize_encrypted_schema(
                 ),
             )
         connection.execute("DROP TABLE indexed_mappings_plaintext_migration")
-        # Rebuild the database file to avoid retaining dropped plaintext pages where SQLite permits.
-        connection.execute("VACUUM")
+        migrated_plaintext = True
     elif not {"value_hash", "encrypted_value"}.issubset(columns):
         raise MappingEncryptionError("Unbekanntes Mapping-Datenbankschema; Start wird sicherheitshalber abgebrochen.")
 
@@ -258,6 +258,7 @@ def _initialize_encrypted_schema(
             "Die Mapping-Schlüsseldatei passt nicht zu dieser Datenbank. "
             "Datenbank und Schlüssel dürfen nicht unabhängig voneinander ersetzt werden."
         )
+    return migrated_plaintext
 
 
 def get_or_create_indexed_mapping(
@@ -287,7 +288,18 @@ def get_or_create_indexed_mapping(
         master_key = _load_or_create_key(path, encrypted_schema_exists)
         encryption_key, lookup_key = _derive_keys(master_key)
         connection.execute("BEGIN IMMEDIATE")
-        _initialize_encrypted_schema(connection, encryption_key, lookup_key)
+        migrated_plaintext = _initialize_encrypted_schema(connection, encryption_key, lookup_key)
+        if migrated_plaintext:
+            connection.commit()
+            # VACUUM cannot run inside a transaction. If it fails, fail closed; the next
+            # start can retry compaction before the mapping database is used.
+            try:
+                connection.execute("VACUUM")
+            except sqlite3.DatabaseError as exc:
+                raise MappingEncryptionError(
+                    "Die alte Mapping-Datenbank konnte nach der Verschlüsselung nicht bereinigt werden."
+                ) from exc
+            connection.execute("BEGIN IMMEDIATE")
         value_hash = _value_hash(lookup_key, original_value)
         row = connection.execute(
             """
