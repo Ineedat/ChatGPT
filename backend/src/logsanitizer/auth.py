@@ -19,6 +19,9 @@ COOKIE = "logsanitizer_session"
 CSRF = "logsanitizer_csrf"
 TTL = 28800
 ROLES = {"admin", "operator", "reviewer", "approver"}
+LOGIN_FAILURE_LIMIT = 5
+LOGIN_WINDOW_SECONDS = 300
+LOGIN_LOCK_SECONDS = 300
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
 def _path():
@@ -49,6 +52,12 @@ def initialize_auth_database():
         CREATE TABLE IF NOT EXISTS user_roles(user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL, PRIMARY KEY(user_id,role));
         CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, csrf_token TEXT NOT NULL, expires_at INTEGER NOT NULL);
         CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
+        CREATE TABLE IF NOT EXISTS login_attempts(
+            attempt_key TEXT PRIMARY KEY,
+            window_started INTEGER NOT NULL,
+            failures INTEGER NOT NULL DEFAULT 0,
+            locked_until INTEGER NOT NULL DEFAULT 0
+        );
         """)
         db.execute("DELETE FROM sessions WHERE expires_at<=?", (int(time.time()),))
     try: os.chmod(_path(), 0o600)
@@ -93,12 +102,56 @@ class NewUser(BaseModel):
     password: str = Field(min_length=12,max_length=1024)
     roles: list[str] = Field(min_length=1)
 
+def _login_attempt_key(username: str, client_host: str) -> str:
+    material = f"{username.strip().casefold()}|{client_host}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
+
+
+def _login_is_locked(attempt_key: str, now: int) -> bool:
+    with _db() as db:
+        row = db.execute(
+            "SELECT locked_until FROM login_attempts WHERE attempt_key=?",
+            (attempt_key,),
+        ).fetchone()
+    return row is not None and int(row["locked_until"]) > now
+
+
+def _record_login_failure(attempt_key: str, now: int) -> None:
+    with _db() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            "SELECT window_started, failures FROM login_attempts WHERE attempt_key=?",
+            (attempt_key,),
+        ).fetchone()
+        if row is None or now - int(row["window_started"]) >= LOGIN_WINDOW_SECONDS:
+            started, failures = now, 1
+        else:
+            started, failures = int(row["window_started"]), int(row["failures"]) + 1
+        locked_until = now + LOGIN_LOCK_SECONDS if failures >= LOGIN_FAILURE_LIMIT else 0
+        db.execute(
+            """INSERT INTO login_attempts(attempt_key, window_started, failures, locked_until)
+               VALUES(?,?,?,?) ON CONFLICT(attempt_key) DO UPDATE SET
+               window_started=excluded.window_started, failures=excluded.failures,
+               locked_until=excluded.locked_until""",
+            (attempt_key, started, failures, locked_until),
+        )
+
+
 @router.post("/login")
-def login(payload: Login, response: Response):
+def login(payload: Login, request: Request, response: Response):
     initialize_auth_database()
+    client_host = request.client.host if request.client else "unknown"
+    attempt_key = _login_attempt_key(payload.username, client_host)
+    now = int(time.time())
+    if _login_is_locked(attempt_key, now):
+        raise HTTPException(429, "Zu viele fehlgeschlagene Anmeldeversuche. Bitte später erneut versuchen.")
     with _db() as db:
         user=db.execute("SELECT id,password_hash FROM users WHERE username=? COLLATE NOCASE AND enabled=1",(payload.username.strip(),)).fetchone()
-    if user is None or not _verify(payload.password,user["password_hash"]): raise HTTPException(401,"Benutzername oder Passwort ungültig.")
+    if user is None or not _verify(payload.password,user["password_hash"]):
+        _record_login_failure(attempt_key, now)
+        raise HTTPException(401,"Benutzername oder Passwort ungültig.")
+    with _db() as db:
+        db.execute("DELETE FROM login_attempts WHERE attempt_key=?", (attempt_key,))
     token,csrf=secrets.token_urlsafe(32),secrets.token_urlsafe(32)
     with _db() as db:
         db.execute("DELETE FROM sessions WHERE user_id=? OR expires_at<=?",(user["id"],int(time.time())))
@@ -140,7 +193,7 @@ def add_user(payload: NewUser):
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path,method=request.url.path,request.method.upper()
-        if not path.startswith("/api/") or path in {"/api/health","/api/auth/login","/api/docs","/api/openapi.json"}: return await call_next(request)
+        if not path.startswith("/api/") or path in {"/api/health","/api/auth/login"}: return await call_next(request)
         token=request.cookies.get(COOKIE)
         user=_user(token) if token else None
         if user is None: return JSONResponse({"detail":"Anmeldung erforderlich."},status_code=401)
