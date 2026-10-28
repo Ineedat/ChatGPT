@@ -41,14 +41,12 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
-from logsanitizer.review_workflow import (
-    create_run as create_review_run,
-    fail_run as fail_review_run,
-    finish_run as finish_review_run,
-    initialize_review_database,
-    router as review_router,
-    set_run_running as set_review_run_running,
-)
+from logsanitizer.review_workflow import create_run as create_review_run
+from logsanitizer.review_workflow import fail_run as fail_review_run
+from logsanitizer.review_workflow import finish_run as finish_review_run
+from logsanitizer.review_workflow import initialize_review_database
+from logsanitizer.review_workflow import router as review_router
+from logsanitizer.review_workflow import set_run_running as set_review_run_running
 from logsanitizer.rule_config import (
     RuleConfig,
     find_rule_conflicts,
