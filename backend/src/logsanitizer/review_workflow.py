@@ -255,21 +255,25 @@ def get_run(run_id: str) -> dict | None:
         return _public_run(row) if row else None
 
 
-def list_runs(status: str | None = None, limit: int = 100) -> list[dict]:
+def list_runs(status: str | None = None, limit: int = 100, owner_user_id: int | None = None) -> list[dict]:
     initialize_review_database()
     if status is not None and status not in VALID_STATUSES:
         raise HTTPException(status_code=422, detail="Ungültiger Laufstatus.")
     with _db() as db:
+        clauses = []
+        values: list[object] = []
         if status:
-            rows = db.execute(
-                "SELECT * FROM review_runs WHERE status=? ORDER BY created_at DESC LIMIT ?",
-                (status, min(limit, 200)),
-            ).fetchall()
-        else:
-            rows = db.execute(
-                "SELECT * FROM review_runs ORDER BY created_at DESC LIMIT ?",
-                (min(limit, 200),),
-            ).fetchall()
+            clauses.append("status=?")
+            values.append(status)
+        if owner_user_id is not None:
+            clauses.append("actor_user_id=?")
+            values.append(owner_user_id)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        values.append(min(limit, 200))
+        rows = db.execute(
+            f"SELECT * FROM review_runs{where} ORDER BY created_at DESC LIMIT ?",
+            values,
+        ).fetchall()
         return [_public_run(row) for row in rows]
 
 
@@ -322,8 +326,16 @@ def review_queue() -> list[dict]:
 
 
 @router.get("/runs")
-def run_history(status: str | None = Query(default=None), limit: int = Query(default=100, ge=1, le=200)) -> list[dict]:
-    return list_runs(status, limit)
+def run_history(
+    request: Request,
+    status: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> list[dict]:
+    actor_id, _ = _actor(request)
+    roles = set(request.state.user["roles"])
+    reviewer_roles = {"admin", "reviewer", "approver"}
+    owner_id = None if roles.intersection(reviewer_roles) else actor_id
+    return list_runs(status, limit, owner_id)
 
 
 @router.get("/runs/{run_id}/search")
