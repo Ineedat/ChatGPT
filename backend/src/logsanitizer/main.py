@@ -7,11 +7,13 @@ import csv
 import io
 import json
 import os
+import threading
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -42,7 +44,7 @@ from logsanitizer.rule_config import (
     load_rule_config,
     save_rule_config,
 )
-from logsanitizer.sanitizer import SanitizationError, sanitize_file
+from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
 @asynccontextmanager
@@ -324,6 +326,108 @@ class SanitizationRequest(BaseModel):
     profile_id: str | None = Field(default=None, max_length=64)
 
 
+
+@app.post(
+    "/api/projects/{project_id}/files/{file_id}/sanitize-jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["sanitization"],
+)
+def project_file_sanitize_start(
+    project_id: str,
+    file_id: str,
+    payload: SanitizationRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
+    """Start a cancellable local sanitization job and return immediately."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    source = Path(row["source_path"])
+    output = Path(payload.output_path).expanduser()
+    selected_format = row["format_override"] or row["detected_format"]
+    if source.is_symlink() or not source.is_file():
+        raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
+    if selected_format not in {"text", "jsonl"}:
+        raise HTTPException(status_code=422, detail="Unterstützt werden derzeit nur Text und JSON Lines.")
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    if output.is_symlink() or output.exists():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
+    if not output.parent.is_dir():
+        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    try:
+        config = load_rule_config()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
+    if find_rule_conflicts(config):
+        raise HTTPException(status_code=409, detail="Regelkonflikte müssen vor der Bereinigung behoben werden.")
+    if payload.profile_id is not None and payload.profile_id not in {p.id for p in config.profiles}:
+        raise HTTPException(status_code=422, detail="Das angegebene Quellprofil ist nicht definiert.")
+
+    job_id = uuid.uuid4().hex
+    with _SANITIZATION_LOCK:
+        _SANITIZATION_JOBS[job_id] = {
+            "id": job_id,
+            "project_id": project_id,
+            "file_id": file_id,
+            "status": "queued",
+            "phase": "queued",
+            "processed_bytes": 0,
+            "total_bytes": source.stat().st_size,
+            "lines_processed": 0,
+            "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        }
+        _SANITIZATION_CANCEL[job_id] = threading.Event()
+    background_tasks.add_task(
+        _run_sanitization_job, job_id, project_id, file_id, source, output,
+        config, payload.profile_id, selected_format,
+    )
+    return {"id": job_id, "status": "queued", "status_url": f"/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}"}
+
+
+@app.get(
+    "/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}",
+    tags=["sanitization"],
+)
+def project_file_sanitize_status(project_id: str, file_id: str, job_id: str) -> dict[str, object]:
+    """Return progress and status without exposing source paths or log contents."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with _SANITIZATION_LOCK:
+        job = _SANITIZATION_JOBS.get(job_id)
+        if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
+            raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+        return {key: value for key, value in job.items() if key not in {"project_id", "file_id"}}
+
+
+@app.post(
+    "/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}/cancel",
+    tags=["sanitization"],
+)
+def project_file_sanitize_cancel(project_id: str, file_id: str, job_id: str) -> dict[str, object]:
+    """Request cooperative cancellation; the worker removes its staging file."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with _SANITIZATION_LOCK:
+        job = _SANITIZATION_JOBS.get(job_id)
+        if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
+            raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+        if job["status"] in {"completed", "failed", "cancelled"}:
+            return {"id": job_id, "status": job["status"]}
+        event = _SANITIZATION_CANCEL.get(job_id)
+        if event is not None:
+            event.set()
+            job["status"] = "cancelling"
+    return {"id": job_id, "status": "cancelling"}
+
+
 @app.post("/api/projects/{project_id}/files/{file_id}/sanitize", tags=["sanitization"])
 def project_file_sanitize(
     project_id: str, file_id: str, payload: SanitizationRequest
@@ -369,6 +473,63 @@ def project_file_sanitize(
         raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
     except OSError as exc:
         raise HTTPException(status_code=422, detail="Datei konnte nicht bereinigt werden.") from exc
+
+
+
+_SANITIZATION_JOBS: dict[str, dict[str, object]] = {}
+_SANITIZATION_CANCEL: dict[str, threading.Event] = {}
+_SANITIZATION_LOCK = threading.Lock()
+
+
+def _set_job(job_id: str, **changes: object) -> None:
+    with _SANITIZATION_LOCK:
+        if job_id in _SANITIZATION_JOBS:
+            _SANITIZATION_JOBS[job_id].update(changes)
+
+
+def _job_progress(job_id: str, progress: dict[str, int | str]) -> None:
+    _set_job(job_id, **progress)
+
+
+def _run_sanitization_job(
+    job_id: str,
+    project_id: str,
+    file_id: str,
+    source: Path,
+    output: Path,
+    config: RuleConfig,
+    profile_id: str | None,
+    selected_format: str,
+) -> None:
+    cancel_event = _SANITIZATION_CANCEL[job_id]
+    _set_job(job_id, status="running", phase="sanitizing")
+    try:
+        result = sanitize_file(
+            source,
+            output,
+            config,
+            profile_id,
+            selected_format,
+            project_id,
+            progress_callback=lambda progress: _job_progress(job_id, progress),
+            cancel_check=cancel_event.is_set,
+        )
+        _set_job(job_id, status="completed", phase="completed", result={
+            "file_id": file_id, "output_name": output.name, **result,
+        })
+    except SanitizationCancelled:
+        _set_job(job_id, status="cancelled", phase="cancelled", error="Bereinigung wurde abgebrochen.")
+    except FileExistsError:
+        _set_job(job_id, status="failed", phase="failed", error="Die Zieldatei existiert bereits.")
+    except SanitizationError as exc:
+        _set_job(job_id, status="failed", phase="failed", error=str(exc))
+    except PermissionError:
+        _set_job(job_id, status="failed", phase="failed", error="Kein Zugriff auf Quell- oder Zieldatei.")
+    except (OSError, RuntimeError):
+        _set_job(job_id, status="failed", phase="failed", error="Datei konnte nicht bereinigt werden.")
+    finally:
+        with _SANITIZATION_LOCK:
+            _SANITIZATION_CANCEL.pop(job_id, None)
 
 
 MAX_FOLDER_FILES = 5000
