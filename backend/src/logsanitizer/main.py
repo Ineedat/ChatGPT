@@ -40,6 +40,7 @@ from logsanitizer.database import (
     update_format_override,
 )
 from logsanitizer.format_validation import validate_file
+from logsanitizer.notifications import notify_pending_review
 from logsanitizer.job_store import (
     create_job,
     get_job,
@@ -497,6 +498,7 @@ def project_file_sanitize(
         set_review_run_running(run_id)
         result = sanitize_file(source, output, config, payload.profile_id, selected_format, project_id)
         review_run = finish_review_run(run_id, result)
+        notify_pending_review(review_run)
         return {
             "file_id": file_id,
             "output_name": output.name,
@@ -576,6 +578,7 @@ def _run_sanitization_job(
             cancel_check=cancel_event.is_set,
         )
         review_run = finish_review_run(job_id, result)
+        notify_pending_review(review_run)
         _set_job(job_id, status="completed", phase="completed", result={
             "file_id": file_id, "output_name": output.name, "review_status": review_run["status"], **result,
         })
