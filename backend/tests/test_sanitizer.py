@@ -326,8 +326,8 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
         state = status_response.json()
         assert state["status"] == "completed"
         assert state["phase"] == "completed"
-        assert state["processed_bytes"] == len(original)
-        assert state["total_bytes"] == len(original)
+        assert state["processed_bytes"] == output.stat().st_size
+        assert state["total_bytes"] == output.stat().st_size
         assert state["result"]["validated"] is True
         assert "source_path" not in status_response.text
         assert "secret=alpha" not in status_response.text
