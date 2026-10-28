@@ -1,6 +1,7 @@
 """Local-only account and server-side session support."""
 from __future__ import annotations
 import hashlib, hmac, os, secrets, sqlite3, time
+from contextlib import contextmanager
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -20,11 +21,19 @@ def _path():
     except OSError: pass
     return base/"auth.sqlite3"
 
+@contextmanager
 def _db():
     db = sqlite3.connect(_path(), timeout=5)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
-    return db
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 def initialize_auth_database():
     with _db() as db:
