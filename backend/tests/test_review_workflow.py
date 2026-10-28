@@ -48,7 +48,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
     save_rule_config(_config())
 
     with BaseTestClient(app) as client:
-        create_user("reviewer", "reviewer-password-123", ["reviewer"])
+        create_user("reviewer", "reviewer-password-123", ["operator", "reviewer"])
         login = client.post("/api/auth/login", json={
             "username": "reviewer", "password": "reviewer-password-123"
         })
@@ -160,7 +160,6 @@ def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(t
     create_user("operator-only", "operator-password-123", ["operator"])
 
     with BaseTestClient(app) as client:
-        client.post("/api/auth/logout")
         login = client.post("/api/auth/login", json={
             "username": "operator-only", "password": "operator-password-123"
         })
