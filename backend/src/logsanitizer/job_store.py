@@ -87,15 +87,48 @@ def initialize_job_database() -> int:
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_sanitize_jobs_project ON sanitize_jobs(project_id, created_at)")
         stale = db.execute(
-            "SELECT id, output_path FROM sanitize_jobs WHERE status IN ('queued','running','cancelling')"
+            "SELECT id, output_path, process_id FROM sanitize_jobs "
+            "WHERE status IN ('queued','running','cancelling')"
         ).fetchall()
         recovered = 0
+        stale_outputs: set[Path] = set()
         for row in stale:
-            existing = db.execute(
-                "SELECT process_id FROM sanitize_jobs WHERE id=?", (row["id"],)
-            ).fetchone()
-            if existing and _pid_alive(int(existing["process_id"])):
+            if _pid_alive(int(row["process_id"])):
                 continue
+            stale_outputs.add(Path(row["output_path"]))
+            db.execute(
+                "UPDATE sanitize_jobs SET status='interrupted', phase='interrupted', "
+                "error='Der Prozess wurde vor Abschluss beendet; bitte den Lauf erneut starten.', "
+                "updated_at=? WHERE id=?",
+                (_now(), row["id"]),
+            )
+            recovered += 1
+        # Do not touch a same-named staging file while any live job may own that output.
+        live_outputs = {
+            Path(row["output_path"])
+            for row in db.execute(
+                "SELECT output_path, process_id FROM sanitize_jobs "
+                "WHERE status IN ('queued','running','cancelling')"
+            ).fetchall()
+            if _pid_alive(int(row["process_id"]))
+        }
+        for output in stale_outputs - live_outputs:
+            try:
+                if output.parent.is_dir() and not output.is_symlink():
+                    prefix = f".{output.name}.logsanitizer-"
+                    for candidate in output.parent.iterdir():
+                        if (
+                            candidate.name.startswith(prefix)
+                            and candidate.name.endswith(".tmp")
+                            and candidate.is_file()
+                            and not candidate.is_symlink()
+                        ):
+                            candidate.unlink()
+            except OSError:
+                # Recovery is fail-safe: keep the durable interrupted status even if cleanup fails.
+                pass
+        return recovered
+
             db.execute(
                 "UPDATE sanitize_jobs SET status='interrupted', phase='interrupted', "
                 "error='Der Prozess wurde vor Abschluss beendet; bitte den Lauf erneut starten.', "
