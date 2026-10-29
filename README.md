@@ -1,32 +1,54 @@
 # LogSanitizer
 
-A portable, offline-first application for sanitizing application log files on Windows and Linux.
+Portable, offline-first application for sanitizing application logs on Windows and Linux.
 
-> **Project status:** Early development scaffold. This repository does not yet provide a production-ready sanitization workflow. Do not use it to release real or sensitive logs until the security and validation requirements are implemented and tested.
+> **Project status:** Active development. The current branch contains a development implementation; not all planned formats, large-file performance targets, or deployment scenarios have been fully verified.
+
+## Product direction — requirements v2.8
+
+LogSanitizer runs only on a standalone laptop or inside a defined, internet-disconnected Air-Gap network. It is not intended for public or untrusted networks. The product is deliberately not a high-security platform: prioritize **performance, low resource consumption, ease of use and maintainability** over elaborate local encryption, key custody, filesystem ACL engineering or mandatory output-path restrictions.
+
+The user and workflow model remains important: administrator, Rule Owner, Processor and Reviewer/Releaser roles; review queue; approval/return/stop; run history and audit trail.
 
 ## Goals
 
-- Process large log files (target: at least 5 GB) using streaming, without loading whole files into memory.
-- Leave source files unchanged.
-- Apply configurable, testable sanitization rules to text logs and structured JSON.
+- Stream large log files (target: at least 5 GB) without loading whole files into memory.
+- Keep source files unchanged.
+- Apply configurable rules to text logs and structured formats.
 - Keep placeholder mappings consistent across all files in a project.
 - Work fully offline, including documentation and UI assets.
-- Support review, validation, audit, and controlled release workflows.
+- Provide clear progress, cancellation, validation and review workflows.
+- Offer a simple portable Windows/Linux deployment for standalone and defined Air-Gap operation.
 
-## Deployment profiles\n\nPortable Windows/Linux builds are designed to support two explicit profiles selected through a local JSON configuration file. **Standalone** is laptop-first: loopback-only binding, local accounts, no LDAP, and no SMTP. **Network/Darksite** requires an explicit interface binding, LDAP/Active Directory authentication with encrypted LDAP transport and explicit group-to-role mapping, application-level HTTPS with a configured TLS certificate, and can use SMTP for review notifications. Service-account and SMTP passwords are environment secrets, never shipped in the portable config. See `config/deployment.example.json` and `backend/README.md`.\n\nThe deployment profile and launcher are implemented, but a packaged Windows/Linux release and a live integration test against a real LDAP/AD/SMTP environment are not yet complete. Network mode is not production-approved until the remaining security review is finished.\n\n## Technology\n
+## Deployment
+
+**Standalone:** local account, loopback binding, local data.
+
+**Air-Gap network:** explicitly configured interface and network profile; optional LDAP/Active Directory role mapping and SMTP review notifications. Network operation is limited to the defined isolated network. No cloud or internet dependency.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the example deployment configuration.
+
+## Technology
+
 - Backend: Python 3.11+ and FastAPI
 - Frontend: React and TypeScript
-- Metadata: SQLite
+- Metadata and local mappings: SQLite
 - Configuration: versioned JSON
 - Tests: pytest and frontend test tooling
 
-## Current scope
+## Functional scope
 
-The current development scaffold includes local SQLite project management, source-file registration, heuristic format detection on a sample of at most 64 KiB, manual per-file format selection, and explicit full-file format validation for text, JSON, JSON Lines, CSV, and XML. It also includes a versioned JSON rule-configuration schema (v1), shared rules and source-specific profiles, plain-text/regex match definitions, case sensitivity, priorities, regex syntax checks, exact-priority conflict detection, and local atomic persistence through the API. A first streaming execution endpoint now applies enabled shared rules and optional source-profile rules in ascending priority order to UTF-8 text and JSON Lines. It writes to a separate, non-existing destination, uses a 1 MiB maximum line size, removes partial output on processing or validation errors, and leaves the source unchanged. Before reporting success it re-reads the output as a bounded stream, validates UTF-8 and JSONL syntax where applicable, and scans all active shared/profile rule patterns for residual matches; a match blocks the run and deletes the output. The result explicitly reports `validated` and `validation_scope= configured_rules_and_format`. This scan only covers configured patterns and syntax; it does not prove that all sensitive data has been detected. Indexed replacement rules now support stable project-scoped placeholders such as `[IP_1]` across multiple files. Their original-value mappings are stored in a separate local SQLite database encrypted with AES-256-GCM; a separate 32-byte key file is protected with POSIX owner-only permissions or a Windows current-user ACL. Existing plaintext mappings are migrated on first access, but cross-platform security verification and backup/recovery procedures still require validation. Full JSON documents, XML, and CSV execution through the sanitization engine, controlled export/release, and comprehensive sensitive-data detection are not implemented. Sanitization can also run as a cancellable background job with byte/line progress. Output is staged in a private temporary file in the destination directory, validated before publication, and published without overwriting an existing target; the staging file is removed on normal success, failure, or cancellation. Job status and progress are persisted in `sanitize_jobs.sqlite3`; startup recovery marks jobs from dead worker processes as `interrupted` and safely removes matching orphaned staging files when no live job owns the output. Arbitrary user regexes can still have expensive execution behavior; this prototype is not production-ready. Validation reports format/syntax errors and byte counts without returning source content. Detection is only a guess based on a bounded sample; full-file syntax validation is not a sanitization scan and does not prove that sensitive values have been found. Basic local authentication and a persistent review workflow are now implemented in the development branch, including role-gated review, literal search of sanitized output only, per-user saved searches, approval/return/stop decisions, justified exceptions, and append-only audit events. The review history and background-job progress are durable in separate local SQLite databases. Interrupted jobs are marked `interrupted` at startup and are not automatically resumed; operators must revalidate the source and configuration by starting a new run. Full authentication/security verification and packaging remain open. Optional SMTP notifications are available through local environment configuration; delivery is best-effort and has no automatic retry queue.
+The development branch includes project and source-file registration, heuristic format detection, manual format selection, format validation, versioned rule configuration, shared rules and source profiles, streaming text/JSONL processing, project-scoped indexed placeholders, cancellable background jobs, persistent run history, local accounts, role checks and the review workflow.
 
-## Requirements
+The current implementation still contains some high-security mechanisms from the previous requirements baseline (including encrypted mapping storage and enforced output-workspace checks). These are transitional implementation details, not requirements under v2.8; they are scheduled for simplification. Do not assume that the implementation has already been simplified merely because the requirements changed.
 
-See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for the current requirements baseline (v2.7) and [docs/ROADMAP.md](docs/ROADMAP.md) for milestones.
+Not all formats are supported by the sanitization engine yet. Comprehensive sensitive-data detection and measured 5-GB performance are also outstanding. A validation scan only checks configured rules and format integrity; it does not prove that every sensitive value has been detected.
+
+## Requirements and roadmap
+
+- [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) — current baseline **v2.8**
+- [docs/ROADMAP.md](docs/ROADMAP.md) — implementation milestones
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture decisions
 
 ## Development
 
@@ -49,22 +71,16 @@ npm install
 npm run dev
 ```
 
-Keep the backend bound to `127.0.0.1` during development. Do not expose it to a network until authentication, authorization, secure configuration, and network-binding safeguards have been implemented and reviewed.
+Keep local development bound to 127.0.0.1. Only configure a network bind for the defined Air-Gap deployment.
 
-## Security principles
+## Operating principles
 
-- Never upload log contents, secrets, or mapping data to this repository.
-- Never commit real log files, credentials, tokens, local databases, generated outputs, or user data.
+- Never commit real log files, credentials, tokens, local databases, generated outputs or user data.
 - Source files are read-only inputs and must not be modified or deleted by the application.
-- A successful validation scan is not proof that every sensitive value has been detected.
-- Incomplete or failed runs must never be treated as releasable output.
+- Failed or incomplete runs must not be marked successful or approved.
+- User roles, reviewer decisions and audit history remain part of the product.
+- No runtime internet access, cloud service or external asset dependency.
 
 ## License
 
 No license has been selected yet. All rights reserved by default until a license is explicitly chosen.
-
-
-## Local sign-in (development milestone)
-
-Create the first local administrator from the backend directory with `python -m logsanitizer.auth_cli`. The interactive command prompts for a username and password and assigns the initial roles. No public bootstrap endpoint or default password is provided. Basic local authentication and role checks are implemented and tested, but a complete security review remains open; do not expose the app to a network or use real confidential logs until the remaining limitations are addressed. See `backend/README.md` for session, cookie, role, and configuration details.
-\n\n## Review workflow (development status)\n\nThe **Prüfung & Verlauf** view shows the durable local run history. When at least one enabled account has the `reviewer` or `approver` role, successfully validated sanitization runs require a deliberate review decision. If neither role is assigned to any enabled account, a run is automatically approved only after all configured mandatory validation checks pass. Reviewer search uses literal terms against the sanitized output only and returns bounded snippets; original files are never searched or returned. Saved searches belong to the creating account. Approvals, returns, stops, comments, and explicit exception justifications are recorded in the local audit database. A returned run can be re-sanitized to a new destination while preserving a link to the previous run.\n\nThis is still a development prototype, not a production release. Review history and background-job progress survive restarts; jobs abandoned by a dead worker are marked `interrupted`, and matching staging files are cleaned up when safe. Jobs are not automatically resumed. Mapping encryption, comprehensive sensitive-data detection, a full security review, and Windows/Linux packaging remain outstanding. Optional SMTP notifications are configurable through local environment variables, with best-effort delivery and no automatic retry queue. Do not expose the service to a network or use real confidential logs until the remaining risks have been addressed.\n
