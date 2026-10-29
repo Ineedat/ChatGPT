@@ -146,7 +146,7 @@ def load_settings() -> dict[str, Any]:
         keyfile = server.get("tls_keyfile")
         if not certfile or not keyfile or not Path(str(certfile)).is_file() or not Path(str(keyfile)).is_file():
             raise DeploymentConfigError("Netzwerkprofil benötigt vorhandene TLS-Zertifikats- und Schlüsseldateien.")
-        if os.name != "nt" and Path(str(keyfile)).stat().st_mode & 0o027:
+        if os.name != "nt" and Path(str(keyfile)).stat().st_mode & 0o037:
             raise DeploymentConfigError(
                 "TLS-Privatschlüssel darf unter POSIX nicht für Gruppe (außer Lesen) oder andere freigegeben sein."
             )
