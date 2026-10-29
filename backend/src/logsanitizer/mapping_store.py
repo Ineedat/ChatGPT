@@ -6,6 +6,8 @@ import sqlite3
 from pathlib import Path
 
 DEFAULT_DATA_DIR = ".logsanitizer"
+
+
 def mapping_database_path() -> Path:
     configured = os.environ.get("LOGSANITIZER_MAPPINGS_DIR")
     if configured:
