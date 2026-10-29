@@ -18,7 +18,7 @@ a = Analysis(
         (str(ROOT / "packaging" / "default-deployment.json"), "config/deployment.json"),
         (str(ROOT / "docs"), "docs"),
     ],
-    hiddenimports=collect_submodules("ldap3"),
+    hiddenimports=collect_submodules("ldap3") + ["logsanitizer.auth_cli"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
