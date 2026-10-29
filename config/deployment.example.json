@@ -1,6 +1,7 @@
 {
   "profile": "standalone",
   "data_dir": "./data",
+  "output_workspace": "./data/outputs",
   "server": {
     "bind_host": "127.0.0.1",
     "port": 8000,
