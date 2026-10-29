@@ -15,6 +15,9 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from logsanitizer.deployment import load_settings
+from logsanitizer.ldap_auth import LDAPAuthenticationError, authenticate_ldap
+
 COOKIE = "logsanitizer_session"
 CSRF = "logsanitizer_csrf"
 TTL = 28800
@@ -91,6 +94,34 @@ def create_user(username: str, password: str, roles: list[str]) -> int:
         db.executemany("INSERT INTO user_roles(user_id,role) VALUES(?,?)",[(uid,r) for r in roles])
     return uid
 
+def upsert_external_user(username: str, roles: list[str]) -> int:
+    """Synchronize the LDAP identity and its mapped roles without storing its password."""
+    username = username.strip()
+    if not username or len(username) > 80 or not roles or not set(roles) <= ROLES:
+        raise ValueError("Invalid external identity or role mapping.")
+    initialize_auth_database()
+    with _db() as db:
+        row = db.execute(
+            "SELECT id FROM users WHERE username=? COLLATE NOCASE",
+            (username,),
+        ).fetchone()
+        if row is None:
+            cursor = db.execute(
+                "INSERT INTO users(username,password_hash,created_at) VALUES(?,?,?)",
+                (username, _hash(secrets.token_urlsafe(48)), int(time.time())),
+            )
+            user_id = int(cursor.lastrowid)
+        else:
+            user_id = int(row["id"])
+            db.execute("UPDATE users SET enabled=1 WHERE id=?", (user_id,))
+            db.execute("DELETE FROM user_roles WHERE user_id=?", (user_id,))
+        db.executemany(
+            "INSERT INTO user_roles(user_id,role) VALUES(?,?)",
+            [(user_id, role) for role in sorted(set(roles))],
+        )
+    return user_id
+
+
 def _user(token):
     initialize_auth_database()
     with _db() as db:
@@ -144,27 +175,56 @@ def _record_login_failure(attempt_key: str, now: int) -> None:
 
 @router.post("/login")
 def login(payload: Login, request: Request, response: Response):
+    settings = load_settings()
     initialize_auth_database()
     client_host = request.client.host if request.client else "unknown"
     attempt_key = _login_attempt_key(payload.username, client_host)
     now = int(time.time())
     if _login_is_locked(attempt_key, now):
-        raise HTTPException(429, "Zu viele fehlgeschlagene Anmeldeversuche. Bitte später erneut versuchen.")
-    with _db() as db:
-        user=db.execute("SELECT id,password_hash FROM users WHERE username=? COLLATE NOCASE AND enabled=1",(payload.username.strip(),)).fetchone()
-    if user is None or not _verify(payload.password,user["password_hash"]):
-        _record_login_failure(attempt_key, now)
-        raise HTTPException(401,"Benutzername oder Passwort ungültig.")
+        raise HTTPException(429, "Zu viele fehlgeschlagene Anmeldeversuche.")
+
+    if settings["auth"]["provider"] == "ldap":
+        try:
+            identity = authenticate_ldap(payload.username, payload.password, settings)
+            user_id = upsert_external_user(identity["username"], identity["roles"])
+        except (LDAPAuthenticationError, ValueError):
+            _record_login_failure(attempt_key, now)
+            raise HTTPException(401, "Benutzername oder Passwort ungültig.") from None
+        user = {"id": user_id}
+    else:
+        with _db() as db:
+            user = db.execute(
+                "SELECT id,password_hash FROM users WHERE username=? COLLATE NOCASE AND enabled=1",
+                (payload.username.strip(),),
+            ).fetchone()
+        if user is None or not _verify(payload.password, user["password_hash"]):
+            _record_login_failure(attempt_key, now)
+            raise HTTPException(401, "Benutzername oder Passwort ungültig.")
+        user = {"id": int(user["id"])}
+
     with _db() as db:
         db.execute("DELETE FROM login_attempts WHERE attempt_key=?", (attempt_key,))
-    token,csrf=secrets.token_urlsafe(32),secrets.token_urlsafe(32)
+    token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     with _db() as db:
-        db.execute("DELETE FROM sessions WHERE user_id=? OR expires_at<=?",(user["id"],int(time.time())))
-        db.execute("INSERT INTO sessions VALUES(?,?,?,?)",(hashlib.sha256(token.encode()).hexdigest(),user["id"],csrf,int(time.time())+TTL))
-    secure=os.environ.get("LOGSANITIZER_COOKIE_SECURE","").casefold() in {"1","true","yes"}
-    response.set_cookie(COOKIE,token,max_age=TTL,httponly=True,secure=secure,samesite="strict",path="/api")
-    response.set_cookie(CSRF,csrf,max_age=TTL,httponly=False,secure=secure,samesite="strict",path="/api")
-    return {"authenticated":True}
+        db.execute(
+            "DELETE FROM sessions WHERE user_id=? OR expires_at<=?",
+            (user["id"], int(time.time())),
+        )
+        db.execute(
+            "INSERT INTO sessions VALUES(?,?,?,?)",
+            (hashlib.sha256(token.encode()).hexdigest(), user["id"], csrf, int(time.time()) + TTL),
+        )
+    secure = (
+        settings["profile"] == "network"
+        or os.environ.get("LOGSANITIZER_COOKIE_SECURE", "").casefold() in {"1", "true", "yes"}
+    )
+    response.set_cookie(
+        COOKIE, token, max_age=TTL, httponly=True, secure=secure, samesite="strict", path="/api"
+    )
+    response.set_cookie(
+        CSRF, csrf, max_age=TTL, httponly=False, secure=secure, samesite="strict", path="/api"
+    )
+    return {"authenticated": True}
 
 @router.post("/logout")
 def logout(request: Request, response: Response):
