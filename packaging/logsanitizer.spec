@@ -15,6 +15,7 @@ a = Analysis(
     datas=[
         (str(frontend_dist), "frontend/dist"),
         (str(ROOT / "config" / "deployment.example.json"), "config"),
+        (str(ROOT / "packaging" / "default-deployment.json"), "config/deployment.json"),
         (str(ROOT / "docs"), "docs"),
     ],
     hiddenimports=collect_submodules("ldap3"),
@@ -39,6 +40,7 @@ exe = EXE(
     upx=False,
     console=True,
     disable_windowed_traceback=False,
+    contents_directory=".",
 )
 coll = COLLECT(
     exe,
