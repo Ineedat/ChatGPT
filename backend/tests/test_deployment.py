@@ -9,6 +9,8 @@ from logsanitizer.main import app
 
 
 def _write_config(tmp_path, monkeypatch, value):
+    value.setdefault("data_dir", "./data")
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str((tmp_path / "data").resolve()))
     if value.get("profile") == "network":
         cert = tmp_path / "server.crt"
         key = tmp_path / "server.key"
