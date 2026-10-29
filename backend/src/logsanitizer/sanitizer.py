@@ -10,7 +10,6 @@ from pathlib import Path
 import regex as re
 
 from logsanitizer.mapping_store import get_or_create_indexed_mapping
-from logsanitizer.output_workspace import resolve_output_path
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
 
 MAX_LINE_BYTES = 1024 * 1024
@@ -107,13 +106,10 @@ def sanitize_file(
     project_id: str | None = None,
     progress_callback: ProgressCallback | None = None,
     cancel_check: CancelCheck | None = None,
-    allowed_output_root: Path | None = None,
 ) -> dict[str, int | str]:
     """Sanitize UTF-8 text/JSONL one bounded line at a time; never modify the source."""
     source = source_path.expanduser()
     destination = destination_path.expanduser()
-    if allowed_output_root is not None:
-        destination = resolve_output_path(destination, allowed_output_root)
     if not source.is_absolute() or not destination.is_absolute():
         raise SanitizationError("Quell- und Zieldatei müssen absolute Pfade sein.")
     if source.is_symlink() or not source.is_file():
