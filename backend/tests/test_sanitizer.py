@@ -124,7 +124,7 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
         ).json()
         unsupported = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize",
-            json={"output_path": str(tmp_path / "data" / "outputs" / "unsupported.log")},
+            json={"output_path": str(tmp_path / "unsupported.log")},
         )
         assert unsupported.status_code == 422
 
@@ -135,14 +135,14 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
         assert changed.status_code == 200
         response = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize",
-            json={"output_path": str(tmp_path / "data" / "outputs" / "clean.log")},
+            json={"output_path": str(tmp_path / "clean.log")},
         )
         assert response.status_code == 200
         assert response.json()["status"] == "completed"
         assert response.json()["replacements"] == 2
         assert "secret" not in response.text
 
-    assert (tmp_path / "data" / "outputs" / "clean.log").read_bytes() == b"hidden=REDACTED\n"
+    assert (tmp_path / "clean.log").read_bytes() == b"hidden=REDACTED\n"
     assert source.read_bytes() == original
 
 
@@ -316,10 +316,15 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
             json={"output_path": str(tmp_path / "outside-job.log")},
         )
-        assert outside_start.status_code == 422
-        assert not (tmp_path / "outside-job.log").exists()
+        assert outside_start.status_code == 202
+        outside_job_id = outside_start.json()["id"]
+        outside_state = client.get(
+            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs/{outside_job_id}"
+        ).json()
+        assert outside_state["status"] == "completed"
+        assert (tmp_path / "outside-job.log").read_bytes() == b"hidden=REDACTED\\n"
 
-        output = tmp_path / "data" / "outputs" / "job-clean.log"
+        output = tmp_path / "job-clean.log"
         started = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
             json={"output_path": str(output)},
@@ -369,16 +374,19 @@ def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Pa
 
 
 
-def test_sanitization_api_rejects_output_outside_configured_workspace(tmp_path: Path, monkeypatch) -> None:
+def test_sanitization_api_allows_user_selected_output_directory(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(config())
     source = tmp_path / "outside-source.log"
-    source.write_text("secret=value\\n", encoding="utf-8")
-    outside = tmp_path / "outside.log"
+    original = b"secret=value\\n"
+    source.write_bytes(original)
+    output_dir = tmp_path / "chosen-output"
+    output_dir.mkdir()
+    outside = output_dir / "outside.log"
 
     with TestClient(app) as client:
-        project_id = client.post("/api/projects", json={"name": "Workspace boundary"}).json()["id"]
+        project_id = client.post("/api/projects", json={"name": "Chosen output"}).json()["id"]
         imported = client.post(
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
@@ -390,24 +398,19 @@ def test_sanitization_api_rejects_output_outside_configured_workspace(tmp_path: 
             f"/api/projects/{project_id}/files/{imported['id']}/sanitize",
             json={"output_path": str(outside)},
         )
-        assert response.status_code == 422
-        assert not outside.exists()
+        assert response.status_code == 200
+        assert response.json()["status"] == "completed"
+
+    assert outside.read_bytes() == b"hidden=REDACTED\\n"
+    assert source.read_bytes() == original
 
 
-def test_workspace_resolver_rejects_traversal_and_symlinked_directory(tmp_path: Path) -> None:
-    from logsanitizer.output_workspace import OutputWorkspaceError, resolve_output_path
+def test_sanitizer_rejects_source_as_output(tmp_path: Path) -> None:
+    source = tmp_path / "same.log"
+    original = b"secret=value\\n"
+    source.write_bytes(original)
 
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    with pytest.raises(OutputWorkspaceError):
-        resolve_output_path("../outside.log", workspace)
+    with pytest.raises(SanitizationError, match="identisch"):
+        sanitize_file(source, source, config())
 
-    actual = tmp_path / "actual"
-    actual.mkdir()
-    link = workspace / "linked"
-    try:
-        link.symlink_to(actual, target_is_directory=True)
-    except (OSError, NotImplementedError):
-        pytest.skip("Symlinks are unavailable for this test account/platform")
-    with pytest.raises(OutputWorkspaceError):
-        resolve_output_path("linked/out.log", workspace)
+    assert source.read_bytes() == original
