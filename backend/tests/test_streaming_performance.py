@@ -5,9 +5,10 @@ Set LOGSANITIZER_RUN_5GB_TEST=1 to run the opt-in 5 GiB end-to-end test.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import os
 import tracemalloc
-from pathlib import Path
 
 import pytest
 
