@@ -21,7 +21,7 @@
 - [x] Explizite vollständige Formatvalidierung für Text, JSON, JSON Lines, CSV und XML über Backend-Endpunkt und UI; unbekannte Formate werden nicht als gültig bestätigt. Die Validierung prüft Syntax, nicht die Erkennung sensibler Daten.
 - [x] Versionierte JSON-Regelkonfiguration v1 mit Schema-, Regex-, Profilreferenz- und Konfliktprüfung; lokale atomare Speicherung über API. Die Regeln werden auf unterstützte Text- und JSONL-Dateien angewendet.
 - [x] Erste zeilenweise Streaming-Ausführung für UTF-8-Text und JSON Lines mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung; maximale Eingabezeile 1 MiB. Vollständige JSON-Dokumente und weitere Formate bleiben offen.
-- [ ] Mapping-Speicherung auf einfache lokale SQLite-Struktur zurückführen; AES-Verschlüsselung, separate Schlüsseldatei, HMAC-Sonderlogik und aufwendige Schlüsselmigration gemäß Anforderungen v2.8 entfernen. Projektweite konsistente Platzhalter bleiben erhalten. Bestehende Daten vor einer Migration berücksichtigen.
+- [x] Neue Mapping-Speicherung auf einfache lokale SQLite-Struktur zurückgeführt; neue Werte liegen direkt in SQLite, projektweite konsistente Platzhalter bleiben erhalten. Bestehende verschlüsselte Datenbanken werden einmalig mit der bisherigen Schlüsseldatei migriert; die Schlüsseldatei wird erst nach erfolgreichem Commit entfernt. CI für den neuen Stand ist noch ausstehend.
 - [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
 - [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
 - [ ] Ausgabe-/Arbeitsbereich vereinfachen: frei wählbare Ausgabepfade statt verpflichtender Workspace-Allowlist; unnötige Pfad-/Symlink-Sonderlogik gemäß Anforderungen v2.8 entfernen, Quelldateien weiterhin unverändert lassen.
@@ -49,7 +49,7 @@
 Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverhalten und Dokumentation. Sicherheitsfunktionen müssen auch abgewiesene/unzulässige Pfade testen.
 
 ## Umstellung auf Anforderungen v2.8
-- [ ] Bestehende Mapping-Verschlüsselung und Schlüsseldatei durch einfache lokale Mapping-Speicherung ersetzen; Migration/Kompatibilität klären. Deployment-Dokumentation weist auf den Übergangszustand hin.
+- [x] Bestehende Mapping-Verschlüsselung durch einfache lokale Mapping-Speicherung ersetzt; einmalige Migration verschlüsselter Bestandsdaten implementiert und in Tests abgedeckt. CI-Verifikation ausstehend.
 - [ ] Konfigurierbaren Ausgabeort ohne verpflichtende Workspace-Allowlist im Backend umsetzen (Dokumentation angepasst).
 - [x] Deployment-Dokumentation auf v2.8 ausgerichtet: Standalone-Laptop und definiertes Air-Gap-Netz; LDAP/SMTP als optionale Netzwerkfunktionen. Die Laufzeitumstellung ist davon getrennt und noch offen.
 - [ ] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit regressionssicher erhalten.
