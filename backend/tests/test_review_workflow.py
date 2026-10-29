@@ -311,3 +311,46 @@ def test_reviewer_can_approve_and_stop_pending_runs_with_audit_events(tmp_path, 
             and event["comment"] == "Prüfung wegen fachlicher Unklarheit gestoppt."
             for event in events
         )
+
+
+def test_operator_cannot_access_review_decisions_search_comments_or_audit(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+    create_user("operator-review-boundary", "operator-password-456", ["operator"])
+    create_user("assigned-reviewer", "reviewer-password-456", ["reviewer"])
+
+    with BaseTestClient(app) as client:
+        login = client.post("/api/auth/login", json={
+            "username": "operator-review-boundary",
+            "password": "operator-password-456",
+        })
+        assert login.status_code == 200
+        client.headers.update({
+            "X-CSRF-Token": client.cookies.get("logsanitizer_csrf")
+        })
+        response, _, _, _ = _sanitized_run(client, tmp_path)
+        assert response.status_code == 200
+        run_id = response.json()["review_run_id"]
+        assert response.json()["review_status"] == "pending_review"
+
+        denied = [
+            client.get("/api/reviews/queue"),
+            client.get("/api/reviews/audit"),
+            client.get("/api/reviews/saved-searches"),
+            client.get(f"/api/reviews/runs/{run_id}/search", params={"q": "REDACTED"}),
+            client.post("/api/reviews/saved-searches", json={
+                "name": "Operator search", "query": "REDACTED"
+            }),
+            client.post(f"/api/reviews/runs/{run_id}/approve", json={}),
+            client.post(f"/api/reviews/runs/{run_id}/return", json={
+                "comment": "Operator must not return a run."
+            }),
+            client.post(f"/api/reviews/runs/{run_id}/stop", json={}),
+            client.post(f"/api/reviews/runs/{run_id}/comments", json={
+                "comment": "Operator must not comment."
+            }),
+        ]
+        assert [item.status_code for item in denied] == [403] * len(denied)
+        assert client.get("/api/reviews/runs").status_code == 200
+        assert client.get("/api/reviews/runs").json()[0]["status"] == "pending_review"
