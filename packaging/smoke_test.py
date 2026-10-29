@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 def main() -> int:
-    bundle = Path(sys.argv[1] if len(sys.argv) > 1 else "dist/LogSanitizer")
+    bundle = Path(sys.argv[1] if len(sys.argv) > 1 else "dist/LogSanitizer").resolve()
     executable = bundle / ("LogSanitizer.exe" if os.name == "nt" else "LogSanitizer")
     if not executable.is_file():
         raise SystemExit(f"Bundle executable not found: {executable}")
