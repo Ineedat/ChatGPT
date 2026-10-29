@@ -124,7 +124,7 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
         ).json()
         unsupported = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize",
-            json={"output_path": str(tmp_path / "unsupported.log")},
+            json={"output_path": str(tmp_path / "data" / "outputs" / "unsupported.log")},
         )
         assert unsupported.status_code == 422
 
