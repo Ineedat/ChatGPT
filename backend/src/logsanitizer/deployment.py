@@ -133,8 +133,6 @@ def load_settings() -> dict[str, Any]:
             raise DeploymentConfigError("SMTP-Sicherheit muss starttls, ssl oder none sein.")
         if not isinstance(smtp.get("port"), int) or not 1 <= smtp["port"] <= 65535:
             raise DeploymentConfigError("SMTP-Port muss zwischen 1 und 65535 liegen.")
-    if profile == "network":
-        os.environ["LOGSANITIZER_COOKIE_SECURE"] = "1"
     smtp_env_names = (
         "LOGSANITIZER_SMTP_HOST", "LOGSANITIZER_SMTP_PORT", "LOGSANITIZER_SMTP_SECURITY",
         "LOGSANITIZER_SMTP_FROM", "LOGSANITIZER_REVIEWER_EMAILS", "LOGSANITIZER_OPERATOR_EMAILS",
