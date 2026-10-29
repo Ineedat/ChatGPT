@@ -131,6 +131,9 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(_config())
+    from logsanitizer import review_workflow
+    notified = []
+    monkeypatch.setattr(review_workflow, "notify_returned_run", lambda run: notified.append(run))
 
     with TestClient(app) as client:
         response, project, file, _ = _sanitized_run(client, tmp_path)
@@ -150,6 +153,9 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
         assert returned.status_code == 200
         assert returned.json()["status"] == "returned"
         assert returned.json()["last_comment"] == "Bitte Regel prüfen und erneut bereinigen."
+        assert len(notified) == 1
+        assert notified[0]["id"] == run_id
+        assert notified[0]["status"] == "returned"
         assert client.get("/api/reviews/queue").json() == []
         events = client.get("/api/reviews/audit").json()
         assert any(event["action"] == "return" and event["comment"] for event in events)
