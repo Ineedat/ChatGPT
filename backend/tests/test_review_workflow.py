@@ -242,3 +242,72 @@ def test_review_search_bounds_results_and_shows_match_context(tmp_path, monkeypa
         assert body["match_count"] == 20
         assert body["truncated"] is True
         assert len(body["results"]) == 20
+
+
+
+def test_unknown_reviewer_assignment_fails_closed_and_records_pending_review(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+
+    from logsanitizer import review_workflow
+
+    monkeypatch.setattr(review_workflow, "_review_assignee_state", lambda: None)
+    with TestClient(app) as client:
+        response, _, _, _ = _sanitized_run(client, tmp_path)
+        assert response.status_code == 200
+        assert response.json()["review_status"] == "pending_review"
+        run_id = response.json()["review_run_id"]
+        events = client.get("/api/reviews/audit").json()
+        assert any(
+            event["run_id"] == run_id and event["action"] == "pending_review"
+            for event in events
+        )
+
+
+def test_reviewer_can_approve_and_stop_pending_runs_with_audit_events(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+
+    from logsanitizer import review_workflow
+
+    monkeypatch.setattr(review_workflow, "_review_assignee_state", lambda: True)
+    with TestClient(app) as client:
+        approved_response, _, _, _ = _sanitized_run(
+            client, tmp_path, name="approve.log"
+        )
+        stopped_response, _, _, _ = _sanitized_run(
+            client, tmp_path, name="stop.log"
+        )
+        assert approved_response.status_code == 200
+        assert stopped_response.status_code == 200
+        approved_id = approved_response.json()["review_run_id"]
+        stopped_id = stopped_response.json()["review_run_id"]
+
+        approved = client.post(
+            f"/api/reviews/runs/{approved_id}/approve",
+            json={"comment": "Ausgabe stichprobenartig geprüft."},
+        )
+        stopped = client.post(
+            f"/api/reviews/runs/{stopped_id}/stop",
+            json={"comment": "Prüfung wegen fachlicher Unklarheit gestoppt."},
+        )
+        assert approved.status_code == 200
+        assert approved.json()["status"] == "approved"
+        assert stopped.status_code == 200
+        assert stopped.json()["status"] == "stopped"
+
+        events = client.get("/api/reviews/audit").json()
+        assert any(
+            event["run_id"] == approved_id
+            and event["action"] == "approve"
+            and event["comment"] == "Ausgabe stichprobenartig geprüft."
+            for event in events
+        )
+        assert any(
+            event["run_id"] == stopped_id
+            and event["action"] == "stop"
+            and event["comment"] == "Prüfung wegen fachlicher Unklarheit gestoppt."
+            for event in events
+        )
