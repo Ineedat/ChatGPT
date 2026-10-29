@@ -13,8 +13,7 @@ A portable, offline-first application for sanitizing application log files on Wi
 - Work fully offline, including documentation and UI assets.
 - Support review, validation, audit, and controlled release workflows.
 
-## Technology
-
+## Deployment profiles\n\nPortable Windows/Linux builds are designed to support two explicit profiles selected through a local JSON configuration file. **Standalone** is laptop-first: loopback-only binding, local accounts, no LDAP, and no SMTP. **Network/Darksite** requires an explicit interface binding, LDAP/Active Directory authentication with encrypted LDAP transport and explicit group-to-role mapping, HTTPS/TLS termination, and can use SMTP for review notifications. Service-account and SMTP passwords are environment secrets, never shipped in the portable config. See `config/deployment.example.json` and `backend/README.md`.\n\nThe deployment profile and launcher are implemented, but a packaged Windows/Linux release and a live integration test against a real LDAP/AD/SMTP environment are not yet complete. Network mode is not production-approved until the remaining security review is finished.\n\n## Technology\n
 - Backend: Python 3.11+ and FastAPI
 - Frontend: React and TypeScript
 - Metadata: SQLite
