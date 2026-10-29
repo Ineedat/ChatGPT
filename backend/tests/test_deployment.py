@@ -38,6 +38,7 @@ def test_standalone_profile_is_local_and_disables_smtp(tmp_path, monkeypatch):
         "smtp": {"enabled": False},
     })
     monkeypatch.setenv("LOGSANITIZER_SMTP_HOST", "smtp.should-not-be-used.invalid")
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str((tmp_path / "data").resolve()))
     settings = load_settings()
     assert settings["profile"] == "standalone"
     assert settings["server"]["bind_host"] == "127.0.0.1"
