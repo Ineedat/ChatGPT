@@ -35,7 +35,7 @@
 - [x] Prüfer-Warteschlange und sichere wörtliche Stichprobensuche ausschließlich in bereinigten Ausgaben; eigene gespeicherte Suchmuster.
 - [x] Freigabe, Rückgabe, Stopp und Kommentare; Laufhistorie und unveränderliche Audit-Ereignisse.
 - [x] Eng begrenzte, ausdrücklich begründete Ausnahmen; fehlgeschlagene Pflichtvalidierungen bleiben nicht freigabefähig.
-- [ ] Rollen- und Berechtigungstests für Administrator, Rule Owner, Processor und Reviewer/Releaser; Rollen und Freigabeworkflow bleiben verbindlich, ohne umfassendes Hochsicherheits-Audit.
+- [x] Rollen- und Berechtigungstests: Operator-/Reviewer-/Approver-/Admin-Trennung, kombinierte Rollen, Review-Entscheidungen, Such-/Kommentar-/Audit-Zugriff und Fail-closed-Verhalten bei unbekannter Prüferzuordnung; CI erfolgreich.
 
 ## Meilenstein 3 — Deployment
 - [x] Optionale SMTP-Benachrichtigungen für ausstehende Prüffreigaben und zurückgegebene Läufe; Konfiguration über lokale Umgebungsvariablen und automatisierte Tests.
@@ -43,14 +43,22 @@
 - [x] Explizite Deployment-Profile: Standalone nur Loopback/lokale Konten/SMTP aus; Netzwerkprofil benötigt LDAP, geschützte Bind-Adresse und TLS-Zertifikat/Schlüssel und startet HTTPS. Netzwerk- und TLS-Betrieb muss vor Freigabe gegen die Zielumgebung geprüft werden.
 - [x] Portable Windows-/Linux-CI-Paketierung: PyInstaller-One-Folder-Build und Standalone-Health-Smoke-Test auf `windows-latest` und `ubuntu-latest` erfolgreich (GitHub Actions Lauf 40936541846, 2026-10-29). Dies bestätigt den CI-Build, ersetzt aber noch keine Installationstests auf den tatsächlich unterstützten Zielversionen.
 - [ ] Offline-Handbuch und portable Pakete auf den tatsächlichen Zielversionen von Windows/Linux prüfen; Netzwerkprofil zusätzlich separat paketiert und gegen die Zielumgebung testen.
-- [ ] Performanceprüfung mit Testdateien >= 5 GB (Laufzeit, RAM/CPU, UI-Reaktionsfähigkeit); Bedienbarkeit und typische Arbeitsabläufe testen.
+- [x] Streaming-Speicherregression: 64-MiB-Testdatei mit begrenztem Python-Speicherverbrauch in CI; zusätzlicher optionaler 5-GiB-End-to-End-Test über `LOGSANITIZER_RUN_5GB_TEST=1`.
+- [ ] 5-GiB-Test auf dedizierter Zielhardware ausführen und Laufzeit, RAM/CPU sowie UI-Reaktionsfähigkeit dokumentieren; Bedienbarkeit und typische Arbeitsabläufe testen.
 
-## Aktueller Validierungsstand (2026-10-29)\n- [x] CI-Lauf 40955808621 (Commit 9045e35): Backend Linux, Backend Windows, Frontend sowie portable Builds/Smoke-Tests Linux und Windows erfolgreich.\n- [x] Issue #3 zur verpflichtenden Workspace-Allowlist gemäß v2.8 als nicht mehr geplant geschlossen; dies ist keine Aussage über Race-Resistenz der bisherigen Implementierung.\n\n## Definition of done
+## Aktueller Validierungsstand (2026-10-29)
+
+- [x] CI-Lauf 40960974895 (Commit f8f57ab): Backend Linux, Frontend, portable Builds/Smoke-Tests Linux und Windows erfolgreich.
+- [x] Backend-Windows-Job erfolgreich; dieser Job führt aktuell nur den gezielten Mapping-Test aus, nicht die vollständige Backend-Suite.
+- [x] Rollenmatrix, Review-Entscheidungen, Operator-Berechtigungsgrenzen und Rückgabe-Benachrichtigung sind durch Tests abgedeckt.
+- [x] Issue #3 zur verpflichtenden Workspace-Allowlist gemäß v2.8 als nicht mehr geplant geschlossen; dies ist keine Aussage über Race-Resistenz der bisherigen Implementierung.
+
+## Definition of done
 Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverhalten und Dokumentation. Sicherheitsfunktionen müssen auch abgewiesene/unzulässige Pfade testen.
 
 ## Umstellung auf Anforderungen v2.8
 - [x] Mapping-Verschlüsselung durch einfache lokale Mapping-Speicherung ersetzt; keine Migration von Entwicklungs-/Testdatenbanken.
 - [x] Backend-Ausgabeort ohne verpflichtende Workspace-Allowlist umgesetzt; die veraltete Deployment-Einstellung wurde entfernt.
 - [x] Deployment-Dokumentation auf v2.8 ausgerichtet: Standalone-Laptop und definiertes Air-Gap-Netz; LDAP/SMTP als optionale Netzwerkfunktionen. Die Laufzeitumstellung ist davon getrennt und noch offen.
-- [ ] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit regressionssicher erhalten.
-- [ ] Performance- und Usability-Schwerpunkt: 5-GB-Tests, Speicherprofile, UI-Reaktionszeiten und kurze Bedienwege.
+- [x] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit mit Regressionstests abgesichert; CI erfolgreich.
+- [ ] Performance- und Usability-Schwerpunkt: 5-GiB-Lauf auf Zielhardware, CPU-/RAM-/Laufzeitprofile, UI-Reaktionszeiten und kurze Bedienwege.
