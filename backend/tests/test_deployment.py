@@ -17,6 +17,8 @@ def _write_config(tmp_path, monkeypatch, value):
         key = tmp_path / "server.key"
         cert.write_text("test certificate placeholder", encoding="utf-8")
         key.write_text("test private key placeholder", encoding="utf-8")
+        if os.name != "nt":
+            key.chmod(0o600)
         server = value.setdefault("server", {})
         server["tls_certfile"] = str(cert)
         server["tls_keyfile"] = str(key)
@@ -133,3 +135,22 @@ def test_ldap_identity_cannot_take_over_local_account(tmp_path, monkeypatch):
     create_user("same-name", "local-account-password", ["admin"])
     with pytest.raises(ValueError, match="collides with a local account"):
         upsert_external_user("same-name", ["operator"])
+
+
+
+def test_network_profile_rejects_plaintext_ldap(tmp_path, monkeypatch):
+    _write_config(tmp_path, monkeypatch, {
+        "profile": "network",
+        "server": {"bind_host": "10.20.30.40", "port": 8000},
+        "auth": {"provider": "ldap"},
+        "ldap": {
+            "enabled": True, "host": "ldap.example.invalid", "port": 389,
+            "use_ssl": False, "start_tls": False,
+            "bind_dn": "CN=reader,DC=example,DC=invalid",
+            "user_search_base": "DC=example,DC=invalid",
+            "role_groups": {"operator": "CN=Operators,DC=example,DC=invalid"},
+        },
+    })
+    monkeypatch.setenv("LOGSANITIZER_LDAP_BIND_PASSWORD", "test-only-secret")
+    with pytest.raises(DeploymentConfigError, match="unverschlüsseltes LDAP"):
+        load_settings()
