@@ -10,7 +10,7 @@ LogSanitizer uses one JSON configuration file for deployment-specific settings. 
    - ./data keeps SQLite databases, mapping database, and its separate key file in a writable directory beside the config.
    - Empty uses the platform user's LogSanitizer data directory.
 4. Start LogSanitizer.exe on Windows or ./LogSanitizer on Linux. The bundled UI is served locally; open http://127.0.0.1:8000.
-5. Create the first local administrator using the Python CLI before creating a bundle for end users, or provide a supported first-run setup workflow in a future release.
+5. Create the first local administrator from the portable bundle with LogSanitizer.exe --create-admin on Windows or ./LogSanitizer --create-admin on Linux. The command asks for a username and a password twice; it does not expose a network bootstrap endpoint.
 
 Standalone is intended for disconnected laptop use. No LDAP module is required at runtime for this profile, and SMTP is disabled.
 
