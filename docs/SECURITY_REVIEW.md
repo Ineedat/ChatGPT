@@ -36,8 +36,10 @@ These controls reduce risk but do not establish production readiness. Verify the
 - **Location:** `backend/src/logsanitizer/main.py`, sanitization request handling; `backend/src/logsanitizer/sanitizer.py`, staging and publication
 - **Evidence:** The request accepts an absolute `output_path`; the worker creates a staging file in that destination's parent directory. Existing targets and final-component symlinks are rejected, but there is no configured workspace allowlist.
 - **Impact:** An authenticated operator can ask the service to create a new file in any directory writable by the service account. This increases accidental disclosure and path-confusion risk.
-- **Required fix:** Introduce a configured output workspace and validate resolved destinations against it; define explicit import/export locations and permissions. Preserve no-overwrite and symlink protections, including against races.
-- **Release gate:** Complete controlled output/release workflow before production use.
+- **Status (2026-10-29):** Partially mitigated in the development branch. A configurable `output_workspace` is resolved relative to the deployment JSON (default: `data_dir/outputs`). Both synchronous and background API routes reject destinations outside it, path traversal, symlinked workspace/parent components, missing target directories, and existing targets. The sanitizer repeats the workspace check immediately before staging/publication. Regression tests cover outside-workspace requests, traversal, and symlinked directories.
+- **Remaining gap:** This is not yet race-resistant against a hostile concurrent local process replacing directory entries between validation and file creation/publication. The current path-based staging and hard-link publication still require OS-level directory-handle / reparse-point-safe handling on Linux and Windows. Do not mark this finding closed.
+- **Required fix:** Complete race-resistant publication on both supported operating systems, test parent-directory replacement and final-component races, and define explicit import/export locations and permissions.
+- **Release gate:** Complete controlled output/release workflow and the race-hardening tests before production use.
 
 ### LS-SEC-004 — Network transport and secure-cookie configuration
 
