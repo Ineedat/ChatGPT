@@ -1,36 +1,49 @@
-# Deployment and portable operation
+# Deployment und portabler Betrieb
 
-LogSanitizer uses one JSON configuration file for deployment-specific settings. The template is config/deployment.example.json. The portable bundle includes a safe standalone config/deployment.json. Edit that file or set LOGSANITIZER_CONFIG to a protected external file. Relative data, output-workspace, and certificate paths are resolved from the JSON file's directory.
+LogSanitizer ist für zwei klar abgegrenzte Betriebsarten vorgesehen: einen einzelnen Windows-/Linux-Laptop ohne Internetverbindung oder ein ausdrücklich definiertes, isoliertes Air-Gap-Netz. Ein Betrieb im öffentlichen Internet oder in nicht vertrauenswürdigen Netzen ist nicht vorgesehen.
 
-## Standalone laptop (offline)
+Die zentrale Deployment-Konfiguration liegt in `config/deployment.json`; die Vorlage ist `config/deployment.example.json`. Im portablen Paket wird eine Standardkonfiguration mitgeliefert. Alternativ kann über `LOGSANITIZER_CONFIG` eine externe Konfigurationsdatei angegeben werden. Relative Pfade werden grundsätzlich relativ zum Speicherort der Konfigurationsdatei interpretiert.
 
-1. Set profile to standalone, server.bind_host to 127.0.0.1, and auth.provider to local.
-2. Keep SMTP disabled. This profile rejects non-loopback binding and removes SMTP configuration from the process environment.
-3. Choose data_dir:
-   - ./data keeps SQLite databases, mapping database, and its separate key file in a writable directory beside the config.
-   - Empty uses the platform user's LogSanitizer data directory.
-4. Set output_workspace to a dedicated output directory (default: ./data/outputs). Relative paths are anchored to the deployment JSON. Both synchronous and background sanitization reject destinations outside this workspace, traversal components, symlinked workspace/parent components, and existing files. Keep this directory writable only by the LogSanitizer service account.
-5. Start LogSanitizer.exe on Windows or ./LogSanitizer on Linux. The bundled UI is served locally; open http://127.0.0.1:8000.
-6. Create the first local administrator from the portable bundle with LogSanitizer.exe --create-admin on Windows or ./LogSanitizer --create-admin on Linux. The command asks for a username and a password twice; it does not expose a network bootstrap endpoint.
+## Standalone-Laptop
 
-The path check is not yet race-resistant against a hostile concurrent local process swapping directory entries; keep the workspace private to the service account and treat LS-SEC-003 as open until OS-level publication hardening is complete.\n\nStandalone is intended for disconnected laptop use. No LDAP module is required at runtime for this profile, and SMTP is disabled.
+- Profil: `standalone`
+- Bind-Adresse: `127.0.0.1` (nur lokaler Zugriff)
+- Anmeldung: lokale Benutzerkonten
+- LDAP und SMTP: nicht erforderlich
+- Internetzugriff: nicht erforderlich
 
-## Network / Darksite profile
+Das Programm wird unter Windows über `LogSanitizer.exe`, unter Linux über `./LogSanitizer` gestartet. Die Oberfläche wird lokal bereitgestellt und ist standardmäßig unter `http://127.0.0.1:8000` erreichbar.
 
-1. Set profile to network, choose the explicit interface address in server.bind_host, and set auth.provider to ldap.
-2. Configure server.tls_certfile and server.tls_keyfile with an HTTPS certificate and private key. The portable launcher serves HTTPS directly in network mode. Keep the private key readable only by the service account.
-3. Configure LDAP host/port, bind_dn, user_search_base, user_filter, username/group attributes, and explicit role_groups mapping. LDAPS or StartTLS is mandatory; certificate chain and hostname validation are enabled. Use ca_certs_file only for a private CA that is not in the system trust store.
-4. Provide the LDAP service account password as LOGSANITIZER_LDAP_BIND_PASSWORD through the service manager or protected environment configuration. It must not be stored in JSON.
-5. Optionally enable SMTP and set host, port, transport (starttls or ssl), sender, reviewer recipients, and operator recipients in JSON. If SMTP authentication is required, provide LOGSANITIZER_SMTP_USERNAME and LOGSANITIZER_SMTP_PASSWORD as environment secrets.
-6. Install the optional LDAP dependency in source deployments with python -m pip install -e ".[ldap]". The portable build includes LDAP support.
-7. Restrict the application port to intended Darksite clients using host firewall rules. Do not expose it to untrusted networks.
+Der erste Administrator wird einmalig über `LogSanitizer.exe --create-admin` beziehungsweise `./LogSanitizer --create-admin` angelegt. Benutzer und Rollen werden anschließend in der Anwendung verwaltet.
 
-Network mode refuses to start when the bind address, LDAP setup, TLS files, role mapping, or LDAP service secret is missing. LDAP failures do not fall back to local-password authentication. User roles are synchronized from configured direct group membership on successful login; nested group expansion is not currently implemented.
+## Isoliertes Air-Gap-Netz
 
-## Backup, data and recovery
+Für den Netzwerkbetrieb wird eine konkrete, für die vorgesehenen Clients erreichbare Schnittstellenadresse in `server.bind_host` konfiguriert. Der Netzwerkbetrieb bleibt auf das definierte isolierte Netz beschränkt; Firewall-Regeln sollen den Zugriff auf die vorgesehenen Clients begrenzen.
 
-The configured data directory contains multiple SQLite metadata stores and mappings.key. Back up the database files and key as a coordinated set, with the key protected separately from ordinary backups. A backup that includes both the mapping database and key allows recovery of original values. Never place secrets in the deployment JSON or ship real LDAP/TLS private keys in the application bundle.
+Die Anmeldung kann über lokale Benutzerkonten oder optional über LDAP/Active Directory erfolgen. Bei LDAP werden Server, Suchbasis und Gruppenzuordnung zu den LogSanitizer-Rollen konfiguriert. SMTP kann optional für Benachrichtigungen über ausstehende Reviews und Rückgaben aktiviert werden. Ohne LDAP und SMTP bleibt die Anwendung auch im isolierten Netz nutzbar.
 
-## Build notes
+TLS kann entsprechend der konkreten Netzwerkinfrastruktur eingesetzt werden. Es ist kein Produktziel, für einen vollständig isolierten, kontrollierten Air-Gap-Betrieb eine komplexe Zertifikats- und Geheimnisverwaltung zwingend vorauszusetzen. Die Netzfreigabe und die konkrete Transportabsicherung müssen zur jeweiligen Umgebung passen.
 
-The repository's PyInstaller specification builds a one-folder bundle and includes the React frontend, configuration template, and offline documentation. Build separately on Windows and Linux; these are platform-specific outputs. The CI smoke test launches the standalone bundle and checks its local health endpoint. This build check does not replace a live LDAP/AD + SMTP integration test or a production security review.
+## Daten, Mapping und Backups
+
+Projekte, importierte Dateimetadaten, Review-Informationen und Mapping-Zuordnungen werden lokal in SQLite gespeichert. Die Mapping-Zuordnungen sind projektbezogen: derselbe Originalwert erhält innerhalb eines Projekts über mehrere Dateien hinweg denselben Ersatzwert.
+
+Die v2.8-Anforderungsbasis sieht keine verpflichtende Verschlüsselung der Mapping-Datenbank mit einer separat verwalteten Schlüsseldatei mehr vor. Die Vereinfachung der bestehenden Implementierung erfolgt schrittweise. **Bis diese Umstellung abgeschlossen ist, kann die aktuelle Programmversion weiterhin eine Datei `mappings.key` verwenden.** Bei bestehenden Installationen dürfen Datenbank und Schlüsseldatei deshalb nicht unabhängig voneinander gelöscht oder ersetzt werden.
+
+Vor Updates oder Migrationen ist eine Sicherung des gesamten Datenverzeichnisses anzulegen. Die Sicherung muss insbesondere die SQLite-Dateien und – solange die bestehende Verschlüsselungsimplementierung verwendet wird – die zugehörige Schlüsseldatei enthalten. Ein Wiederherstellungstest ist empfehlenswert.
+
+## Ausgabe und Dateiverarbeitung
+
+Quelldateien bleiben unverändert. Die Verarbeitung großer Dateien erfolgt streamend; vollständiges Einlesen einer Logdatei in den Arbeitsspeicher ist nicht vorgesehen. Die Ausgabe wird an einen vom Anwender gewählten Zielort geschrieben.
+
+Die v2.8-Anforderungen verlangen keinen verpflichtenden, zentral konfigurierten Ausgabe-Workspace. Die bestehende Implementierung kann diesen Schutzmechanismus in der Übergangsphase noch erzwingen. Bis die entsprechende Codevereinfachung abgeschlossen und getestet ist, sind die aktuellen Laufzeitbeschränkungen der jeweiligen Programmversion maßgeblich.
+
+## Rollen und Review
+
+Die Benutzer- und Rollenverwaltung bleibt Bestandteil des Produkts. Unterstützt werden die administrativen und fachlichen Aufgaben für Administration, Regelverantwortung, Verarbeitung sowie Review/Freigabe. Rollen können bei geringer Personalstärke einer Person zugeordnet und später auf mehrere Personen verteilt werden.
+
+Ist ein Reviewer/Freigeber zugewiesen, bleibt die bewusste Prüfung und Freigabe Bestandteil des Ablaufs. Ohne zugewiesene Review-Rolle kann der Lauf automatisch freigegeben werden. Rückgabe, Abbruch, Kommentare und nachvollziehbare Statushistorie bleiben erhalten.
+
+## Portable Builds
+
+Die PyInstaller-Spezifikation erstellt ein portables Paket. Windows- und Linux-Pakete werden jeweils auf dem entsprechenden Betriebssystem gebaut. Die CI führt Frontend-Tests, Backend-Tests, Paket-Builds und Smoke-Tests aus. Ein erfolgreicher Smoke-Test ersetzt keinen Integrationstest mit einer konkreten LDAP-/SMTP-Umgebung.
