@@ -61,9 +61,9 @@ def _config_path() -> Path | None:
     if configured:
         return Path(configured).expanduser()
     candidates = (
+        Path(sys.executable).resolve().parent / "config" / "deployment.json",
         Path.cwd() / "config" / "deployment.json",
         Path(__file__).resolve().parents[3] / "config" / "deployment.json",
-        Path(sys.executable).resolve().parent / "config" / "deployment.json",
     )
     return next((candidate for candidate in candidates if candidate.is_file()), None)
 
