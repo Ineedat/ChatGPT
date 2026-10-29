@@ -103,6 +103,8 @@ def load_settings() -> dict[str, Any]:
     if auth.get("provider") not in {"local", "ldap"}:
         raise DeploymentConfigError("Authentifizierungsanbieter muss 'local' oder 'ldap' sein.")
     if profile == "standalone":
+        if smtp.get("enabled"):
+            raise DeploymentConfigError("SMTP ist im Standalone-Profil deaktiviert.")
         if server.get("bind_host") not in {"127.0.0.1", "::1", "localhost"}:
             raise DeploymentConfigError("Standalone muss auf Loopback beschränkt bleiben.")
         if auth.get("provider") != "local":
@@ -120,8 +122,10 @@ def load_settings() -> dict[str, Any]:
             raise DeploymentConfigError("LDAP-Host, Bind-DN und User-Search-Base sind erforderlich.")
         if not isinstance(ldap.get("role_groups"), dict) or not ldap["role_groups"]:
             raise DeploymentConfigError("LDAP-Rollengruppen müssen explizit konfiguriert sein.")
-    if ldap.get("enabled") and (ldap.get("use_ssl") is True and ldap.get("start_tls") is True):
+    if ldap.get("enabled") and ldap.get("use_ssl") is True and ldap.get("start_tls") is True:
         raise DeploymentConfigError("LDAP LDAPS und StartTLS dürfen nicht gleichzeitig aktiviert sein.")
+    if ldap.get("enabled") and ldap.get("use_ssl") is not True and ldap.get("start_tls") is not True:
+        raise DeploymentConfigError("LDAP benötigt LDAPS oder StartTLS; unverschlüsseltes LDAP ist nicht zulässig.")
     if smtp.get("enabled"):
         if not smtp.get("host") or not smtp.get("from"):
             raise DeploymentConfigError("Aktiviertes SMTP benötigt Host und Absenderadresse.")
