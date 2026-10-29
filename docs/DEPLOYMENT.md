@@ -1,6 +1,6 @@
 # Deployment and portable operation
 
-LogSanitizer uses one JSON configuration file for deployment-specific settings. The template is config/deployment.example.json. Copy it to config/deployment.json beside the portable bundle, or set LOGSANITIZER_CONFIG to a protected external file. Relative data and certificate paths are resolved from the JSON file's directory.
+LogSanitizer uses one JSON configuration file for deployment-specific settings. The template is config/deployment.example.json. The portable bundle includes a safe standalone config/deployment.json. Edit that file or set LOGSANITIZER_CONFIG to a protected external file. Relative data and certificate paths are resolved from the JSON file's directory.
 
 ## Standalone laptop (offline)
 
