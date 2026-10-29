@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 DEFAULTS: dict[str, Any] = {
     "profile": "standalone",
+    "data_dir": "",
     "server": {"bind_host": "127.0.0.1", "port": 8000, "tls_certfile": "", "tls_keyfile": ""},
     "auth": {"provider": "local"},
     "ldap": {
@@ -61,6 +63,7 @@ def _config_path() -> Path | None:
     candidates = (
         Path.cwd() / "config" / "deployment.json",
         Path(__file__).resolve().parents[3] / "config" / "deployment.json",
+        Path(sys.executable).resolve().parent / "config" / "deployment.json",
     )
     return next((candidate for candidate in candidates if candidate.is_file()), None)
 
@@ -99,6 +102,12 @@ def load_settings() -> dict[str, Any]:
                 if not certificate_path.is_absolute():
                     certificate_path = path.parent / certificate_path
                 server_config[key] = str(certificate_path.resolve())
+        data_dir = str(settings.get("data_dir") or "").strip()
+        if data_dir:
+            resolved_data = Path(data_dir).expanduser()
+            if not resolved_data.is_absolute():
+                resolved_data = path.parent / resolved_data
+            settings["data_dir"] = str(resolved_data.resolve())
         ldap_config = settings.get("ldap", {})
         ca_path = ldap_config.get("ca_certs_file")
         if ca_path:
@@ -106,6 +115,9 @@ def load_settings() -> dict[str, Any]:
             if not resolved_ca.is_absolute():
                 resolved_ca = path.parent / resolved_ca
             ldap_config["ca_certs_file"] = str(resolved_ca.resolve())
+
+    if settings.get("data_dir") and "LOGSANITIZER_DATA_DIR" not in os.environ:
+        os.environ["LOGSANITIZER_DATA_DIR"] = str(settings["data_dir"])
 
     profile = settings.get("profile")
     server = settings.get("server", {})
@@ -140,6 +152,9 @@ def load_settings() -> dict[str, Any]:
             raise DeploymentConfigError("LDAP-Host, Bind-DN und User-Search-Base sind erforderlich.")
         if not isinstance(ldap.get("role_groups"), dict) or not ldap["role_groups"]:
             raise DeploymentConfigError("LDAP-Rollengruppen müssen explizit konfiguriert sein.")
+        ca_file = str(ldap.get("ca_certs_file") or "").strip()
+        if ca_file and not Path(ca_file).is_file():
+            raise DeploymentConfigError("Die konfigurierte LDAP-CA-Datei wurde nicht gefunden.")
     if ldap.get("enabled") and ldap.get("use_ssl") is True and ldap.get("start_tls") is True:
         raise DeploymentConfigError("LDAP LDAPS und StartTLS dürfen nicht gleichzeitig aktiviert sein.")
     if ldap.get("enabled") and ldap.get("use_ssl") is not True and ldap.get("start_tls") is not True:
