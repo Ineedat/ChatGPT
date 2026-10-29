@@ -4,9 +4,9 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+from logsanitizer.auth import create_user, upsert_external_user
 from logsanitizer.deployment import DeploymentConfigError, load_settings
 from logsanitizer.main import app
-from logsanitizer.auth import create_user, upsert_external_user
 
 
 def _write_config(tmp_path, monkeypatch, value):
