@@ -127,11 +127,28 @@ def test_encrypted_legacy_database_without_key_is_preserved(tmp_path, monkeypatc
     path = mapping_database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     _legacy_encrypted_database(path, b"k" * 32, "cannot-decrypt")
-    before = path.read_bytes()
+    with sqlite3.connect(path) as db:
+        before_rows = db.execute(
+            "SELECT project_id, category, prefix, value_hash, encrypted_value, replacement, sequence "
+            "FROM indexed_mappings"
+        ).fetchall()
+        before_meta = db.execute(
+            "SELECT name, value FROM mapping_meta ORDER BY name"
+        ).fetchall()
 
     with pytest.raises(MappingStoreError, match="mappings.key"):
         get_or_create_indexed_mapping("project-1", "ip", "IP", "cannot-decrypt")
-    assert path.read_bytes() == before
+
+    # SQLite may update its file header while opening/rolling back a transaction;
+    # assert the persisted logical contents rather than byte-for-byte identity.
+    with sqlite3.connect(path) as db:
+        assert db.execute(
+            "SELECT project_id, category, prefix, value_hash, encrypted_value, replacement, sequence "
+            "FROM indexed_mappings"
+        ).fetchall() == before_rows
+        assert db.execute(
+            "SELECT name, value FROM mapping_meta ORDER BY name"
+        ).fetchall() == before_meta
 
 
 def test_encrypted_legacy_database_with_corrupt_ciphertext_is_not_migrated(
