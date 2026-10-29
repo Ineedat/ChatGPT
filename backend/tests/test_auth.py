@@ -73,3 +73,60 @@ def test_login_attempts_are_rate_limited_and_docs_require_auth(tmp_path, monkeyp
             json={"username": "rate-limited", "password": "rate-limit-password-123"},
         )
         assert locked.status_code == 429
+
+
+
+def test_role_matrix_keeps_operator_and_review_permissions_separate(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("operator-only", "operator-password-123", ["operator"])
+    create_user("reviewer-only", "reviewer-password-123", ["reviewer"])
+    create_user("approver-only", "approver-password-123", ["approver"])
+    create_user("admin-only", "admin-password-123", ["admin"])
+    create_user("combined", "combined-password-123", ["operator", "reviewer"])
+
+    def authenticated(username, password):
+        client = TestClient(app)
+        response = client.post(
+            "/api/auth/login",
+            json={"username": username, "password": password},
+        )
+        assert response.status_code == 200
+        client.headers.update({
+            "X-CSRF-Token": client.cookies.get("logsanitizer_csrf")
+        })
+        return client
+
+    with authenticated("operator-only", "operator-password-123") as operator, \
+         authenticated("reviewer-only", "reviewer-password-123") as reviewer, \
+         authenticated("approver-only", "approver-password-123") as approver, \
+         authenticated("admin-only", "admin-password-123") as admin, \
+         authenticated("combined", "combined-password-123") as combined:
+        # Operators may manage projects and sanitize, but cannot enter the review workspace.
+        assert operator.post("/api/projects", json={"name": "Operator project"}).status_code == 201
+        assert operator.get("/api/reviews/queue").status_code == 403
+        assert operator.get("/api/reviews/audit").status_code == 403
+
+        # Reviewer and approver roles can access review data, but cannot manage projects.
+        for client in (reviewer, approver):
+            assert client.get("/api/reviews/queue").status_code == 200
+            assert client.get("/api/reviews/audit").status_code == 200
+            assert client.post("/api/projects", json={"name": "Denied"}).status_code == 403
+            assert client.get("/api/auth/users").status_code == 403
+
+        # User administration remains exclusive to admins.
+        assert admin.get("/api/auth/users").status_code == 200
+        created = admin.post(
+            "/api/auth/users",
+            json={
+                "username": "managed-user",
+                "password": "managed-password-123",
+                "roles": ["operator", "reviewer"],
+            },
+        )
+        assert created.status_code == 201
+        assert operator.get("/api/auth/users").status_code == 403
+
+        # Multiple roles can be bound to one account without losing either permission set.
+        assert set(combined.get("/api/auth/me").json()["roles"]) == {"operator", "reviewer"}
+        assert combined.post("/api/projects", json={"name": "Combined project"}).status_code == 201
+        assert combined.get("/api/reviews/queue").status_code == 200
