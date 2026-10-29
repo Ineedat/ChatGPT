@@ -16,7 +16,7 @@
     "port": 636,
     "use_ssl": true,
     "start_tls": false,
-    "ca_certs_file": "certs/directory-ca.pem",
+    "ca_certs_file": "",
     "bind_dn": "CN=logsanitizer-reader,OU=Service Accounts,DC=example,DC=invalid",
     "user_search_base": "OU=Users,DC=example,DC=invalid",
     "user_filter": "(sAMAccountName={username})",
