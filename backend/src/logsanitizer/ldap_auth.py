@@ -1,6 +1,7 @@
 """LDAP/Active Directory authentication for the network deployment profile."""
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -36,19 +37,27 @@ def authenticate_ldap(username: str, password: str, settings: dict[str, Any]) ->
         get_info=NONE,
         connect_timeout=5,
     )
-    bind_password = __import__("os").environ.get("LOGSANITIZER_LDAP_BIND_PASSWORD", "")
+    bind_password = os.environ.get("LOGSANITIZER_LDAP_BIND_PASSWORD", "")
     if not bind_password:
         raise LDAPAuthenticationError("LDAP-Anmeldung nicht verfügbar.")
     try:
-        with Connection(
+        connection = Connection(
             server,
             user=str(config["bind_dn"]),
             password=bind_password,
-            auto_bind=True,
             receive_timeout=5,
-        ) as connection:
-            attributes = [str(config.get("username_attribute", "sAMAccountName")),
-                          str(config.get("group_attribute", "memberOf"))]
+        )
+        try:
+            if not connection.open():
+                raise LDAPAuthenticationError("LDAP-Verbindung fehlgeschlagen.")
+            if config.get("start_tls") and not connection.start_tls():
+                raise LDAPAuthenticationError("LDAP-TLS konnte nicht aufgebaut werden.")
+            if not connection.bind():
+                raise LDAPAuthenticationError("LDAP-Dienstkonto konnte nicht authentifiziert werden.")
+            attributes = [
+                str(config.get("username_attribute", "sAMAccountName")),
+                str(config.get("group_attribute", "memberOf")),
+            ]
             if not connection.search(
                 str(config["user_search_base"]),
                 search_filter,
@@ -58,19 +67,31 @@ def authenticate_ldap(username: str, password: str, settings: dict[str, Any]) ->
                 raise LDAPAuthenticationError("LDAP-Anmeldung abgelehnt.")
             entry = connection.entries[0]
             user_dn = str(entry.entry_dn)
-            canonical_username = str(entry[str(config.get("username_attribute", "sAMAccountName"))].value or username)
+            canonical_username = str(
+                entry[str(config.get("username_attribute", "sAMAccountName"))].value or username
+            )
             groups = {
                 str(value).casefold()
                 for value in (entry[str(config.get("group_attribute", "memberOf"))].values or [])
             }
-        with Connection(
+        finally:
+            connection.unbind()
+
+        user_connection = Connection(
             server,
             user=user_dn,
             password=password,
-            auto_bind=True,
             receive_timeout=5,
-        ):
-            pass
+        )
+        try:
+            if not user_connection.open():
+                raise LDAPAuthenticationError("LDAP-Anmeldung abgelehnt.")
+            if config.get("start_tls") and not user_connection.start_tls():
+                raise LDAPAuthenticationError("LDAP-Anmeldung abgelehnt.")
+            if not user_connection.bind():
+                raise LDAPAuthenticationError("LDAP-Anmeldung abgelehnt.")
+        finally:
+            user_connection.unbind()
         role_groups = config.get("role_groups", {})
         allowed_roles = {"admin", "operator", "reviewer", "approver"}
         roles = sorted(
