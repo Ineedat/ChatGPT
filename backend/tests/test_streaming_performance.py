@@ -6,8 +6,8 @@ Set LOGSANITIZER_RUN_5GB_TEST=1 to run the opt-in 5 GiB end-to-end test.
 from __future__ import annotations
 
 import os
-import tracemalloc
 from pathlib import Path
+import tracemalloc
 
 import pytest
 
@@ -15,7 +15,7 @@ from logsanitizer.rule_config import RuleConfig
 from logsanitizer.sanitizer import sanitize_file
 
 
-CHUNK = (b"2026-10-29T12:00:00Z INFO service request completed\n" * 16_384)
+CHUNK = (b"2026-10-29T12:00:00Z INFO service request completed\\n" * 16_384)
 CHUNK_BYTES = len(CHUNK)
 
 
