@@ -483,7 +483,12 @@ def project_file_sanitize(
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
 
     source = Path(row["source_path"])
-    output = Path(payload.output_path).expanduser()
+    try:
+        output = resolve_output_path(payload.output_path, load_settings()["output_workspace"])
+    except OutputWorkspaceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
     selected_format = row["format_override"] or row["detected_format"]
     if selected_format not in {"text", "jsonl"}:
         raise HTTPException(
