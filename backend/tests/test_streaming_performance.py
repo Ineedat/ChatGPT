@@ -6,8 +6,8 @@ Set LOGSANITIZER_RUN_5GB_TEST=1 to run the opt-in 5 GiB end-to-end test.
 from __future__ import annotations
 
 import os
+import pathlib
 import tracemalloc
-from pathlib import Path
 
 import pytest
 
@@ -19,7 +19,7 @@ CHUNK = (b"2026-10-29T12:00:00Z INFO service request completed\n" * 16_384)
 CHUNK_BYTES = len(CHUNK)
 
 
-def _write_repeated_file(path: Path, size_bytes: int) -> None:
+def _write_repeated_file(path: pathlib.Path, size_bytes: int) -> None:
     """Create a file incrementally without holding the complete fixture in memory."""
     full_chunks, remainder = divmod(size_bytes, CHUNK_BYTES)
     with path.open("wb") as stream:
@@ -33,7 +33,7 @@ def _plain_config() -> RuleConfig:
     return RuleConfig.model_validate({"schema_version": 1, "profiles": [], "rules": []})
 
 
-def _assert_streaming_run(source: Path, destination: Path) -> dict[str, int | str]:
+def _assert_streaming_run(source: pathlib.Path, destination: pathlib.Path) -> dict[str, int | str]:
     result = sanitize_file(source, destination, _plain_config(), format_name="text")
     assert result["status"] == "completed"
     assert result["validated"] is True
@@ -43,7 +43,7 @@ def _assert_streaming_run(source: Path, destination: Path) -> dict[str, int | st
     return result
 
 
-def test_large_file_processing_uses_bounded_python_memory(tmp_path: Path) -> None:
+def test_large_file_processing_uses_bounded_python_memory(tmp_path: pathlib.Path) -> None:
     """A 64 MiB input must not be materialized as one Python bytes/string object."""
     source = tmp_path / "large.log"
     destination = tmp_path / "large.clean.log"
