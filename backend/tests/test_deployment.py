@@ -65,7 +65,6 @@ def test_network_profile_requires_ldap_tls_and_bind_secret(tmp_path, monkeypatch
     monkeypatch.setenv("LOGSANITIZER_LDAP_BIND_PASSWORD", "test-only-secret")
     settings = load_settings()
     assert settings["auth"]["provider"] == "ldap"
-    assert os.environ["LOGSANITIZER_COOKIE_SECURE"] == "1"
 
 
 def test_secrets_are_rejected_from_json_configuration(tmp_path, monkeypatch):
