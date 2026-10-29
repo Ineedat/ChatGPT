@@ -51,7 +51,6 @@ from logsanitizer.job_store import (
     update_job,
 )
 from logsanitizer.notifications import notify_pending_review
-from logsanitizer.output_workspace import OutputWorkspaceError, resolve_output_path
 from logsanitizer.review_workflow import create_run as create_review_run
 from logsanitizer.review_workflow import fail_run as fail_review_run
 from logsanitizer.review_workflow import finish_run as finish_review_run
@@ -382,12 +381,15 @@ def project_file_sanitize_start(
     if row is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
     source = Path(row["source_path"])
-    try:
-        output = resolve_output_path(payload.output_path, load_settings()["output_workspace"])
-    except OutputWorkspaceError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except FileExistsError as exc:
-        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
+    output = Path(payload.output_path).expanduser()
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    if not output.parent.is_dir():
+        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    if output.resolve(strict=False) == source.resolve(strict=False):
+        raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
+    if output.exists():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
     selected_format = row["format_override"] or row["detected_format"]
     if source.is_symlink() or not source.is_file():
         raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
@@ -483,12 +485,15 @@ def project_file_sanitize(
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
 
     source = Path(row["source_path"])
-    try:
-        output = resolve_output_path(payload.output_path, load_settings()["output_workspace"])
-    except OutputWorkspaceError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except FileExistsError as exc:
-        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
+    output = Path(payload.output_path).expanduser()
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    if not output.parent.is_dir():
+        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    if output.resolve(strict=False) == source.resolve(strict=False):
+        raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
+    if output.exists():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
     selected_format = row["format_override"] or row["detected_format"]
     if selected_format not in {"text", "jsonl"}:
         raise HTTPException(
@@ -511,7 +516,7 @@ def project_file_sanitize(
             int(user["id"]), str(user["username"]), payload.retry_of_run_id,
         )
         set_review_run_running(run_id)
-        result = sanitize_file(source, output, config, payload.profile_id, selected_format, project_id, allowed_output_root=Path(load_settings()["output_workspace"]))
+        result = sanitize_file(source, output, config, payload.profile_id, selected_format, project_id)
         review_run = finish_review_run(run_id, result)
         notify_pending_review(review_run)
         return {
@@ -591,7 +596,6 @@ def _run_sanitization_job(
             project_id,
             progress_callback=lambda progress: _job_progress(job_id, progress),
             cancel_check=cancel_event.is_set,
-            allowed_output_root=Path(load_settings()["output_workspace"]),
         )
         review_run = finish_review_run(job_id, result)
         _set_job(job_id, status="completed", phase="completed", result={
