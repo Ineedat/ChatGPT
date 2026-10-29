@@ -12,7 +12,7 @@ from typing import Any
 
 DEFAULTS: dict[str, Any] = {
     "profile": "standalone",
-    "server": {"bind_host": "127.0.0.1", "port": 8000, "tls_terminated": False},
+    "server": {"bind_host": "127.0.0.1", "port": 8000, "tls_certfile": "", "tls_keyfile": ""},
     "auth": {"provider": "local"},
     "ldap": {
         "enabled": False,
@@ -90,6 +90,14 @@ def load_settings() -> dict[str, Any]:
                     reject_secrets(nested)
         reject_secrets(loaded)
         settings = _merge(settings, loaded)
+        server_config = settings.get("server", {})
+        for key in ("tls_certfile", "tls_keyfile"):
+            configured_path = server_config.get(key)
+            if configured_path:
+                certificate_path = Path(str(configured_path)).expanduser()
+                if not certificate_path.is_absolute():
+                    certificate_path = path.parent / certificate_path
+                server_config[key] = str(certificate_path.resolve())
 
     profile = settings.get("profile")
     server = settings.get("server", {})
@@ -114,8 +122,10 @@ def load_settings() -> dict[str, Any]:
             raise DeploymentConfigError("Netzwerkprofil erfordert aktiviertes LDAP als Anmeldeanbieter.")
         if server.get("bind_host") in {"127.0.0.1", "::1", "localhost", ""}:
             raise DeploymentConfigError("Netzwerkprofil benötigt eine explizite Netzwerk-Bind-Adresse.")
-        if server.get("tls_terminated") is not True:
-            raise DeploymentConfigError("Netzwerkprofil erfordert HTTPS/TLS-Terminierung.")
+        certfile = server.get("tls_certfile")
+        keyfile = server.get("tls_keyfile")
+        if not certfile or not keyfile or not Path(str(certfile)).is_file() or not Path(str(keyfile)).is_file():
+            raise DeploymentConfigError("Netzwerkprofil benötigt vorhandene TLS-Zertifikats- und Schlüsseldateien.")
         if not os.environ.get("LOGSANITIZER_LDAP_BIND_PASSWORD"):
             raise DeploymentConfigError("LOGSANITIZER_LDAP_BIND_PASSWORD ist nicht gesetzt.")
         if not ldap.get("host") or not ldap.get("bind_dn") or not ldap.get("user_search_base"):
@@ -129,8 +139,8 @@ def load_settings() -> dict[str, Any]:
     if smtp.get("enabled"):
         if not smtp.get("host") or not smtp.get("from"):
             raise DeploymentConfigError("Aktiviertes SMTP benötigt Host und Absenderadresse.")
-        if smtp.get("security") not in {"starttls", "ssl", "none"}:
-            raise DeploymentConfigError("SMTP-Sicherheit muss starttls, ssl oder none sein.")
+        if smtp.get("security") not in {"starttls", "ssl"}:
+            raise DeploymentConfigError("Netzwerk-SMTP muss STARTTLS oder SSL verwenden.")
         if not isinstance(smtp.get("port"), int) or not 1 <= smtp["port"] <= 65535:
             raise DeploymentConfigError("SMTP-Port muss zwischen 1 und 65535 liegen.")
     smtp_env_names = (
