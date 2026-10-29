@@ -1,0 +1,38 @@
+{
+  "profile": "standalone",
+  "server": {
+    "bind_host": "127.0.0.1",
+    "port": 8000,
+    "tls_terminated": false
+  },
+  "auth": {
+    "provider": "local"
+  },
+  "ldap": {
+    "enabled": false,
+    "host": "ldap.example.invalid",
+    "port": 636,
+    "use_ssl": true,
+    "start_tls": false,
+    "bind_dn": "CN=logsanitizer-reader,OU=Service Accounts,DC=example,DC=invalid",
+    "user_search_base": "OU=Users,DC=example,DC=invalid",
+    "user_filter": "(sAMAccountName={username})",
+    "username_attribute": "sAMAccountName",
+    "group_attribute": "memberOf",
+    "role_groups": {
+      "admin": "CN=LogSanitizer-Admins,OU=Groups,DC=example,DC=invalid",
+      "operator": "CN=LogSanitizer-Operators,OU=Groups,DC=example,DC=invalid",
+      "reviewer": "CN=LogSanitizer-Reviewers,OU=Groups,DC=example,DC=invalid",
+      "approver": "CN=LogSanitizer-Approvers,OU=Groups,DC=example,DC=invalid"
+    }
+  },
+  "smtp": {
+    "enabled": false,
+    "host": "smtp.example.invalid",
+    "port": 587,
+    "security": "starttls",
+    "from": "logsanitizer@example.invalid",
+    "reviewer_emails": "reviewers@example.invalid",
+    "operator_emails": "operators@example.invalid"
+  }
+}
