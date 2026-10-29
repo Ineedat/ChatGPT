@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from logsanitizer.auth import AuthMiddleware, initialize_auth_database
 from logsanitizer.auth import router as auth_router
+from logsanitizer.deployment import load_settings
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
@@ -65,6 +66,7 @@ from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, san
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    load_settings()
     initialize_database()
     initialize_auth_database()
     initialize_review_database()
