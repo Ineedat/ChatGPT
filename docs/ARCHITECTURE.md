@@ -1,41 +1,55 @@
 # Architekturentscheidungen
 
+**Gültige Anforderungsbaseline:** v2.8. Performance, Bedienbarkeit und Wartbarkeit haben Vorrang. Zielbetrieb ist ausschließlich Standalone-Laptop oder ein definiertes Air-Gap-Netz.
+
 ```text
-React/TypeScript UI -> FastAPI (loopback standardmäßig)
+React/TypeScript UI -> FastAPI
                          |-- Projekt-/Importdienste
-                         |-- Format-Erkennung (geplant)
-                         |-- Regel-Engine + Streaming (geplant)
-                         |-- Validierung/Freigabestatus (geplant)
-                         |-- Rollen/Review/Audit (geplant)
-                         |-- SQLite-Metadaten
-                         |-- separat geschützte Mapping-Daten
-                         |-- getrennte temporäre Daten und Ausgaben
+                         |-- Format-Erkennung und Validierung
+                         |-- Regel-Engine + Streaming
+                         |-- Rollen / Review / Audit
+                         |-- SQLite-Metadaten und lokale Mapping-Daten
+                         |-- temporäre Daten und frei wählbare Ausgaben
 ```
 
 ## Leitlinien
+
 1. Lokal-first; keine Laufzeitabhängigkeit vom Internet.
-2. Sicherer Standard: nur 127.0.0.1; keine Netzwerkfreigabe ohne Authentifizierung und Autorisierung.
-3. Streaming mit begrenzten Puffern, keine vollständigen 5-GB-Dateien im RAM.
+2. Standalone standardmäßig nur auf 127.0.0.1. Netzwerkbetrieb nur nach ausdrücklicher Konfiguration für das definierte Air-Gap-Netz.
+3. Streaming mit begrenzten Puffern; große Dateien dürfen nicht vollständig in den RAM geladen werden.
 4. Quelldateien sind schreibgeschützte Eingaben.
 5. Import, Verarbeitung, Validierung, wartende Prüfung, Rückgabe, Freigabe und Export sind getrennte Zustände.
-6. Fail-closed: unvollständige Läufe und Pflichtprüfungsfehler sind nicht freigabefähig.
-7. Regeln, Mappings, Zugangsdaten, Diagnose und Auditdaten haben getrennte Schutz-/Offenlegungsregeln.
-8. Neue Läufe verweisen auf vorherige Läufe; Audit kopiert keine Loginhalte.
-9. GUI-Hilfe ist lokal eingebunden und zugänglich.
-10. Validierung reduziert Risiken, garantiert aber nicht die Erkennung jedes sensiblen Werts.
-11. Import registriert zunächst nur lokale Quelldateipfade und Metadaten; Quelldateiinhalte werden nicht in SQLite kopiert.
+6. Fehlgeschlagene oder unvollständige Läufe dürfen nicht als erfolgreich/freigegeben gelten.
+7. Benutzerrollen bleiben verbindlich: Administrator, Rule Owner, Processor und Reviewer/Releaser. Eine Person kann mehrere Rollen übernehmen.
+8. Mapping-Daten werden einfach lokal in SQLite gehalten. Verschlüsselung mit separater Schlüsseldatei und komplexe Schlüsselverwaltung sind keine Anforderungen.
+9. Ausgabepfade sind flexibel wählbar; ein verpflichtender Workspace mit Pfad-Allowlist oder OS-spezifische Race-Härtung ist nicht erforderlich.
+10. UI-Hilfe ist lokal eingebunden und zugänglich.
+11. Validierung reduziert Risiken, garantiert aber nicht die Erkennung jedes sensiblen Werts.
 
 ## Initialer API-Vertrag
-- GET /api/health: minimaler Liveness-Status ohne lokale Daten offenzulegen.
-- GET /api/projects/{project_id}/files: registrierte Quelldatei-Metadaten.
-- POST /api/projects/{project_id}/files: absolute lokale Quelldatei registrieren, ohne Inhalte zu lesen.
-- POST /api/projects/{project_id}/files/import-folder: Dateien eines absoluten lokalen Ordners registrieren, rekursiv optional, mit per-Datei-Fehlerliste und Limit von 5.000 Kandidaten.
 
-## Während der Implementierung zu entscheiden
-- Mapping-Verschlüsselung mit separater Schlüsseldatei ist implementiert; Windows/Linux-ACL-, Backup- und Recovery-Verifikation bleibt offen.
+- GET /api/health: minimaler Liveness-Status.
+- GET /api/projects/{project_id}/files: registrierte Quelldatei-Metadaten.
+- POST /api/projects/{project_id}/files: lokale Quelldatei registrieren, ohne sie zu verändern.
+- POST /api/projects/{project_id}/files/import-folder: Dateien eines lokalen Ordners registrieren, rekursiv optional.
+
+## Performance- und UX-Entscheidungen
+
+- Große Dateien werden streamend verarbeitet; RAM-Verbrauch und temporäre I/O sind zu messen.
+- Unnötige Mehrfachdurchläufe und temporäre Indizes vermeiden.
+- Fortschritt, Abbruch, verständliche Fehlermeldungen und klare Statusanzeigen haben Vorrang.
+- Dateiauswahl, Ausgabepfad und Regelbearbeitung sollen möglichst wenige Bedienungsschritte erfordern.
+- Automatische Format-Erkennung mit manueller Korrekturmöglichkeit.
+
+## Rollen- und Prüfprozess
+
+Erfolgreich validierte Läufe werden in der lokalen Laufhistorie protokolliert. Wenn ein Reviewer/Releaser zugewiesen ist, ist eine bewusste Freigabe erforderlich. Andernfalls erfolgt die automatische Freigabe nur nach bestandenen Pflichtprüfungen. Prüfer können bereinigte Ausgaben durchsuchen und Läufe freigeben, zurückgeben oder stoppen. Kommentare und begründete Ausnahmen bleiben nachvollziehbar protokolliert.
+
+## Noch zu verifizieren
+
 - Unterstützte Encodings und Umgang mit fehlerhaften Bytes.
-- Grenzen für Regex-Ausführung.
+- Grenzen für Regex-Ausführung und Ressourcenverbrauch.
 - Umgang mit sehr großen einzelnen JSON-Dokumenten.
-- Cross-platform-Paketierung und abgesicherter Netzwerkmodus.
-- Sicherer lokaler Dateiauswahldialog für große Dateien und Ordner auf Windows/Linux.
-\n\n## Prüf- und Freigabeprozess\n\nErfolgreich validierte Läufe werden dauerhaft in `review.sqlite3` protokolliert. Wenn mindestens ein aktivierter Benutzer die Rolle `reviewer` oder `approver` besitzt, wird ein Lauf in die manuelle Prüfer-Warteschlange gestellt; ist keine solche Rolle zugewiesen, erfolgt eine automatische Freigabe nur bei bestandener Pflichtvalidierung. Die Prüfersuche liest ausschließlich die bereinigte Ausgabe, verwendet wörtliche Suchbegriffe und begrenzt Ergebnisse und Zeilenlänge. Persönliche Suchmuster sind nach Benutzer getrennt. Entscheidungen, Kommentare und begründete Ausnahmen werden als unveränderliche Audit-Ereignisse gespeichert. Die gespeicherten Ausgabepfade werden nicht über die API ausgegeben.\n\nStatus und Fortschritt der Hintergrundjobs werden separat in `sanitize_jobs.sqlite3` persistiert. Beim Start werden Läufe, deren Worker-Prozess nicht mehr lebt, als `interrupted` markiert; passende Staging-Dateien werden nur entfernt, wenn kein aktiver Lauf die Ausgabe beansprucht. Läufe werden nicht automatisch fortgesetzt, da Quelldatei und Regelkonfiguration vor einem sicheren Neustart erneut geprüft werden müssen. Ein Bediener kann einen neuen Lauf starten. SMTP-Benachrichtigungen können per Umgebungsvariablen aktiviert werden: neue Prüffälle gehen an die konfigurierte Prüferliste, Rückgaben an die Betreiberliste. Nachrichten enthalten keine Loginhalte, Kommentare oder absoluten Pfade. Der Versand ist best-effort und besitzt noch keine dauerhafte Wiederholungswarteschlange. Die vollständige Sicherheitsprüfung bleibt offen.\n
+- Cross-platform-Paketierung und tatsächlicher Betrieb auf unterstützten Windows-/Linux-Versionen.
+- Performance mit repräsentativen Dateien >= 5 GB.
+- LDAP/AD- und SMTP-Integration im tatsächlichen Air-Gap-Zielnetz, sofern aktiviert.
