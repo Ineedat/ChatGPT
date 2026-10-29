@@ -1,6 +1,6 @@
 # Deployment and portable operation
 
-LogSanitizer uses one JSON configuration file for deployment-specific settings. The template is config/deployment.example.json. The portable bundle includes a safe standalone config/deployment.json. Edit that file or set LOGSANITIZER_CONFIG to a protected external file. Relative data and certificate paths are resolved from the JSON file's directory.
+LogSanitizer uses one JSON configuration file for deployment-specific settings. The template is config/deployment.example.json. The portable bundle includes a safe standalone config/deployment.json. Edit that file or set LOGSANITIZER_CONFIG to a protected external file. Relative data, output-workspace, and certificate paths are resolved from the JSON file's directory.
 
 ## Standalone laptop (offline)
 
@@ -9,10 +9,11 @@ LogSanitizer uses one JSON configuration file for deployment-specific settings. 
 3. Choose data_dir:
    - ./data keeps SQLite databases, mapping database, and its separate key file in a writable directory beside the config.
    - Empty uses the platform user's LogSanitizer data directory.
-4. Start LogSanitizer.exe on Windows or ./LogSanitizer on Linux. The bundled UI is served locally; open http://127.0.0.1:8000.
-5. Create the first local administrator from the portable bundle with LogSanitizer.exe --create-admin on Windows or ./LogSanitizer --create-admin on Linux. The command asks for a username and a password twice; it does not expose a network bootstrap endpoint.
+4. Set output_workspace to a dedicated output directory (default: ./data/outputs). Relative paths are anchored to the deployment JSON. Both synchronous and background sanitization reject destinations outside this workspace, traversal components, symlinked workspace/parent components, and existing files. Keep this directory writable only by the LogSanitizer service account.
+5. Start LogSanitizer.exe on Windows or ./LogSanitizer on Linux. The bundled UI is served locally; open http://127.0.0.1:8000.
+6. Create the first local administrator from the portable bundle with LogSanitizer.exe --create-admin on Windows or ./LogSanitizer --create-admin on Linux. The command asks for a username and a password twice; it does not expose a network bootstrap endpoint.
 
-Standalone is intended for disconnected laptop use. No LDAP module is required at runtime for this profile, and SMTP is disabled.
+The path check is not yet race-resistant against a hostile concurrent local process swapping directory entries; keep the workspace private to the service account and treat LS-SEC-003 as open until OS-level publication hardening is complete.\n\nStandalone is intended for disconnected laptop use. No LDAP module is required at runtime for this profile, and SMTP is disabled.
 
 ## Network / Darksite profile
 
