@@ -6,6 +6,16 @@ from logsanitizer.deployment import load_settings
 
 def main() -> None:
     settings = load_settings()
+    import sys
+
+    if "--create-admin" in sys.argv[1:]:
+        if settings["profile"] != "standalone":
+            raise SystemExit("Lokale Administratoren können nur im Standalone-Profil angelegt werden.")
+        from logsanitizer.auth_cli import main as create_admin
+
+        create_admin()
+        return
+
     server = settings["server"]
     options = {}
     if settings["profile"] == "network":
