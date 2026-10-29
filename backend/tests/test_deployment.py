@@ -32,7 +32,8 @@ def test_missing_config_path_fails_closed(tmp_path, monkeypatch):
 def test_standalone_profile_is_local_and_disables_smtp(tmp_path, monkeypatch):
     _write_config(tmp_path, monkeypatch, {
         "profile": "standalone",
-        "server": {"bind_host": "127.0.0.1", "port": 8000, "tls_terminated": False},
+        "data_dir": "./data",
+        "server": {"bind_host": "127.0.0.1", "port": 8000, "tls_certfile": "", "tls_keyfile": ""},
         "auth": {"provider": "local"},
         "smtp": {"enabled": False},
     })
