@@ -32,8 +32,11 @@ def authenticate_ldap(username: str, password: str, settings: dict[str, Any]) ->
     search_filter = template.replace("{username}", escape_filter_chars(username))
     tls = bool(config.get("use_ssl"))
     ca_file = str(config.get("ca_certs_file") or "").strip()
-    tls_context = ssl.create_default_context(cafile=ca_file or None)
-    tls_settings = Tls(validate=ssl.CERT_REQUIRED, ssl_context=tls_context)
+    tls_settings = Tls(
+        validate=ssl.CERT_REQUIRED,
+        ca_certs_file=ca_file or None,
+        valid_names=[str(config["host"])],
+    )
     server = Server(
         str(config["host"]),
         port=int(config.get("port", 636 if tls else 389)),
