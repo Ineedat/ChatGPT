@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from logsanitizer.deployment import DeploymentConfigError, load_settings
 from logsanitizer.main import app
+from logsanitizer.auth import create_user, upsert_external_user
 
 
 def _write_config(tmp_path, monkeypatch, value):
@@ -124,3 +125,11 @@ def test_network_login_uses_ldap_only_and_sets_secure_cookie(tmp_path, monkeypat
         assert success.status_code == 200
         assert "secure" in success.headers["set-cookie"].casefold()
         assert client.get("/api/auth/me").json()["roles"] == ["operator"]
+
+
+
+def test_ldap_identity_cannot_take_over_local_account(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("same-name", "local-account-password", ["admin"])
+    with pytest.raises(ValueError, match="collides with a local account"):
+        upsert_external_user("same-name", ["operator"])
