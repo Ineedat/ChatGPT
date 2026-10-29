@@ -14,6 +14,7 @@ from typing import Any
 DEFAULTS: dict[str, Any] = {
     "profile": "standalone",
     "data_dir": "",
+    "output_workspace": "",
     "server": {"bind_host": "127.0.0.1", "port": 8000, "tls_certfile": "", "tls_keyfile": ""},
     "auth": {"provider": "local"},
     "ldap": {
@@ -108,6 +109,16 @@ def load_settings() -> dict[str, Any]:
             if not resolved_data.is_absolute():
                 resolved_data = path.parent / resolved_data
             settings["data_dir"] = str(resolved_data.resolve())
+        workspace_value = str(settings.get("output_workspace") or "").strip()
+        if workspace_value:
+            workspace_path = Path(workspace_value).expanduser()
+            if not workspace_path.is_absolute():
+                workspace_path = path.parent / workspace_path
+        else:
+            data_root = Path(str(settings.get("data_dir") or os.environ.get("LOGSANITIZER_DATA_DIR") or (path.parent / "data")))
+            workspace_path = data_root / "outputs"
+        settings["output_workspace"] = str(workspace_path)
+
         ldap_config = settings.get("ldap", {})
         ca_path = ldap_config.get("ca_certs_file")
         if ca_path:
@@ -118,6 +129,10 @@ def load_settings() -> dict[str, Any]:
 
     if settings.get("data_dir") and "LOGSANITIZER_DATA_DIR" not in os.environ:
         os.environ["LOGSANITIZER_DATA_DIR"] = str(settings["data_dir"])
+
+    if not settings.get("output_workspace"):
+        data_root = Path(str(settings.get("data_dir") or os.environ.get("LOGSANITIZER_DATA_DIR") or (Path.cwd() / "data")))
+        settings["output_workspace"] = str(data_root / "outputs")
 
     profile = settings.get("profile")
     server = settings.get("server", {})
