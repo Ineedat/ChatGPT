@@ -3,7 +3,7 @@
 The regular CI test uses a moderate fixture to catch accidental whole-file reads.
 Set LOGSANITIZER_RUN_5GB_TEST=1 to run the opt-in 5 GiB end-to-end test.
 """
-from __future__ import annotations
+# ruff: noqa: I001
 
 import os
 import pathlib
@@ -66,7 +66,7 @@ def test_large_file_processing_uses_bounded_python_memory(tmp_path: pathlib.Path
     os.environ.get("LOGSANITIZER_RUN_5GB_TEST") != "1",
     reason="Set LOGSANITIZER_RUN_5GB_TEST=1 for the resource-intensive 5 GiB test.",
 )
-def test_five_gibibyte_file_streams_end_to_end(tmp_path: Path) -> None:
+def test_five_gibibyte_file_streams_end_to_end(tmp_path: pathlib.Path) -> None:
     """Opt-in release qualification: generate, sanitize and verify a 5 GiB log."""
     source = tmp_path / "five-gib.log"
     destination = tmp_path / "five-gib.clean.log"
