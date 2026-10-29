@@ -35,7 +35,7 @@ def _sanitized_run(client, tmp_path, name="app.log", contents=b"secret=alpha\n")
         f"/api/projects/{project['id']}/files/{file['id']}/format",
         json={"format_override": "text"},
     )
-    output = tmp_path / f"clean-{name}"
+    output = tmp_path / "data" / "outputs" / f"clean-{name}"
     response = client.post(
         f"/api/projects/{project['id']}/files/{file['id']}/sanitize",
         json={"output_path": str(output)},
@@ -154,7 +154,7 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
         events = client.get("/api/reviews/audit").json()
         assert any(event["action"] == "return" and event["comment"] for event in events)
 
-        retry_output = tmp_path / "reworked.log"
+        retry_output = tmp_path / "data" / "outputs" / "reworked.log"
         retried = client.post(
             f"/api/projects/{project['id']}/files/{file['id']}/sanitize-jobs",
             json={"output_path": str(retry_output), "retry_of_run_id": run_id},
