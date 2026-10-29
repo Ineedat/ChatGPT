@@ -1,7 +1,7 @@
 # Security review — development branch
 
 **Review date:** 2026-10-28  
-**Scope:** Static review of the current development branch, focusing on authentication, authorization, local file handling, regex execution, sensitive mapping storage, and release posture. This is not a penetration test or a production approval.
+**Scope:** Static review of the current development branch, focusing on authentication, authorization, local file handling, regex execution, sensitive mapping storage, deployment profiles, LDAP/TLS, and portable build readiness. This is not a penetration test or a production approval.
 
 ## Changes made during this review
 
@@ -39,13 +39,12 @@ These controls reduce risk but do not establish production readiness. Verify the
 - **Required fix:** Introduce a configured output workspace and validate resolved destinations against it; define explicit import/export locations and permissions. Preserve no-overwrite and symlink protections, including against races.
 - **Release gate:** Complete controlled output/release workflow before production use.
 
-### LS-SEC-004 — Secure-cookie behavior is opt-in
+### LS-SEC-004 — Network transport and secure-cookie configuration
 
-- **Severity:** Medium
-- **Location:** `backend/src/logsanitizer/auth.py`, login cookie configuration
-- **Evidence:** The `Secure` cookie attribute is enabled only when `LOGSANITIZER_COOKIE_SECURE` is set to a truthy value.
-- **Impact:** If the service is exposed over plain HTTP on a network, a session cookie could be transmitted without transport encryption. SameSite and HttpOnly do not encrypt traffic.
-- **Required fix:** Keep loopback-only HTTP as the safe default; require explicit secure deployment configuration for non-loopback binding, and document HTTPS termination and trusted-proxy assumptions. Do not enable network mode until that behavior is enforced and tested.
+- **Status:** Mitigated in the current branch; CI and target-environment verification pending.
+- **Location:** `backend/src/logsanitizer/deployment.py`, `backend/src/logsanitizer/__main__.py`, `backend/src/logsanitizer/auth.py`.
+- **Change:** Standalone mode rejects non-loopback binds. Network mode requires LDAP, a configured network bind, existing TLS certificate/key files, and an LDAP service secret; the launcher starts Uvicorn with HTTPS and the login route sets Secure cookies. LDAP requires LDAPS or StartTLS and validates the server certificate and hostname. SMTP in network configuration must use STARTTLS or SSL.
+- **Residual caution:** The configuration can verify the presence of TLS files but cannot establish that a certificate is issued by the expected organization or that firewall rules are correct. Verify the actual certificate, service-account permissions, interface exposure, and real LDAP/SMTP integration before production use.
 
 ### LS-SEC-005 — Authentication and role enforcement need broader integration testing
 
@@ -59,14 +58,14 @@ These controls reduce risk but do not establish production readiness. Verify the
 
 - No comprehensive sensitive-data detection; residual scanning only checks configured rules.
 - No verified 5 GB performance/integration test or large-file resource budget.
-- No Windows/Linux portable packaging and installation-hardening verification.
+- A PyInstaller one-folder build specification and Windows/Linux CI build/smoke-test job have been added; successful artifact builds and installation-hardening verification are still release gates.
 - No controlled, auditable release/export workflow.
 - SMTP delivery is best-effort and has no persistent retry queue.
 - CI tests are not a substitute for security testing on supported operating systems and realistic data.
 
 ## Exit criteria before network or confidential-data use
 
-1. Close LS-SEC-001 and LS-SEC-002 with regression tests.
+1. Keep LS-SEC-001 and LS-SEC-002 regression-tested and complete a documented restore drill.
 2. Close or explicitly accept LS-SEC-003 and LS-SEC-004 with enforced deployment safeguards.
 3. Complete the route/role authorization matrix and independent security review.
 4. Verify large-file behavior, dependency advisories, Windows/Linux file permissions, and packaging in isolated test environments.
