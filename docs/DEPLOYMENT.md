@@ -36,7 +36,7 @@ Vor regulären Updates ist eine Sicherung des gesamten Datenverzeichnisses empfe
 
 Quelldateien bleiben unverändert. Die Verarbeitung großer Dateien erfolgt streamend; vollständiges Einlesen einer Logdatei in den Arbeitsspeicher ist nicht vorgesehen. Die Ausgabe wird an einen vom Anwender gewählten Zielort geschrieben.
 
-Die v2.8-Anforderungen verlangen keinen verpflichtenden, zentral konfigurierten Ausgabe-Workspace. Die bestehende Implementierung kann diesen Schutzmechanismus in der Übergangsphase noch erzwingen. Bis die entsprechende Codevereinfachung abgeschlossen und getestet ist, sind die aktuellen Laufzeitbeschränkungen der jeweiligen Programmversion maßgeblich.
+Der Anwender kann einen absoluten Ausgabepfad frei wählen. Der Zielordner muss bereits existieren; vorhandene Zieldateien werden nicht überschrieben. Eine Workspace-Allowlist oder ein zentral konfigurierter Ausgabeordner ist nicht erforderlich.
 
 ## Rollen und Review
 
