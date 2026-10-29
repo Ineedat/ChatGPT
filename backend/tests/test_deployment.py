@@ -9,6 +9,14 @@ from logsanitizer.main import app
 
 
 def _write_config(tmp_path, monkeypatch, value):
+    if value.get("profile") == "network":
+        cert = tmp_path / "server.crt"
+        key = tmp_path / "server.key"
+        cert.write_text("test certificate placeholder", encoding="utf-8")
+        key.write_text("test private key placeholder", encoding="utf-8")
+        server = value.setdefault("server", {})
+        server["tls_certfile"] = str(cert)
+        server["tls_keyfile"] = str(key)
     path = tmp_path / "deployment.json"
     path.write_text(json.dumps(value), encoding="utf-8")
     monkeypatch.setenv("LOGSANITIZER_CONFIG", str(path))
@@ -48,7 +56,7 @@ def test_standalone_rejects_network_bind(tmp_path, monkeypatch):
 def test_network_profile_requires_ldap_tls_and_bind_secret(tmp_path, monkeypatch):
     _write_config(tmp_path, monkeypatch, {
         "profile": "network",
-        "server": {"bind_host": "10.20.30.40", "port": 8000, "tls_terminated": True},
+        "server": {"bind_host": "10.20.30.40", "port": 8000, "tls_certfile": "server.crt", "tls_keyfile": "server.key"},
         "auth": {"provider": "ldap"},
         "ldap": {
             "enabled": True, "host": "ldap.example.invalid", "port": 636,
