@@ -312,6 +312,13 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
             f"/api/projects/{project_id}/files/{file['id']}/format",
             json={"format_override": "text"},
         )
+        outside_start = client.post(
+            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
+            json={"output_path": str(tmp_path / "outside-job.log")},
+        )
+        assert outside_start.status_code == 422
+        assert not (tmp_path / "outside-job.log").exists()
+
         output = tmp_path / "data" / "outputs" / "job-clean.log"
         started = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
