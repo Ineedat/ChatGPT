@@ -20,6 +20,7 @@ DEFAULTS: dict[str, Any] = {
         "port": 636,
         "use_ssl": True,
         "start_tls": False,
+        "ca_certs_file": "",
         "bind_dn": "",
         "user_search_base": "",
         "user_filter": "(sAMAccountName={username})",
@@ -98,6 +99,13 @@ def load_settings() -> dict[str, Any]:
                 if not certificate_path.is_absolute():
                     certificate_path = path.parent / certificate_path
                 server_config[key] = str(certificate_path.resolve())
+        ldap_config = settings.get("ldap", {})
+        ca_path = ldap_config.get("ca_certs_file")
+        if ca_path:
+            resolved_ca = Path(str(ca_path)).expanduser()
+            if not resolved_ca.is_absolute():
+                resolved_ca = path.parent / resolved_ca
+            ldap_config["ca_certs_file"] = str(resolved_ca.resolve())
 
     profile = settings.get("profile")
     server = settings.get("server", {})
