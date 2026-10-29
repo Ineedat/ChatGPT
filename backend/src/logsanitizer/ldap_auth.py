@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import ssl
 from typing import Any
 
 
@@ -16,7 +17,7 @@ def authenticate_ldap(username: str, password: str, settings: dict[str, Any]) ->
     authentication and never logs usernames, passwords, LDAP responses, or DNs.
     """
     try:
-        from ldap3 import NONE, Connection, Server
+        from ldap3 import NONE, Connection, Server, Tls
         from ldap3.utils.conv import escape_filter_chars
     except ImportError as exc:
         raise LDAPAuthenticationError("LDAP-Unterstützung ist nicht installiert.") from exc
@@ -30,10 +31,14 @@ def authenticate_ldap(username: str, password: str, settings: dict[str, Any]) ->
         raise LDAPAuthenticationError("LDAP-Suchfilter ist ungültig.")
     search_filter = template.replace("{username}", escape_filter_chars(username))
     tls = bool(config.get("use_ssl"))
+    ca_file = str(config.get("ca_certs_file") or "").strip()
+    tls_context = ssl.create_default_context(cafile=ca_file or None)
+    tls_settings = Tls(validate=ssl.CERT_REQUIRED, ssl_context=tls_context)
     server = Server(
         str(config["host"]),
         port=int(config.get("port", 636 if tls else 389)),
         use_ssl=tls,
+        tls=tls_settings,
         get_info=NONE,
         connect_timeout=5,
     )
