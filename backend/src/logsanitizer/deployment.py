@@ -166,7 +166,8 @@ def load_settings() -> dict[str, Any]:
     if smtp.get("enabled"):
         if not smtp.get("host") or not smtp.get("from"):
             raise DeploymentConfigError("Aktiviertes SMTP benötigt Host und Absenderadresse.")
-        if smtp.get("security") not in {"starttls", "ssl"}:
+        effective_security = os.environ.get("LOGSANITIZER_SMTP_SECURITY", str(smtp.get("security", "")))
+        if effective_security not in {"starttls", "ssl"}:
             raise DeploymentConfigError("Netzwerk-SMTP muss STARTTLS oder SSL verwenden.")
         if not isinstance(smtp.get("port"), int) or not 1 <= smtp["port"] <= 65535:
             raise DeploymentConfigError("SMTP-Port muss zwischen 1 und 65535 liegen.")
