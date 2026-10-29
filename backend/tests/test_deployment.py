@@ -101,7 +101,7 @@ def test_network_login_uses_ldap_only_and_sets_secure_cookie(tmp_path, monkeypat
             return {"username": username, "roles": ["operator"]}
         raise auth_module.LDAPAuthenticationError("denied")
     monkeypatch.setattr(auth_module, "authenticate_ldap", fake_ldap)
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         denied = client.post("/api/auth/login", json={
             "username": "directory-user", "password": "wrong",
         })
