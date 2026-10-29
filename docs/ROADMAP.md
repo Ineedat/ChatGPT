@@ -1,5 +1,7 @@
 # Roadmap
 
+> **Baseline v2.8 (2026-10-29):** Performance and usability take priority for Standalone-Laptop and defined Air-Gap operation. High-security hardening items are no longer release gates; user accounts, roles, review/approval and audit remain required. See [REQUIREMENTS.md](REQUIREMENTS.md).
+
 ## Meilenstein 0 — Grundgerüst
 - [x] Anforderungen v2.7 dokumentieren.
 - [x] FastAPI-Health-Endpunkt und Test.
@@ -19,11 +21,11 @@
 - [x] Explizite vollständige Formatvalidierung für Text, JSON, JSON Lines, CSV und XML über Backend-Endpunkt und UI; unbekannte Formate werden nicht als gültig bestätigt. Die Validierung prüft Syntax, nicht die Erkennung sensibler Daten.
 - [x] Versionierte JSON-Regelkonfiguration v1 mit Schema-, Regex-, Profilreferenz- und Konfliktprüfung; lokale atomare Speicherung über API. Die Regeln werden auf unterstützte Text- und JSONL-Dateien angewendet.
 - [x] Erste zeilenweise Streaming-Ausführung für UTF-8-Text und JSON Lines mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung; maximale Eingabezeile 1 MiB. Vollständige JSON-Dokumente und weitere Formate bleiben offen.
-- [x] Persistente projektbezogene Index-Mappings in separater lokaler SQLite-Datei; Originalwerte mit AES-256-GCM verschlüsselt, HMAC-Fingerprints für stabile Suche, separater zufälliger Schlüsseldatei, POSIX-Modus 0600/Verzeichnis 0700 bzw. explizite Windows-ACL für Schlüssel und Datenverzeichnis. Fehlender/falscher Schlüssel und manipulierte Chiffretexte werden fail-closed behandelt; Migration alter Klartextdatenbank und Backup-/Recovery-Tests sind implementiert. CI: vollständige Backend-Suite unter Linux (66 bestanden, 2 übersprungen) sowie Mapping-/ACL-/Recovery-Suite unter Windows (8 bestanden, 1 übersprungen). Manuelle Wiederherstellung auf den tatsächlich unterstützten Zielsystemen bleibt vor vertraulichem Einsatz erforderlich.
+- [ ] Mapping-Speicherung auf einfache lokale SQLite-Struktur zurückführen; AES-Verschlüsselung, separate Schlüsseldatei, HMAC-Sonderlogik und aufwendige Schlüsselmigration gemäß Anforderungen v2.8 entfernen. Projektweite konsistente Platzhalter bleiben erhalten. Bestehende Daten vor einer Migration berücksichtigen.
 - [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
 - [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
-- [x] Konfigurierbarer Ausgabe-Workspace (`output_workspace`, Standard `data_dir/outputs`) mit zentraler Pfadbegrenzung für synchrone und asynchrone Bereinigungs-APIs; Traversierung und Symlink-Komponenten werden abgewiesen. Regressionstests für Workspace-Grenzen vorhanden.
-- [ ] LS-SEC-003 vollständig schließen: race-resistente Veröffentlichung mit OS-spezifischen Directory-Handles/Reparse-Point-Schutz unter Linux und Windows; Angriffe durch parallelen Austausch von Verzeichniseinträgen testen. Der aktuelle Workspace-Check ist nur eine Teilminderung und kein Produktionsfreigabekriterium.
+- [ ] Ausgabe-/Arbeitsbereich vereinfachen: frei wählbare Ausgabepfade statt verpflichtender Workspace-Allowlist; unnötige Pfad-/Symlink-Sonderlogik gemäß Anforderungen v2.8 entfernen, Quelldateien weiterhin unverändert lassen.
+- [x] LS-SEC-003 race-resistente Veröffentlichung ist nach Anforderungen v2.8 kein Produktziel mehr. Die aufwendige Race-Härtung wird nicht umgesetzt; einfache, zuverlässige Dateiausgabe mit Fehlerbereinigung bleibt erforderlich.
 - [x] Dauerhafte Lauf-/Prüfhistorie mit Ergebniskennzahlen, Status, Kommentaren, Ausnahmebegründungen und Audit-Ereignissen in einer separaten lokalen SQLite-Datenbank.
 - [x] Dauerhafte Hintergrundjob-Status-/Fortschrittsdaten in SQLite; beim Start verwaiste Läufe als `interrupted` markieren und zugehörige verwaiste Staging-Dateien sicher bereinigen.
 - [x] Pflichtvalidierung nach der Bereinigung: Ausgabe vollständig zeilenweise erneut lesen, UTF-8/JSONL-Syntax prüfen und alle aktiven konfigurierten Muster auf Resttreffer scannen; bei Fehlern Ausgabe löschen und Lauf ablehnen. Gilt nur für unterstützte Text-/JSONL-Ausgabe und ist kein Beweis vollständiger Geheimniserkennung.
@@ -33,7 +35,7 @@
 - [x] Prüfer-Warteschlange und sichere wörtliche Stichprobensuche ausschließlich in bereinigten Ausgaben; eigene gespeicherte Suchmuster.
 - [x] Freigabe, Rückgabe, Stopp und Kommentare; Laufhistorie und unveränderliche Audit-Ereignisse.
 - [x] Eng begrenzte, ausdrücklich begründete Ausnahmen; fehlgeschlagene Pflichtvalidierungen bleiben nicht freigabefähig.
-- [ ] Vollständige Sicherheitsprüfung der Authentifizierung/Rollenmatrix vor Produktions- oder Netzwerkbetrieb.
+- [ ] Rollen- und Berechtigungstests für Administrator, Rule Owner, Processor und Reviewer/Releaser; Rollen und Freigabeworkflow bleiben verbindlich, ohne umfassendes Hochsicherheits-Audit.
 
 ## Meilenstein 3 — Deployment
 - [x] Optionale SMTP-Benachrichtigungen für ausstehende Prüffreigaben und zurückgegebene Läufe; Konfiguration über lokale Umgebungsvariablen und automatisierte Tests.
@@ -41,7 +43,14 @@
 - [x] Explizite Deployment-Profile: Standalone nur Loopback/lokale Konten/SMTP aus; Netzwerkprofil benötigt LDAP, geschützte Bind-Adresse und TLS-Zertifikat/Schlüssel und startet HTTPS. Netzwerk- und TLS-Betrieb muss vor Freigabe gegen die Zielumgebung geprüft werden.
 - [x] Portable Windows-/Linux-CI-Paketierung: PyInstaller-One-Folder-Build und Standalone-Health-Smoke-Test auf `windows-latest` und `ubuntu-latest` erfolgreich (GitHub Actions Lauf 40936541846, 2026-10-29). Dies bestätigt den CI-Build, ersetzt aber noch keine Installationstests auf den tatsächlich unterstützten Zielversionen.
 - [ ] Offline-Handbuch und portable Pakete auf den tatsächlichen Zielversionen von Windows/Linux prüfen; Netzwerkprofil zusätzlich separat paketiert und gegen die Zielumgebung testen.
-- [ ] Sicherheits- und Performanceprüfung, Testdateien >= 5 GB.
+- [ ] Performanceprüfung mit Testdateien >= 5 GB (Laufzeit, RAM/CPU, UI-Reaktionsfähigkeit); Bedienbarkeit und typische Arbeitsabläufe testen.
 
 ## Definition of done
 Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverhalten und Dokumentation. Sicherheitsfunktionen müssen auch abgewiesene/unzulässige Pfade testen.
+
+## Umstellung auf Anforderungen v2.8
+- [ ] Bestehende Mapping-Verschlüsselung und Schlüsseldatei durch einfache lokale Mapping-Speicherung ersetzen; Migration/Kompatibilität klären.
+- [ ] Konfigurierbaren Ausgabeort ohne verpflichtende Workspace-Allowlist umsetzen.
+- [ ] Deployment vereinfachen: Standalone-Laptop und optional definiertes Air-Gap-Netz; LDAP/SMTP nur als optionale Netzwerkfunktionen.
+- [ ] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit regressionssicher erhalten.
+- [ ] Performance- und Usability-Schwerpunkt: 5-GB-Tests, Speicherprofile, UI-Reaktionszeiten und kurze Bedienwege.
