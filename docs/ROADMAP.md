@@ -35,9 +35,9 @@
 
 ## Meilenstein 3 — Deployment
 - [x] Optionale SMTP-Benachrichtigungen für ausstehende Prüffreigaben und zurückgegebene Läufe; Konfiguration über lokale Umgebungsvariablen und automatisierte Tests.
-- [ ] Optionale LDAP/AD-Integration.
-- [ ] Geschützte Darksite-Netzwerkbindung.
-- [ ] Portable Windows-/Linux-Paketierung und Offline-Handbuch.
+- [x] Optionale LDAP/AD-Anmeldung im Netzwerkprofil: LDAPS oder StartTLS, explizite LDAP-Gruppen-Zuordnung zu Rollen, keine lokale Passwort-Fallback-Anmeldung; Konfiguration aus JSON plus Dienstkonto-Geheimnis aus der Umgebung. Live-Verbindung zu einer echten LDAP/AD-Instanz bleibt ein Integrationstest vor Freigabe.
+- [x] Explizite Deployment-Profile: Standalone nur Loopback/lokale Konten/SMTP aus; Netzwerkprofil benötigt LDAP, geschützte Bind-Adresse und TLS-Zertifikat/Schlüssel und startet HTTPS. Netzwerk- und TLS-Betrieb muss vor Freigabe gegen die Zielumgebung geprüft werden.
+- [ ] Portable Windows-/Linux-Paketierung und Offline-Handbuch (Konfigurationsformat und Launcher vorbereitet; ausführbare Bundles/Installer noch nicht erstellt).
 - [ ] Sicherheits- und Performanceprüfung, Testdateien >= 5 GB.
 
 ## Definition of done
