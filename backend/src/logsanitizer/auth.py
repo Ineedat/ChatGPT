@@ -61,6 +61,11 @@ def initialize_auth_database():
             failures INTEGER NOT NULL DEFAULT 0,
             locked_until INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS external_identities(
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            provider TEXT NOT NULL,
+            external_username TEXT NOT NULL UNIQUE COLLATE NOCASE
+        );
         """)
         now = int(time.time())
         db.execute("DELETE FROM sessions WHERE expires_at<=?", (now,))
@@ -95,14 +100,14 @@ def create_user(username: str, password: str, roles: list[str]) -> int:
     return uid
 
 def upsert_external_user(username: str, roles: list[str]) -> int:
-    """Synchronize the LDAP identity and its mapped roles without storing its password."""
+    """Synchronize an LDAP identity without overwriting local accounts or disabled users."""
     username = username.strip()
     if not username or len(username) > 80 or not roles or not set(roles) <= ROLES:
         raise ValueError("Invalid external identity or role mapping.")
     initialize_auth_database()
     with _db() as db:
         row = db.execute(
-            "SELECT id FROM users WHERE username=? COLLATE NOCASE",
+            "SELECT id, enabled FROM users WHERE username=? COLLATE NOCASE",
             (username,),
         ).fetchone()
         if row is None:
@@ -111,9 +116,22 @@ def upsert_external_user(username: str, roles: list[str]) -> int:
                 (username, _hash(secrets.token_urlsafe(48)), int(time.time())),
             )
             user_id = int(cursor.lastrowid)
+            db.execute(
+                "INSERT INTO external_identities(user_id,provider,external_username) VALUES(?,?,?)",
+                (user_id, "ldap", username),
+            )
         else:
             user_id = int(row["id"])
-            db.execute("UPDATE users SET enabled=1 WHERE id=?", (user_id,))
+            identity = db.execute(
+                "SELECT provider,external_username FROM external_identities WHERE user_id=?",
+                (user_id,),
+            ).fetchone()
+            if identity is None or identity["provider"] != "ldap":
+                raise ValueError("LDAP identity collides with a local account.")
+            if not bool(row["enabled"]):
+                raise ValueError("LDAP account is disabled locally.")
+            if str(identity["external_username"]).casefold() != username.casefold():
+                raise ValueError("LDAP identity mismatch.")
             db.execute("DELETE FROM user_roles WHERE user_id=?", (user_id,))
         db.executemany(
             "INSERT INTO user_roles(user_id,role) VALUES(?,?)",
