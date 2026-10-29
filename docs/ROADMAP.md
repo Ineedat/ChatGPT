@@ -45,12 +45,12 @@
 - [ ] Offline-Handbuch und portable Pakete auf den tatsächlichen Zielversionen von Windows/Linux prüfen; Netzwerkprofil zusätzlich separat paketiert und gegen die Zielumgebung testen.
 - [ ] Performanceprüfung mit Testdateien >= 5 GB (Laufzeit, RAM/CPU, UI-Reaktionsfähigkeit); Bedienbarkeit und typische Arbeitsabläufe testen.
 
-## Definition of done
+## Aktueller Validierungsstand (2026-10-29)\n- [x] CI-Lauf 40955808621 (Commit 9045e35): Backend Linux, Backend Windows, Frontend sowie portable Builds/Smoke-Tests Linux und Windows erfolgreich.\n- [x] Issue #3 zur verpflichtenden Workspace-Allowlist gemäß v2.8 als nicht mehr geplant geschlossen; dies ist keine Aussage über Race-Resistenz der bisherigen Implementierung.\n\n## Definition of done
 Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverhalten und Dokumentation. Sicherheitsfunktionen müssen auch abgewiesene/unzulässige Pfade testen.
 
 ## Umstellung auf Anforderungen v2.8
-- [ ] Bestehende Mapping-Verschlüsselung und Schlüsseldatei durch einfache lokale Mapping-Speicherung ersetzen; Migration/Kompatibilität klären.
-- [ ] Konfigurierbaren Ausgabeort ohne verpflichtende Workspace-Allowlist umsetzen.
-- [ ] Deployment vereinfachen: Standalone-Laptop und optional definiertes Air-Gap-Netz; LDAP/SMTP nur als optionale Netzwerkfunktionen.
+- [ ] Bestehende Mapping-Verschlüsselung und Schlüsseldatei durch einfache lokale Mapping-Speicherung ersetzen; Migration/Kompatibilität klären. Deployment-Dokumentation weist auf den Übergangszustand hin.
+- [ ] Konfigurierbaren Ausgabeort ohne verpflichtende Workspace-Allowlist im Backend umsetzen (Dokumentation angepasst).
+- [x] Deployment-Dokumentation auf v2.8 ausgerichtet: Standalone-Laptop und definiertes Air-Gap-Netz; LDAP/SMTP als optionale Netzwerkfunktionen. Die Laufzeitumstellung ist davon getrennt und noch offen.
 - [ ] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit regressionssicher erhalten.
 - [ ] Performance- und Usability-Schwerpunkt: 5-GB-Tests, Speicherprofile, UI-Reaktionszeiten und kurze Bedienwege.
