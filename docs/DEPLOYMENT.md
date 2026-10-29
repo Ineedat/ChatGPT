@@ -28,9 +28,9 @@ TLS kann entsprechend der konkreten Netzwerkinfrastruktur eingesetzt werden. Es 
 
 Projekte, importierte Dateimetadaten, Review-Informationen und Mapping-Zuordnungen werden lokal in SQLite gespeichert. Die Mapping-Zuordnungen sind projektbezogen: derselbe Originalwert erhält innerhalb eines Projekts über mehrere Dateien hinweg denselben Ersatzwert.
 
-Neue Mapping-Einträge werden in der v2.8-Implementierung direkt in der lokalen SQLite-Datenbank gespeichert; eine separate Schlüsseldatei wird für den laufenden Betrieb nicht mehr angelegt. Bereits vorhandene verschlüsselte Mapping-Datenbanken werden beim ersten Zugriff einmalig migriert. Dafür muss die bisherige `mappings.key` im selben Datenverzeichnis vorhanden sein. Nach erfolgreicher Migration wird sie entfernt. **Vor dem ersten Start mit dieser Version unbedingt Datenbank und bisherige Schlüsseldatei gemeinsam sichern.** Fehlt der alte Schlüssel oder ist ein Eintrag beschädigt, wird die Migration abgebrochen und die alte Datenbank bleibt erhalten.
+Mapping-Zuordnungen werden direkt in der lokalen SQLite-Datenbank gespeichert. Eine separate Schlüsseldatei und eine Migration verschlüsselter Altbestände sind nicht Bestandteil der finalen Produktversion. Da vor dem finalen Einsatz keine echten Logs verarbeitet werden, beginnt die Produktivnutzung mit einer frisch angelegten Mapping-Datenbank. Eine vorhandene Mapping-Datenbank aus Entwicklungs- oder Testständen wird nicht übernommen.
 
-Vor Updates oder Migrationen ist eine Sicherung des gesamten Datenverzeichnisses anzulegen. Die Sicherung muss insbesondere die SQLite-Dateien und – solange die bestehende Verschlüsselungsimplementierung verwendet wird – die zugehörige Schlüsseldatei enthalten. Ein Wiederherstellungstest ist empfehlenswert.
+Vor regulären Updates ist eine Sicherung des gesamten Datenverzeichnisses empfehlenswert. Ein Wiederherstellungstest stellt sicher, dass Projekte, Mapping-Zuordnungen und Review-Historie verfügbar bleiben.
 
 ## Ausgabe und Dateiverarbeitung
 
