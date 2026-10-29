@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import os
+import sys
 import threading
 import uuid
 from collections.abc import AsyncIterator
@@ -15,6 +16,7 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from logsanitizer.auth import AuthMiddleware, initialize_auth_database
@@ -733,3 +735,20 @@ def project_folder_import(
 app.include_router(review_router)
 app.include_router(auth_router)
 app.add_middleware(AuthMiddleware)
+
+
+def _frontend_dist() -> Path | None:
+    candidates = (
+        Path(__file__).resolve().parents[3] / "frontend" / "dist",
+        Path(__file__).resolve().parents[1] / "frontend" / "dist",
+        Path(sys.executable).resolve().parent / "frontend" / "dist",
+    )
+    return next(
+        (candidate for candidate in candidates if (candidate / "index.html").is_file()),
+        None,
+    )
+
+
+_frontend_path = _frontend_dist()
+if _frontend_path is not None:
+    app.mount("/", StaticFiles(directory=str(_frontend_path), html=True), name="frontend")
