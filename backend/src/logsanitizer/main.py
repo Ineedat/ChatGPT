@@ -21,7 +21,6 @@ from pydantic import BaseModel, Field
 
 from logsanitizer.auth import AuthMiddleware, initialize_auth_database
 from logsanitizer.auth import router as auth_router
-from logsanitizer.deployment import load_settings
 from logsanitizer.database import (
     FileAlreadyRegisteredError,
     FileImportRequest,
@@ -42,6 +41,7 @@ from logsanitizer.database import (
     update_detected_format,
     update_format_override,
 )
+from logsanitizer.deployment import load_settings
 from logsanitizer.format_validation import validate_file
 from logsanitizer.job_store import (
     create_job,
