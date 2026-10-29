@@ -84,7 +84,7 @@ def load_settings() -> dict[str, Any]:
         def reject_secrets(value: Any) -> None:
             if isinstance(value, dict):
                 for key, nested in value.items():
-                    if key.casefold() in forbidden:
+                    if key.casefold() in forbidden or any(marker in key.casefold() for marker in ("password", "secret", "token")):
                         raise DeploymentConfigError(
                             "Geheimnisse gehören nicht in die JSON-Konfiguration, sondern in Umgebungsvariablen."
                         )
