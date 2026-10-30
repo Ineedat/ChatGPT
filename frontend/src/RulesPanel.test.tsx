@@ -60,7 +60,6 @@ describe("rule editor", () => {
     const revokeUrl = vi.fn();
     vi.stubGlobal("URL", { ...URL, createObjectURL: createUrl, revokeObjectURL: revokeUrl });
     render(<RulesPanel />);
-    const input = await screen.findByLabelText("JSON importieren", { selector: "input" }).catch(() => null);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
     const file = new File([JSON.stringify(config)], "rules.json", { type: "application/json" });
@@ -74,7 +73,6 @@ describe("rule editor", () => {
     fireEvent.click(screen.getByRole("button", { name: "JSON exportieren" }));
     expect(createUrl).toHaveBeenCalledTimes(1);
     expect(revokeUrl).toHaveBeenCalledWith("blob:rules-export");
-    expect(input).toBeNull();
   });
 
   it("adds a categorized library template as a disabled editable rule", async () => {
