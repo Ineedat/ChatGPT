@@ -23,7 +23,7 @@ _LIBRARY: list[dict[str, Any]] = [
         "description": "Erkennt typische ausgeschriebene und komprimierte IPv6-Schreibweisen.",
         "pattern": r"(?i)(?<![0-9a-f:])(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}(?![0-9a-f:])|(?<![0-9a-f:])::(?:[0-9a-f]{1,4}:?){1,7}(?![0-9a-f:])|(?<![0-9a-f:])[0-9a-f]{1,4}:(?:[0-9a-f]{0,4}:){1,6}:(?:[0-9a-f]{1,4})?(?![0-9a-f:])",
         "mapping_prefix": "IP", "priority": 110,
-        "example_before": "remote=[2001:db8::17]", "example_after": "remote=[[IP_1]]",
+        "example_before": "remote=2001:db8::17", "example_after": "remote=[IP_1]",
         "notes": "Heuristische Erkennung: IPv6-Varianten mit IPv4-Endstück und eingebettete Zonen-IDs separat prüfen.",
     },
     {
@@ -177,7 +177,7 @@ def list_rule_templates() -> list[dict[str, Any]]:
     templates = deepcopy(_LIBRARY)
     for template in templates:
         template["match_type"] = "regex"
-        template["replacement"] = ""
+        template["replacement"] = f"[{template['mapping_prefix']}_1]"
         template["replacement_mode"] = "indexed"
         template["case_sensitive"] = False
         template["enabled"] = False
