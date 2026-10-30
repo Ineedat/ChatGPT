@@ -9,8 +9,8 @@ from pathlib import Path
 
 import regex as re
 
-from logsanitizer.mapping_store import get_or_create_indexed_mapping
 from logsanitizer.json_sanitizer import JsonStreamError, sanitize_json_stream, validate_json_stream
+from logsanitizer.mapping_store import get_or_create_indexed_mapping
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
 
 MAX_LINE_BYTES = 1024 * 1024
@@ -148,8 +148,10 @@ def sanitize_file(
     if effective_format == "json":
         try:
             try:
-                with source.open("r", encoding="utf-8-sig", newline="") as input_stream:
-                    with staging.open("x", encoding="utf-8", newline="") as output_stream:
+                with (
+                    source.open("r", encoding="utf-8-sig", newline="") as input_stream,
+                    staging.open("x", encoding="utf-8", newline="") as output_stream,
+                ):
                         staging_created = True
                         try:
                             os.chmod(staging, 0o600)
