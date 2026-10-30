@@ -97,3 +97,11 @@ def test_bounded_detection_recognizes_large_json_documents_and_jsonl(tmp_path):
     lines.write_text("".join('{"event":%d}\n' % i for i in range(10000)), encoding="utf-8")
     assert lines.stat().st_size > 64 * 1024
     assert detect_format_from_sample(lines) == "jsonl"
+
+
+def test_bounded_detection_uses_jsonl_suffix_for_a_single_long_record(tmp_path):
+    from logsanitizer.main import detect_format_from_sample
+
+    path = tmp_path / "single-large-record.jsonl"
+    path.write_text('{"message":"' + ("x" * 70000) + '"}\n', encoding="utf-8")
+    assert detect_format_from_sample(path) == "jsonl"

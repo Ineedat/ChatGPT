@@ -227,6 +227,8 @@ def detect_format_from_sample(path: Path) -> str:
             lines = lines[:-1]
         if lines and all(_is_json_line(line) for line in lines):
             return "jsonl"
+        if sample_truncated and path.suffix.casefold() in {".jsonl", ".ndjson"}:
+            return "jsonl"
         if sample_truncated:
             # A document that extends beyond the bounded sample is classified as
             # JSON when it is not a sequence of complete JSON Lines. Full syntax
