@@ -78,7 +78,7 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
 - [x] Integrierte Musterprüfung/Vorschau: einzelne Regeln (auch deaktivierte Entwürfe) und aktive Regelsets mit Profilfilter testen; Treffer/Ersetzungen, Prioritätsreihenfolge, Folgetreffer und überlappende Fundstellen anzeigen. Vorschau läuft ausschließlich im Speicher und verändert weder Quelldateien noch dauerhafte Projekt-Mappings.
 - [x] Offline-Regelbibliothek mit 20 kategorisierten, einzeln übernehmbaren und editierbaren Startvorlagen für IPv4/IPv6, FQDN/Hostnamen, Benutzer, E-Mail, ausgewählte personenbezogene Daten, Passwort-/Token-/API-Key-Felder, Windows-/Unix-Pfade und Infrastrukturwerte; Vorlagen werden zunächst deaktiviert eingefügt. Regex-Tests, API und GUI sind abgedeckt.
-- [ ] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Vorschau und Validierung vor Übernahme.
+- [x] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Dateigrößenbegrenzung, Schema-/Regex-/Profil-/Konfliktprüfung, Importvorschau und expliziter Übernahme in einen ungespeicherten Entwurf; dauerhafte Aktivierung erst nach separatem Speichern. Exporte enthalten keine Projekt-Mappings.
 - [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
 
 ### Priorität 2 — Abnahme und Freigabe
@@ -146,4 +146,4 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Regressionstests für Anfang/Ende, UTF-8-Grenzen, ungültiges UTF-8, Symlink-Ausschluss und unveränderte Quelldateien.
 - [x] Offline-Hilfe aktualisiert; PR-CI vollständig erfolgreich: Lauf [41143691073](https://github.com/Ineedat/ChatGPT/actions/runs/41143691073), alle fünf Jobs grün (Frontend, Backend Windows/Linux, portable Windows/Linux), einschließlich 5-GiB-Benchmark.
 
-Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) bleibt bis zum Abschluss dieser Erweiterung zurückgestellt.
+Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) wurde nach Abschluss der Dateivorschau umgesetzt; die Umsetzung ist in der priorisierten Roadmap abgehakt.
