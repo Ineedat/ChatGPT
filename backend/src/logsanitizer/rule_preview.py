@@ -95,36 +95,42 @@ def preview_rules(
             match_details: list[dict[str, Any]] = []
             rule_fragments: list[str] = []
 
-            def replacement_for(match: re.Match) -> str:
+            def replacement_for(
+                match: re.Match,
+                current_rule: SanitizationRule = rule,
+                details: list[dict[str, Any]] = match_details,
+                fragments: list[str] = rule_fragments,
+                previous_fragments: list[tuple[str, str]] = generated_fragments,
+            ) -> str:
                 value = match.group(0)
-                if rule.replacement_mode == "indexed":
-                    prefix = rule.mapping_prefix or "VALUE"
-                    key = (rule.category, prefix, value)
+                if current_rule.replacement_mode == "indexed":
+                    prefix = current_rule.mapping_prefix or "VALUE"
+                    key = (current_rule.category, prefix, value)
                     if key not in indexed_values:
-                        counter_key = (rule.category, prefix)
+                        counter_key = (current_rule.category, prefix)
                         counters[counter_key] += 1
                         indexed_values[key] = f"[{prefix}_{counters[counter_key]}]"
                     replacement = indexed_values[key]
                 else:
                     try:
-                        replacement = match.expand(rule.replacement)
+                        replacement = match.expand(current_rule.replacement)
                     except re.error as exc:
                         raise RulePreviewError(
-                            f"Ersetzungswert von Regel '{rule.id}' ist ungültig."
+                            f"Ersetzungswert von Regel '{current_rule.id}' ist ungültig."
                         ) from exc
                 chained_from = [
-                    source_id for source_id, fragment in generated_fragments
+                    source_id for source_id, fragment in previous_fragments
                     if fragment and value in fragment
                 ]
-                if len(match_details) < MAX_REPORTED_MATCHES:
-                    match_details.append({
+                if len(details) < MAX_REPORTED_MATCHES:
+                    details.append({
                         "start": match.start(),
                         "end": match.end(),
                         "value": value,
                         "replacement": replacement,
                         "chained_from": list(dict.fromkeys(chained_from)),
                     })
-                rule_fragments.append(replacement)
+                fragments.append(replacement)
                 return replacement
 
             current, count = pattern.subn(replacement_for, current, timeout=REGEX_TIMEOUT_SECONDS)
