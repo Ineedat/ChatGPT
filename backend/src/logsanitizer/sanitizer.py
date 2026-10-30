@@ -152,17 +152,17 @@ def sanitize_file(
                     source.open("r", encoding="utf-8-sig", newline="") as input_stream,
                     staging.open("x", encoding="utf-8", newline="") as output_stream,
                 ):
-                        staging_created = True
-                        try:
-                            os.chmod(staging, 0o600)
-                        except OSError:
-                            pass
-                        replacement_count, line_count = sanitize_json_stream(
-                            input_stream, output_stream, compiled, project_id,
-                            cancel_check, progress_callback, total_bytes,
-                        )
-                        output_stream.flush()
-                        os.fsync(output_stream.fileno())
+                    staging_created = True
+                    try:
+                        os.chmod(staging, 0o600)
+                    except OSError:
+                        pass
+                    replacement_count, line_count = sanitize_json_stream(
+                        input_stream, output_stream, compiled, project_id,
+                        cancel_check, progress_callback, total_bytes,
+                    )
+                    output_stream.flush()
+                    os.fsync(output_stream.fileno())
                 _check_cancelled(cancel_check)
                 with staging.open("r", encoding="utf-8", newline="") as validation_stream:
                     validate_json_stream(validation_stream, compiled, cancel_check)
