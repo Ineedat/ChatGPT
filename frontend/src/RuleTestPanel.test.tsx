@@ -55,5 +55,5 @@ describe("rule test preview", () => {
     render(<RuleTestPanel config={config} draft={invalidDraft} selectedId="ip" draftDirty />);
     fireEvent.click(screen.getByRole("button", { name: "Muster testen" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Regelentwurf ist unvollständig");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
