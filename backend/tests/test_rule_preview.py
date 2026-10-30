@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from test_client import TestClient
 
 from logsanitizer.main import app

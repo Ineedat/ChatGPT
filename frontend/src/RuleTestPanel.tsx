@@ -15,6 +15,7 @@ type Preview = {
     matches: Match[]; matches_truncated: boolean; chained_match_count: number }[];
   overlaps: { first_rule_id: string; second_rule_id: string; start: number; end: number; example: string }[];
   overlaps_truncated: boolean;
+  conflicts: { rule_id: string; conflicts_with: string; reason: string }[];
 };
 type Props = { config: Config; draft: Rule; selectedId: string; draftDirty: boolean };
 
@@ -88,6 +89,7 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
         {item.matches_truncated && <small>Anzeige auf {100} Treffer begrenzt.</small>}
         {item.chained_match_count > 0 && <small className="rule-test-warning">Achtung: {item.chained_match_count} Treffer reagieren auf zuvor erzeugte Ersetzungen.</small>}
       </article>)}
+      {result.conflicts.length > 0 && <div className="rules-conflicts"><strong>Konfigurationskonflikte</strong><ul>{result.conflicts.map(item => <li key={item.rule_id}>{item.rule_id} ↔ {item.conflicts_with}: {item.reason}</li>)}</ul></div>}
       {result.overlaps.length > 0 && <div className="rules-conflicts"><strong>Überlappende Treffer im ursprünglichen Beispiel</strong><ul>{result.overlaps.map((item, index) => <li key={index}>{item.first_rule_id} ↔ {item.second_rule_id}: „{item.example}“</li>)}</ul></div>}
       {result.overlaps_truncated && <p className="field-help">Weitere Überlappungen wurden nicht angezeigt.</p>}
     </div>}

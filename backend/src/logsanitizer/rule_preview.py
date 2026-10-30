@@ -92,8 +92,8 @@ def preview_rules(
 
     for rule, pattern in compiled:
         try:
-            found = list(pattern.finditer(current, timeout=REGEX_TIMEOUT_SECONDS))
             match_details: list[dict[str, Any]] = []
+            rule_fragments: list[str] = []
 
             def replacement_for(match: re.Match) -> str:
                 value = match.group(0)
@@ -124,10 +124,11 @@ def preview_rules(
                         "replacement": replacement,
                         "chained_from": list(dict.fromkeys(chained_from)),
                     })
-                generated_fragments.append((rule.id, replacement))
+                rule_fragments.append(replacement)
                 return replacement
 
             current, count = pattern.subn(replacement_for, current, timeout=REGEX_TIMEOUT_SECONDS)
+            generated_fragments.extend((rule.id, fragment) for fragment in rule_fragments)
         except TimeoutError as exc:
             raise RulePreviewError(f"Das Muster von Regel '{rule.id}' überschreitet das Zeitlimit.") from exc
         results.append({
