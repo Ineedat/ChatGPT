@@ -57,6 +57,7 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
   const [fileError, setFileError] = useState("");
   const [fileLoading, setFileLoading] = useState(false);
+  const [matchIndex, setMatchIndex] = useState(-1);
   const originalPane = useRef<HTMLDivElement>(null);
   const cleanedPane = useRef<HTMLDivElement>(null);
 
@@ -152,10 +153,22 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
       const body = await response.json() as FilePreview & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Dateifenster konnte nicht geladen werden.");
       setFilePreview(body);
+      setMatchIndex(-1);
       setResult(null);
     } catch (cause) {
       setFileError(cause instanceof Error ? cause.message : "Dateifenster konnte nicht geladen werden.");
     } finally { setFileLoading(false); }
+  }
+
+  function jumpToMatch(direction: -1 | 1) {
+    const nodes = originalPane.current?.querySelectorAll("mark") ?? [];
+    if (!nodes.length) return;
+    const next = (matchIndex + direction + nodes.length) % nodes.length;
+    setMatchIndex(next);
+    const target = nodes[next] as HTMLElement;
+    const top = target.offsetTop - 60;
+    if (originalPane.current) originalPane.current.scrollTop = Math.max(0, top);
+    if (cleanedPane.current) cleanedPane.current.scrollTop = Math.max(0, top);
   }
 
   function syncScroll(source: "original" | "cleaned") {
@@ -188,6 +201,8 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: filePreview?.next_offset ?? 0 })} disabled={fileLoading || !filePreview?.has_next}>Weiter</button>
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: Math.max(0, (filePreview?.source_offset ?? 0) - 262144) })} disabled={fileLoading || !filePreview?.has_previous}>Zurück</button>
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: 0 })} disabled={fileLoading || !fileId}>Neu laden</button>
+          <button className="secondary-button" type="button" onClick={() => jumpToMatch(-1)} disabled={!filePreview?.rule_results.some(item => item.matches.length)}>Vorheriger Treffer</button>
+          <button className="secondary-button" type="button" onClick={() => jumpToMatch(1)} disabled={!filePreview?.rule_results.some(item => item.matches.length)}>Nächster Treffer</button>
         </div>
         {fileError && <p className="error-message" role="alert">{fileError}</p>}
         {fileLoading && <p role="status">Dateifenster wird geladen …</p>}
