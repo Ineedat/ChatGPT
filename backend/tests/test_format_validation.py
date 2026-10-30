@@ -89,12 +89,12 @@ def test_bounded_detection_recognizes_large_json_documents_and_jsonl(tmp_path):
     from logsanitizer.main import detect_format_from_sample
 
     document = tmp_path / "large-document.json"
-    document.write_text('{"events":[\n' + ",".join('{"message":"event-%05d"}' % i for i in range(5000)) + "\n]}", encoding="utf-8")
+    document.write_text('{"events":[\n' + ",".join(f'{{"message":"event-{i:05d}"}}' for i in range(5000)) + "\n]}", encoding="utf-8")
     assert document.stat().st_size > 64 * 1024
     assert detect_format_from_sample(document) == "json"
 
     lines = tmp_path / "large-events.jsonl"
-    lines.write_text("".join('{"event":%d}\n' % i for i in range(10000)), encoding="utf-8")
+    lines.write_text("".join(f'{{"event":{i}}}\n' for i in range(10000)), encoding="utf-8")
     assert lines.stat().st_size > 64 * 1024
     assert detect_format_from_sample(lines) == "jsonl"
 
