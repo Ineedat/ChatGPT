@@ -66,7 +66,7 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
     void apiRequest("/api/projects").then(async response => {
       if (!response.ok) throw new Error("Projektliste konnte nicht geladen werden.");
       const items = await response.json() as Project[];
-      if (active) { setProjects(items); if (items.length) setProjectId(items[0].id); }
+      if (active && Array.isArray(items)) { setProjects(items); if (items.length) setProjectId(items[0].id); }
     }).catch(() => { if (active) setFileError("Projektliste ist nicht verfügbar."); });
     return () => { active = false; };
   }, []);
@@ -77,7 +77,7 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
     void apiRequest(`/api/projects/${encodeURIComponent(projectId)}/files`).then(async response => {
       if (!response.ok) throw new Error("Dateiliste konnte nicht geladen werden.");
       const items = await response.json() as SourceFile[];
-      if (active) {
+      if (active && Array.isArray(items)) {
         setFiles(items);
         setFileId(items[0]?.id ?? "");
         setFilePreview(null);
