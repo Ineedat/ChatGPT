@@ -54,3 +54,30 @@
 .profile-item>div{display:grid;gap:4px;min-width:0}
 .profile-item small{overflow-wrap:anywhere}
 @media(max-width:760px){.rules-heading{align-items:flex-start;flex-direction:column}.rules-workspace,.profile-workspace{grid-template-columns:1fr}.rules-list{max-height:230px}.rule-form-grid{grid-template-columns:1fr}}
+
+
+/* Curated starter rule library */
+.rule-library { display: grid; gap: 1rem; }
+.rule-library-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.rule-library-heading h3 { margin: 0 0 .35rem; }
+.rule-library-heading p { margin: 0; color: var(--muted, #687386); }
+.rule-library-heading label { display: grid; gap: .35rem; min-width: 15rem; }
+.rule-library-safety { margin: 0; padding: .75rem 1rem; border-left: 3px solid #b7791f; background: rgba(183, 121, 31, .08); border-radius: .35rem; }
+.rule-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; max-height: 62vh; overflow: auto; padding: .1rem .2rem .5rem 0; }
+.rule-template-card { display: grid; align-content: start; gap: .6rem; border: 1px solid var(--border, #d7dce3); border-radius: .65rem; padding: .9rem; min-width: 0; background: var(--surface, #fff); }
+.rule-template-title { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
+.rule-template-title h4 { margin: 0 0 .25rem; }
+.rule-template-category, .rule-template-priority { font-size: .78rem; color: var(--muted, #687386); }
+.rule-template-priority { white-space: nowrap; }
+.rule-template-card p { margin: 0; font-size: .9rem; }
+.rule-template-card label { display: grid; gap: .25rem; font-size: .8rem; color: var(--muted, #687386); }
+.rule-template-pattern { display: block; max-height: 4.5rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: .45rem; border-radius: .35rem; background: var(--code-bg, #f3f5f8); font-size: .78rem; }
+.rule-template-example { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: .25rem .5rem; align-items: baseline; font-size: .78rem; }
+.rule-template-example span { color: var(--muted, #687386); }
+.rule-template-example code { overflow-wrap: anywhere; }
+.rule-template-note { color: var(--muted, #687386); font-size: .82rem !important; }
+@media (max-width: 900px) {
+  .rule-template-grid { grid-template-columns: minmax(0, 1fr); max-height: none; }
+  .rule-library-heading { align-items: stretch; flex-direction: column; }
+  .rule-library-heading label { min-width: 0; }
+}
