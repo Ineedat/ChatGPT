@@ -63,9 +63,9 @@ from logsanitizer.rule_config import (
     load_rule_config,
     save_rule_config,
 )
+from logsanitizer.rule_file_preview import preview_file_window
 from logsanitizer.rule_library import list_rule_categories, list_rule_templates
 from logsanitizer.rule_preview import RulePreviewError, preview_rules
-from logsanitizer.rule_file_preview import preview_file_window
 from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
