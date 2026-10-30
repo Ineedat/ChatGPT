@@ -50,6 +50,33 @@ describe("rule editor", () => {
     expect(await screen.findByText("Regelkonfiguration wurde lokal gespeichert.")).toBeInTheDocument();
   });
 
+  it("validates an imported JSON file before staging it and exports the active draft", async () => {
+    const config = { schema_version: 1, profiles: [], rules: [] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => config } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ valid: true, conflicts: [] }) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const createUrl = vi.fn(() => "blob:rules-export");
+    const revokeUrl = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL: createUrl, revokeObjectURL: revokeUrl });
+    render(<RulesPanel />);
+    const input = await screen.findByLabelText("JSON importieren", { selector: "input" }).catch(() => null);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+    const file = new File([JSON.stringify(config)], "rules.json", { type: "application/json" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    expect(await screen.findByText(/Importvorschau: rules.json/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rules/config/validate", expect.objectContaining({ method: "POST" }));
+    expect(screen.getByRole("button", { name: "In Entwurf übernehmen" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "In Entwurf übernehmen" }));
+    expect(await screen.findByText(/Import übernommen und als ungespeicherter Entwurf/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "JSON exportieren" }));
+    expect(createUrl).toHaveBeenCalledTimes(1);
+    expect(revokeUrl).toHaveBeenCalledWith("blob:rules-export");
+    expect(input).toBeNull();
+  });
+
   it("adds a categorized library template as a disabled editable rule", async () => {
     const library = {
       categories: [{ name: "IP-Adresse", description: "IPv4 und IPv6", template_count: 1 }],
