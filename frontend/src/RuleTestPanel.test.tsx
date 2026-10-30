@@ -57,3 +57,32 @@ describe("rule test preview", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Regelentwurf ist unvollständig");
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
+
+
+it("loads a registered file into synchronized original and sanitized panes", async () => {
+  const preview = {
+    mode: "enabled-rules", preview_text: "client=[IP]\n", original_text: "client=192.0.2.17\n",
+    changed: true, input_chars: 18, output_chars: 13, source_offset: 0, next_offset: 18,
+    total_bytes: 18, has_previous: false, has_next: false, window_chars: 18,
+    rule_results: [{ rule_id: "ip", name: "IP", priority: 10, enabled: true, match_count: 1,
+      matches: [{ start: 7, end: 17, value: "192.0.2.17", replacement: "[IP]", chained_from: [] }],
+      matches_truncated: false, chained_match_count: 0 }],
+    overlaps: [], overlaps_truncated: false, conflicts: []
+  };
+  const fetchMock = vi.fn().mockImplementation((input, init) => {
+    const url = String(input);
+    const payload = url === "/api/projects" ? [{ id: "project-1", name: "Demo" }]
+      : url.endsWith("/files") ? [{ id: "file-1", display_name: "application.log", size_bytes: 18, detected_format: "text" }]
+      : preview;
+    return Promise.resolve({ ok: true, json: async () => init?.method === "POST" ? preview : payload } as Response);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<RuleTestPanel config={config} draft={draft} selectedId="ip" draftDirty={false} />);
+  await screen.findByRole("option", { name: /application.log/ });
+  fireEvent.click(screen.getByRole("button", { name: "Anfang" }));
+  expect(await screen.findByText("Original")).toBeInTheDocument();
+  expect(screen.getByText("Bereinigte Vorschau")).toBeInTheDocument();
+  expect(screen.getByText("client=192.0.2.17")).toBeInTheDocument();
+  expect(screen.getByText("client=[IP]")).toBeInTheDocument();
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/files/file-1/preview"))).toBe(true);
+});
