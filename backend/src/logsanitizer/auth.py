@@ -295,6 +295,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
         if path.startswith("/api/rules/config") and method!="GET" and not roles.intersection({"admin","rule_owner"}):
             return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        if path == "/api/rules/preview" and not roles.intersection({"admin","rule_owner"}):
+            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
         if "/sanitize" in path and not roles.intersection({"admin","operator"}):
             return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
         if method in {"POST","PUT","PATCH","DELETE"} and path.startswith("/api/projects") and not roles.intersection({"admin","operator"}):

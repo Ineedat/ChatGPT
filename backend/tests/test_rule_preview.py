@@ -1,5 +1,6 @@
 from test_client import TestClient
 
+from logsanitizer.auth import create_user
 from logsanitizer.main import app
 from logsanitizer.rule_config import RuleConfig
 from logsanitizer.rule_preview import preview_rules
@@ -98,3 +99,18 @@ def test_rule_preview_api_is_non_persistent_and_returns_safe_summary(tmp_path, m
         assert body["rule_results"][0]["match_count"] == 1
         assert not (tmp_path / "mappings").exists()
         assert not (tmp_path / "rules" / "rules-v1.json").exists()
+
+
+def test_rule_preview_requires_rule_management_role() -> None:
+    with TestClient(app) as client:
+        create_user("preview-operator", "preview-test-password", ["operator"])
+        login = client.post("/api/auth/login", json={
+            "username": "preview-operator", "password": "preview-test-password",
+        })
+        assert login.status_code == 200
+        client._test_csrf = client.cookies.get("logsanitizer_csrf")
+        response = client.post("/api/rules/preview", json={
+            "config": sample_config().model_dump(mode="json"),
+            "sample_text": "client=192.0.2.17",
+        })
+        assert response.status_code == 403

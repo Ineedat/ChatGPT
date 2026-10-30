@@ -22,7 +22,7 @@ describe("rule test preview", () => {
         rule_results: [{ rule_id: "ip", name: "IP", priority: 10, enabled: true, match_count: 1,
           matches: [{ start: 7, end: 18, value: "192.0.2.17", replacement: "[IP]", chained_from: [] }],
           matches_truncated: false, chained_match_count: 0 }],
-        overlaps: [], overlaps_truncated: false
+        overlaps: [], overlaps_truncated: false, conflicts: []
       })
     } as Response));
     render(<RuleTestPanel config={config} draft={draft} selectedId="ip" draftDirty={false} />);
@@ -34,7 +34,7 @@ describe("rule test preview", () => {
   it("includes a not-yet-saved draft when testing a single rule", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
       mode: "single-rule", preview_text: "safe", changed: false, input_chars: 4, output_chars: 4,
-      rule_results: [], overlaps: [], overlaps_truncated: false
+      rule_results: [], overlaps: [], overlaps_truncated: false, conflicts: []
     }) } as Response);
     vi.stubGlobal("fetch", fetchMock);
     const changedDraft = { ...draft, id: "", name: "Draft", pattern: "demo" };
