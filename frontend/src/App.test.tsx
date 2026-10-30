@@ -181,3 +181,19 @@ describe("offline help keyboard shortcut", () => {
     expect(screen.getByRole("heading", { name: "Große Dateien und Leistung" })).toBeInTheDocument();
   });
 });
+
+
+describe("JSON document sanitization UI", () => {
+  it("allows a JSON document to start a sanitization job", async () => {
+    const project = { id: "project-json", name: "JSON", description: "", status: "draft", created_at: "2026-10-30T10:00:00+00:00", updated_at: "2026-10-30T10:00:00+00:00" };
+    const file = { id: "file-json", project_id: project.id, display_name: "events.json", size_bytes: 128, modified_at: "2026-10-30T10:00:00+00:00", imported_at: "2026-10-30T10:00:00+00:00", state: "registered", detected_format: "json" };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für events.json" }), { target: { value: "/tmp/events.cleaned.json" } });
+    expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled();
+  });
+});

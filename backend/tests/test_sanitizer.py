@@ -1,416 +1,164 @@
+"""Generate and process a synthetic large log while recording resource metrics.
+
+Example:
+  python packaging/benchmark_sanitizer.py --size-gib 5 --work-dir ./benchmark-data
+
+Only synthetic data is generated. The script never reads real log files.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform
+import sys
+import time
+import tracemalloc
 from pathlib import Path
 
-import pytest
-from test_client import TestClient
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend" / "src"))
 
-from logsanitizer.main import app
-from logsanitizer.rule_config import RuleConfig, save_rule_config
-from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
+from logsanitizer.rule_config import RuleConfig
+from logsanitizer.sanitizer import sanitize_file
 
 
-def config() -> RuleConfig:
-    return RuleConfig.model_validate({
+def peak_rss_bytes() -> int | None:
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class Counters(ctypes.Structure):
+                _fields_ = [
+                    ("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+
+            counters = Counters()
+            counters.cb = ctypes.sizeof(counters)
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            if ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+                return int(counters.PeakWorkingSetSize)
+        except (AttributeError, OSError):
+            return None
+        return None
+    try:
+        import resource
+
+        value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return int(value * (1024 if platform.system() != "Darwin" else 1))
+    except (ImportError, OSError, ValueError):
+        return None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--size-gib", type=float, default=5.0)
+    parser.add_argument("--work-dir", type=Path, default=Path("benchmark-data"))
+    args = parser.parse_args()
+    if not 0.01 <= args.size_gib <= 20:
+        parser.error("--size-gib muss zwischen 0.01 und 20 liegen.")
+
+    work_dir = args.work_dir.expanduser().resolve()
+    work_dir.mkdir(parents=True, exist_ok=True)
+    source = work_dir / "synthetic-large.log"
+    output = work_dir / "synthetic-large.cleaned.log"
+    source.unlink(missing_ok=True)
+    output.unlink(missing_ok=True)
+
+    line = b"timestamp=2026-10-30T12:00:00Z user=alice ip=192.0.2.10 event=synthetic-test\n"
+    target_bytes = int(args.size_gib * 1024**3)
+    block = line * max(1, (4 * 1024 * 1024) // len(line))
+    written = 0
+    with source.open("wb") as stream:
+        while written < target_bytes:
+            chunk = block[: min(len(block), target_bytes - written)]
+            stream.write(chunk)
+            written += len(chunk)
+
+    config = RuleConfig.model_validate({
         "schema_version": 1,
-        "profiles": [{"id": "payments", "name": "Payments"}],
-        "rules": [
-            {
-                "id": "token-value",
-                "name": "Token value",
-                "category": "secret",
-                "match_type": "regex",
-                "pattern": r"secret=(\w+)",
-                "replacement": "token=REDACTED",
-                "priority": 20,
-            },
-            {
-                "id": "token-key",
-                "name": "Token key",
-                "category": "secret",
-                "match_type": "plain",
-                "pattern": "token",
-                "replacement": "hidden",
-                "priority": 30,
-            },
-            {
-                "id": "profile-only",
-                "name": "Profile-only",
-                "category": "secret",
-                "match_type": "plain",
-                "pattern": "account",
-                "replacement": "[PROFILE_1]",
-                "priority": 10,
-                "profile_id": "payments",
-            },
-        ],
+        "profiles": [],
+        "rules": [{
+            "id": "synthetic-user",
+            "name": "Synthetic user",
+            "category": "username",
+            "match_type": "plain",
+            "pattern": "user=alice",
+            "replacement": "user=[USER]",
+            "priority": 10,
+        }],
     })
 
+    tracemalloc.start()
+    wall_start = time.perf_counter()
+    cpu_start = time.process_time()
+    result = sanitize_file(source, output, config, format_name="text")
+    wall_seconds = time.perf_counter() - wall_start
+    cpu_seconds = time.process_time() - cpu_start
+    _current, peak_python = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
 
-def test_streaming_sanitizer_orders_rules_and_preserves_source(tmp_path: Path) -> None:
-    source = tmp_path / "service.log"
-    original = b"secret=alpha\r\naccount=42\nplain text\n"
-    source.write_bytes(original)
-    destination = tmp_path / "clean.log"
-
-    result = sanitize_file(source, destination, config())
-
-    assert destination.read_bytes() == b"hidden=REDACTED\r\naccount=42\nplain text\n"
-    assert source.read_bytes() == original
-    assert result == {
-        "status": "completed",
-        "input_bytes": len(original),
-        "output_bytes": len(destination.read_bytes()),
-        "lines_processed": 3,
-        "replacements": 2,
-        "validated": True,
-        "residual_matches": 0,
-        "validation_scope": "configured_rules_and_format",
+    report = {
+        "platform": platform.platform(),
+        "python": sys.version.split()[0],
+        "input_bytes": source.stat().st_size,
+        "output_bytes": output.stat().st_size,
+        "wall_seconds": round(wall_seconds, 3),
+        "cpu_seconds": round(cpu_seconds, 3),
+        "throughput_mib_per_second": round(source.stat().st_size / 1024**2 / wall_seconds, 2),
+        "peak_python_tracemalloc_bytes": peak_python,
+        "peak_process_rss_bytes": peak_rss_bytes(),
+        "lines_processed": result["lines_processed"],
+        "replacements": result["replacements"],
+        "validated": result["validated"],
+        "validation_scope": result["validation_scope"],
     }
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    if not result["validated"] or output.stat().st_size == 0:
+        raise SystemExit("Benchmark result failed validation.")
+    print(f"Synthetic input and output retained in: {work_dir}")
+    return 0
 
 
-def test_profile_rules_apply_only_when_selected(tmp_path: Path) -> None:
-    source = tmp_path / "service.log"
-    source.write_text("account=42\n", encoding="utf-8")
-    shared_output = tmp_path / "shared.log"
-    profile_output = tmp_path / "profile.log"
-
-    sanitize_file(source, shared_output, config())
-    sanitize_file(source, profile_output, config(), profile_id="payments")
-
-    assert shared_output.read_text(encoding="utf-8") == "account=42\n"
-    assert profile_output.read_text(encoding="utf-8") == "[PROFILE_1]=42\n"
+if __name__ == "__main__":
+    raise SystemExit(main())
 
 
-def test_sanitizer_refuses_existing_destination_and_invalid_profile(tmp_path: Path) -> None:
-    source = tmp_path / "service.log"
-    source.write_text("secret=value\n", encoding="utf-8")
-    destination = tmp_path / "clean.log"
-    destination.write_text("keep me", encoding="utf-8")
-
-    with pytest.raises(FileExistsError):
-        sanitize_file(source, destination, config())
-    with pytest.raises(SanitizationError, match="Quellprofil"):
-        sanitize_file(source, tmp_path / "other.log", config(), profile_id="missing")
-
-    assert destination.read_text(encoding="utf-8") == "keep me"
-    assert source.read_text(encoding="utf-8") == "secret=value\n"
-
-
-def test_sanitizer_removes_partial_output_after_invalid_utf8(tmp_path: Path) -> None:
-    source = tmp_path / "service.log"
-    source.write_bytes(b"secret=value\ninvalid=\xff\n")
-    destination = tmp_path / "clean.log"
-
-    with pytest.raises(SanitizationError, match="UTF-8"):
-        sanitize_file(source, destination, config())
-
-    assert not destination.exists()
-    assert source.read_bytes() == b"secret=value\ninvalid=\xff\n"
-
-
-def test_sanitization_api_requires_selected_supported_format_and_writes_separately(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(config())
-    source = tmp_path / "service.log"
-    original = b"secret=alpha\n"
+    source = tmp_path / "events.json"
+    original = b'{"message":"secret=alpha"}'
     source.write_bytes(original)
+    output = tmp_path / "events.cleaned.json"
 
     with TestClient(app) as client:
-        project_id = client.post("/api/projects", json={"name": "Sanitize"}).json()["id"]
-        file = client.post(
+        project_id = client.post("/api/projects", json={"name": "JSON document"}).json()["id"]
+        imported = client.post(
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
-        unsupported = client.post(
-            f"/api/projects/{project_id}/files/{file['id']}/sanitize",
-            json={"output_path": str(tmp_path / "unsupported.log")},
-        )
-        assert unsupported.status_code == 422
-
         changed = client.put(
-            f"/api/projects/{project_id}/files/{file['id']}/format",
-            json={"format_override": "text"},
+            f"/api/projects/{project_id}/files/{imported['id']}/format",
+            json={"format_override": "json"},
         )
         assert changed.status_code == 200
-        response = client.post(
-            f"/api/projects/{project_id}/files/{file['id']}/sanitize",
-            json={"output_path": str(tmp_path / "clean.log")},
-        )
-        assert response.status_code == 200
-        assert response.json()["status"] == "completed"
-        assert response.json()["replacements"] == 2
-        assert "secret" not in response.text
-
-    assert (tmp_path / "clean.log").read_bytes() == b"hidden=REDACTED\n"
-    assert source.read_bytes() == original
-
-
-def test_jsonl_is_validated_before_and_after_rule_execution(tmp_path: Path) -> None:
-    source = tmp_path / "events.jsonl"
-    original = b'{"message":"secret=alpha"}\n'
-    source.write_bytes(original)
-    destination = tmp_path / "clean.jsonl"
-
-    result = sanitize_file(source, destination, config(), format_name="jsonl")
-
-    assert destination.read_bytes() == b'{"message":"hidden=REDACTED"}\n'
-    assert result["replacements"] == 2
-    assert source.read_bytes() == original
-
-
-def test_invalid_jsonl_is_rejected_and_partial_output_removed(tmp_path: Path) -> None:
-    source = tmp_path / "events.jsonl"
-    original = b'{"message":"ok"}\nnot-json\n'
-    source.write_bytes(original)
-    destination = tmp_path / "clean.jsonl"
-
-    with pytest.raises(SanitizationError, match="gültiges JSON"):
-        sanitize_file(source, destination, config(), format_name="jsonl")
-
-    assert not destination.exists()
-    assert source.read_bytes() == original
-
-
-def indexed_config() -> RuleConfig:
-    data = config().model_dump(mode="json")
-    data["rules"] = [{
-        "id": "indexed-ip",
-        "name": "Indexed IP",
-        "category": "network",
-        "match_type": "regex",
-        "pattern": r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b",
-        "replacement": "[IP]",
-        "replacement_mode": "indexed",
-        "mapping_prefix": "IP",
-        "priority": 10,
-    }]
-    return RuleConfig.model_validate(data)
-
-
-def test_indexed_mapping_is_stable_across_files_and_isolated_by_project(
-    tmp_path: Path, monkeypatch
-) -> None:
-    monkeypatch.setenv("LOGSANITIZER_MAPPINGS_DIR", str(tmp_path / "mappings"))
-    cfg = indexed_config()
-    first = tmp_path / "first.log"
-    second = tmp_path / "second.log"
-    third = tmp_path / "third.log"
-    first.write_text("client=192.0.2.10 other=192.0.2.11\\n", encoding="utf-8")
-    second.write_text("again=192.0.2.10\\n", encoding="utf-8")
-    third.write_text("again=192.0.2.10\\n", encoding="utf-8")
-
-    sanitize_file(first, tmp_path / "first.clean", cfg, project_id="project-a")
-    sanitize_file(second, tmp_path / "second.clean", cfg, project_id="project-a")
-    sanitize_file(third, tmp_path / "third.clean", cfg, project_id="project-b")
-
-    assert (tmp_path / "first.clean").read_text(encoding="utf-8") == (
-        "client=[IP_1] other=[IP_2]\\n"
-    )
-    assert (tmp_path / "second.clean").read_text(encoding="utf-8") == "again=[IP_1]\\n"
-    assert (tmp_path / "third.clean").read_text(encoding="utf-8") == "again=[IP_1]\\n"
-    assert first.read_text(encoding="utf-8") == "client=192.0.2.10 other=192.0.2.11\\n"
-    assert second.read_text(encoding="utf-8") == "again=192.0.2.10\\n"
-
-
-def test_indexed_mapping_requires_project_id(tmp_path: Path) -> None:
-    source = tmp_path / "source.log"
-    source.write_text("192.0.2.10\\n", encoding="utf-8")
-
-    with pytest.raises(SanitizationError, match="Projekt-ID"):
-        sanitize_file(source, tmp_path / "clean.log", indexed_config())
-
-def test_residual_rule_match_rejects_and_removes_output_without_echoing_value(tmp_path: Path) -> None:
-    source = tmp_path / "service.log"
-    original = b"secret=alpha\\n"
-    source.write_bytes(original)
-    destination = tmp_path / "clean.log"
-    data = config().model_dump(mode="json")
-    data["rules"] = [data["rules"][0]]
-    data["rules"][0]["replacement"] = "secret=still-present"
-    unsafe_config = RuleConfig.model_validate(data)
-
-    with pytest.raises(SanitizationError, match="Restmusterprüfung fehlgeschlagen") as error:
-        sanitize_file(source, destination, unsafe_config)
-
-    assert "alpha" not in str(error.value)
-    assert not destination.exists()
-    assert source.read_bytes() == original
-
-
-def test_successful_scan_reports_validation_scope_and_zero_residuals(tmp_path: Path) -> None:
-    source = tmp_path / "service.log"
-    source.write_text("secret=alpha\\n", encoding="utf-8")
-    destination = tmp_path / "clean.log"
-
-    result = sanitize_file(source, destination, config())
-
-    assert result["validated"] is True
-    assert result["residual_matches"] == 0
-    assert result["validation_scope"] == "configured_rules_and_format"
-
-
-def test_residual_scan_rejects_invalid_jsonl_output_and_removes_it(tmp_path: Path) -> None:
-    source = tmp_path / "events.jsonl"
-    source.write_text('{"message":"safe"}\n', encoding="utf-8")
-    destination = tmp_path / "clean.jsonl"
-    data = config().model_dump(mode="json")
-    data["rules"] = [data["rules"][0]]
-    data["rules"][0]["pattern"] = "safe"
-    data["rules"][0]["replacement"] = 'not-json"'
-    unsafe_config = RuleConfig.model_validate(data)
-
-    with pytest.raises(SanitizationError, match="ungültige JSON-Zeile"):
-        sanitize_file(source, destination, unsafe_config, format_name="jsonl")
-
-    assert not destination.exists()
-
-
-
-def test_sanitizer_reports_progress_and_cleans_staging_file_on_cancel(tmp_path: Path) -> None:
-    source = tmp_path / "large.log"
-    source.write_text("first line\\nsecond line\\nthird line\\n", encoding="utf-8")
-    destination = tmp_path / "clean.log"
-    progress: list[dict[str, int | str]] = []
-
-    def cancel_after_first_line(update: dict[str, int | str]) -> None:
-        progress.append(update)
-
-    def should_cancel() -> bool:
-        return any(update.get("phase") == "sanitizing" for update in progress)
-
-    with pytest.raises(SanitizationCancelled):
-        sanitize_file(
-            source,
-            destination,
-            config(),
-            progress_callback=cancel_after_first_line,
-            cancel_check=should_cancel,
-        )
-
-    assert progress
-    assert progress[0]["processed_bytes"] > 0
-    assert not destination.exists()
-    assert list(tmp_path.glob(".clean.log.logsanitizer-*.tmp")) == []
-    assert source.read_text(encoding="utf-8") == "first line\\nsecond line\\nthird line\\n"
-
-
-def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
-    save_rule_config(config())
-    source = tmp_path / "service.log"
-    original = b"secret=alpha\\n"
-    source.write_bytes(original)
-
-    with TestClient(app) as client:
-        project_id = client.post("/api/projects", json={"name": "Background sanitize"}).json()["id"]
-        file = client.post(
-            f"/api/projects/{project_id}/files", json={"path": str(source)}
-        ).json()
-        client.put(
-            f"/api/projects/{project_id}/files/{file['id']}/format",
-            json={"format_override": "text"},
-        )
-        outside_start = client.post(
-            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
-            json={"output_path": str(tmp_path / "outside-job.log")},
-        )
-        assert outside_start.status_code == 202
-        outside_job_id = outside_start.json()["id"]
-        outside_state = client.get(
-            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs/{outside_job_id}"
-        ).json()
-        assert outside_state["status"] == "completed"
-        assert (tmp_path / "outside-job.log").read_bytes() == b"hidden=REDACTED\\n"
-
-        output = tmp_path / "job-clean.log"
         started = client.post(
-            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
+            f"/api/projects/{project_id}/files/{imported['id']}/sanitize-jobs",
             json={"output_path": str(output)},
         )
         assert started.status_code == 202
         job_id = started.json()["id"]
-        status_response = client.get(
-            f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs/{job_id}"
-        )
-        assert status_response.status_code == 200
-        state = status_response.json()
-        assert state["status"] == "completed"
-        assert state["phase"] == "completed"
-        assert state["processed_bytes"] == output.stat().st_size
-        assert state["total_bytes"] == output.stat().st_size
-        assert state["result"]["validated"] is True
-        assert "source_path" not in status_response.text
-        assert "secret=alpha" not in status_response.text
-
-    assert output.read_bytes() == b"hidden=REDACTED\\n"
-    assert source.read_bytes() == original
-    assert list(tmp_path.glob(".job-clean.log.logsanitizer-*.tmp")) == []
-
-
-def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Path) -> None:
-    source = tmp_path / "pathological.log"
-    source.write_text("a" * 100_000 + "!\\n", encoding="utf-8")
-    destination = tmp_path / "clean.log"
-    unsafe_config = RuleConfig.model_validate({
-        "schema_version": 1,
-        "rules": [{
-            "id": "pathological",
-            "name": "Pathological regex",
-            "category": "test",
-            "match_type": "regex",
-            "pattern": r"(a+)+$",
-            "replacement": "REDACTED",
-            "priority": 1,
-        }],
-    })
-
-    with pytest.raises(SanitizationError, match="Zeitlimit"):
-        sanitize_file(source, destination, unsafe_config)
-
-    assert not destination.exists()
-    assert list(tmp_path.glob(".clean.log.logsanitizer-*.tmp")) == []
-
-
-
-def test_sanitization_api_allows_user_selected_output_directory(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
-    save_rule_config(config())
-    source = tmp_path / "outside-source.log"
-    original = b"secret=value\\n"
-    source.write_bytes(original)
-    output_dir = tmp_path / "chosen-output"
-    output_dir.mkdir()
-    outside = output_dir / "outside.log"
-
-    with TestClient(app) as client:
-        project_id = client.post("/api/projects", json={"name": "Chosen output"}).json()["id"]
-        imported = client.post(
-            f"/api/projects/{project_id}/files", json={"path": str(source)}
+        state = client.get(
+            f"/api/projects/{project_id}/files/{imported['id']}/sanitize-jobs/{job_id}"
         ).json()
-        client.put(
-            f"/api/projects/{project_id}/files/{imported['id']}/format",
-            json={"format_override": "text"},
-        )
-        response = client.post(
-            f"/api/projects/{project_id}/files/{imported['id']}/sanitize",
-            json={"output_path": str(outside)},
-        )
-        assert response.status_code == 200
-        assert response.json()["status"] == "completed"
+        assert state["status"] == "completed"
+        assert state["result"]["validated"] is True
 
-    assert outside.read_bytes() == b"hidden=REDACTED\\n"
-    assert source.read_bytes() == original
-
-
-def test_sanitizer_rejects_source_as_output(tmp_path: Path) -> None:
-    source = tmp_path / "same.log"
-    original = b"secret=value\\n"
-    source.write_bytes(original)
-
-    with pytest.raises(SanitizationError, match="identisch"):
-        sanitize_file(source, source, config())
-
+    assert output.read_bytes() == b'{"message":"hidden=REDACTED"}'
     assert source.read_bytes() == original

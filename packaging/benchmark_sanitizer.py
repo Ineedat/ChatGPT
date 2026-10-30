@@ -19,8 +19,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend" / "src"))
 
-from logsanitizer.rule_config import RuleConfig
-from logsanitizer.sanitizer import sanitize_file
+from logsanitizer.rule_config import RuleConfig  # noqa: E402
+from logsanitizer.sanitizer import sanitize_file  # noqa: E402
 
 
 def peak_rss_bytes() -> int | None:
