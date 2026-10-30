@@ -52,7 +52,7 @@ def preview_file_window(
             removed = decoded[:-MAX_PREVIEW_CHARS]
             start_offset += len(removed.encode("utf-8"))
             decoded = decoded[-MAX_PREVIEW_CHARS:]
-            first_newline = max(decoded.find("\\n"), decoded.find("\\r"))
+            first_newline = max(decoded.find("\n"), decoded.find("\r"))
             if first_newline >= 0:
                 removed_prefix = decoded[: first_newline + 1]
                 start_offset += len(removed_prefix.encode("utf-8"))
