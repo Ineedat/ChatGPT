@@ -199,6 +199,7 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
           </div>
         </>}
       </div>
+      {result && <span className={result.changed ? "rule-test-status changed" : "rule-test-status"}>{result.changed ? "Ersetzungen gefunden" : "Keine Änderung"}</span>}
       {result && <div className="rule-test-output"><label>Bereinigte Beispielvorschau</label><pre>{result.preview_text}</pre></div>}
       {result && <p className="field-help">{result.input_chars.toLocaleString()} Zeichen vorher · {result.output_chars.toLocaleString()} Zeichen nachher</p>}
       {result?.rule_results.map(item => <article className="rule-test-rule" key={item.rule_id}><div><strong>{item.name}</strong><small>{item.rule_id} · Priorität {item.priority}</small></div><span>{item.match_count} Treffer</span>{item.matches.length > 0 && <ul>{item.matches.map((match, index) => <li key={index}><code>{match.value}</code> → <code>{match.replacement}</code></li>)}</ul>}</article>)}
