@@ -21,7 +21,7 @@ _LIBRARY: list[dict[str, Any]] = [
     {
         "id": "ipv6-addresses", "name": "IPv6-Adressen (Heuristik)", "category": "IP-Adresse",
         "description": "Erkennt typische ausgeschriebene und komprimierte IPv6-Schreibweisen.",
-        "pattern": r"(?i)(?<![0-9a-f:])(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}(?![0-9a-f:])|(?<![0-9a-f:])::(?:[0-9a-f]{1,4}:?){1,7}(?![0-9a-f:])|(?<![0-9a-f:])[0-9a-f]{1,4}:(?:[0-9a-f]{0,4}:){1,6}:(?:[0-9a-f]{1,4})?(?![0-9a-f:])",
+        "pattern": r"(?i)(?<![0-9a-f:])(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}(?![0-9a-f:])|(?<![0-9a-f:])(?:[0-9a-f]{1,4}:){1,7}:(?:[0-9a-f]{1,4})?(?![0-9a-f:])|(?<![0-9a-f:])::(?:[0-9a-f]{1,4}:?){1,7}(?![0-9a-f:])",
         "mapping_prefix": "IP", "priority": 110,
         "example_before": "remote=2001:db8::17", "example_after": "remote=[IP_1]",
         "notes": "Heuristische Erkennung: IPv6-Varianten mit IPv4-Endstück und eingebettete Zonen-IDs separat prüfen.",
