@@ -112,3 +112,15 @@ def test_rule_api_validates_and_persists_only_conflict_free_config(tmp_path, mon
 
         invalid = client.put("/api/rules/config", json={"schema_version": 2, "rules": []})
         assert invalid.status_code == 422
+
+
+def test_rule_library_api_returns_templates_without_changing_active_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    with TestClient(app) as client:
+        response = client.get("/api/rules/library")
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["categories"]) == 8
+        assert len(body["templates"]) == 20
+        assert all(template["enabled"] is False for template in body["templates"])
+        assert not (tmp_path / "rules" / "rules-v1.json").exists()
