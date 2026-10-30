@@ -48,10 +48,12 @@ def preview_file_window(
                     continue
                 raise RulePreviewError("Die Vorschau unterstützt ausschließlich gültige UTF-8-Logdateien.") from exc
 
-        if len(decoded) > MAX_PREVIEW_CHARS:
+        was_truncated = len(decoded) > MAX_PREVIEW_CHARS
+        read_to_eof = stream.tell() >= size
+        if was_truncated:
             decoded = decoded[:MAX_PREVIEW_CHARS]
             raw = decoded.encode("utf-8")
-        if stream.tell() < size and decoded and not decoded.endswith(("\n", "\r")):
+        if (not read_to_eof or was_truncated) and decoded and not decoded.endswith(("\n", "\r")):
             last_newline = max(decoded.rfind("\n"), decoded.rfind("\r"))
             if last_newline < 0:
                 raise RulePreviewError("Eine einzelne Logzeile überschreitet die maximale Vorschaufenstergröße.")
