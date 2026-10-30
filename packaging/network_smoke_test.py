@@ -87,6 +87,7 @@ def main() -> int:
                 "user_search_base": "DC=example,DC=invalid",
                 "role_groups": {
                     "admin": "CN=Admins,DC=example,DC=invalid",
+                    "rule_owner": "CN=Rule-Owners,DC=example,DC=invalid",
                     "operator": "CN=Operators,DC=example,DC=invalid",
                     "reviewer": "CN=Reviewers,DC=example,DC=invalid",
                     "approver": "CN=Approvers,DC=example,DC=invalid",
