@@ -41,7 +41,8 @@ describe("rule test preview", () => {
     render(<RuleTestPanel config={config} draft={changedDraft} selectedId="" draftDirty />);
     fireEvent.click(screen.getByRole("button", { name: "Muster testen" }));
     await screen.findByText("Keine Änderung");
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const body = JSON.parse(postCall?.[1].body as string);
     expect(body.rule_id).toBe("preview-draft");
     expect(body.config.rules.some((rule: { id: string }) => rule.id === "preview-draft")).toBe(true);
   });
