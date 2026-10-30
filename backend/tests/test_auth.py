@@ -163,3 +163,24 @@ def test_csrf_cookie_is_readable_from_frontend_root_path(tmp_path, monkeypatch):
             headers={"X-CSRF-Token": csrf},
         )
         assert created.status_code == 201
+
+
+
+def test_rule_owner_can_manage_rules_but_cannot_process_or_manage_projects(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("rule-owner", "rule-owner-password-123", ["rule_owner"])
+    create_user("processor", "processor-password-123", ["operator"])
+
+    def login(username, password):
+        client = TestClient(app)
+        response = client.post("/api/auth/login", json={"username": username, "password": password})
+        assert response.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        return client
+
+    with login("rule-owner", "rule-owner-password-123") as owner, login("processor", "processor-password-123") as processor:
+        payload = {"schema_version": 1, "profiles": [], "rules": []}
+        assert owner.put("/api/rules/config", json=payload).status_code == 200
+        assert owner.post("/api/projects", json={"name": "Denied project"}).status_code == 403
+        assert processor.put("/api/rules/config", json=payload).status_code == 403
+        assert processor.post("/api/projects", json={"name": "Allowed project"}).status_code == 201

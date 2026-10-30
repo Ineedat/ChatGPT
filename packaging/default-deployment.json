@@ -25,6 +25,7 @@
     "group_attribute": "memberOf",
     "role_groups": {
       "admin": "CN=LogSanitizer-Admins,OU=Groups,DC=example,DC=invalid",
+      "rule_owner": "CN=LogSanitizer-Rule-Owners,OU=Groups,DC=example,DC=invalid",
       "operator": "CN=LogSanitizer-Operators,OU=Groups,DC=example,DC=invalid",
       "reviewer": "CN=LogSanitizer-Reviewers,OU=Groups,DC=example,DC=invalid",
       "approver": "CN=LogSanitizer-Approvers,OU=Groups,DC=example,DC=invalid"

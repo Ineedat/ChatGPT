@@ -21,7 +21,7 @@ from logsanitizer.ldap_auth import LDAPAuthenticationError, authenticate_ldap
 COOKIE = "logsanitizer_session"
 CSRF = "logsanitizer_csrf"
 TTL = 28800
-ROLES = {"admin", "operator", "reviewer", "approver"}
+ROLES = {"admin", "rule_owner", "operator", "reviewer", "approver"}
 LOGIN_FAILURE_LIMIT = 5
 LOGIN_WINDOW_SECONDS = 300
 LOGIN_LOCK_SECONDS = 300
@@ -293,7 +293,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         roles=set(user["roles"])
         if path.startswith("/api/auth/users") and "admin" not in roles:
             return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if path.startswith("/api/rules/config") and method!="GET" and not roles.intersection({"admin","operator"}):
+        if path.startswith("/api/rules/config") and method!="GET" and not roles.intersection({"admin","rule_owner"}):
             return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
         if "/sanitize" in path and not roles.intersection({"admin","operator"}):
             return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)

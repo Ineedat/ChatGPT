@@ -101,7 +101,7 @@ def authenticate_ldap(username: str, password: str, settings: dict[str, Any]) ->
         finally:
             user_connection.unbind()
         role_groups = config.get("role_groups", {})
-        allowed_roles = {"admin", "operator", "reviewer", "approver"}
+        allowed_roles = {"admin", "rule_owner", "operator", "reviewer", "approver"}
         roles = sorted(
             role for role, group_dn in role_groups.items()
             if role in allowed_roles and str(group_dn).casefold() in groups
