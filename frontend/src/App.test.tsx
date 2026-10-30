@@ -170,3 +170,14 @@ describe("full format validation UI", () => {
     expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/validate-format`, expect.objectContaining({ method: "POST" }));
   });
 });
+
+
+describe("offline help keyboard shortcut", () => {
+  it("opens local help with F1", async () => {
+    render(<App />);
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+    fireEvent.keyDown(window, { key: "F1" });
+    expect(await screen.findByRole("heading", { name: "Hilfe und Grundlagen" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Große Dateien und Leistung" })).toBeInTheDocument();
+  });
+});

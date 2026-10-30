@@ -10,7 +10,6 @@ from pathlib import Path
 import regex as re
 
 from logsanitizer.mapping_store import get_or_create_indexed_mapping
-from logsanitizer.json_sanitizer import JsonStreamError, sanitize_json_stream, validate_json_stream
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
 
 MAX_LINE_BYTES = 1024 * 1024
@@ -127,8 +126,8 @@ def sanitize_file(
     effective_format = format_name or (
         "jsonl" if source.suffix.casefold() in {".jsonl", ".ndjson"} else "text"
     )
-    if effective_format not in {"text", "jsonl", "json"}:
-        raise SanitizationError("Unterstützt werden derzeit Text, JSON und JSON Lines (UTF-8).")
+    if effective_format not in {"text", "jsonl"}:
+        raise SanitizationError("Unterstützt werden derzeit Textdateien und JSON Lines (UTF-8).")
 
     rules = [
         rule for rule in config.rules
@@ -145,50 +144,6 @@ def sanitize_file(
     line_count = 0
     staging = destination.with_name(f".{destination.name}.logsanitizer-{uuid.uuid4().hex}.tmp")
     staging_created = False
-    if effective_format == "json":
-        try:
-            try:
-                with source.open("r", encoding="utf-8-sig", newline="") as input_stream:
-                    with staging.open("x", encoding="utf-8", newline="") as output_stream:
-                        staging_created = True
-                        try:
-                            os.chmod(staging, 0o600)
-                        except OSError:
-                            pass
-                        replacement_count, line_count = sanitize_json_stream(
-                            input_stream, output_stream, compiled, project_id,
-                            cancel_check, progress_callback, total_bytes,
-                        )
-                        output_stream.flush()
-                        os.fsync(output_stream.fileno())
-                _check_cancelled(cancel_check)
-                with staging.open("r", encoding="utf-8", newline="") as validation_stream:
-                    validate_json_stream(validation_stream, compiled, cancel_check)
-                _check_cancelled(cancel_check)
-            except JsonStreamError as exc:
-                if cancel_check is not None and cancel_check():
-                    raise SanitizationCancelled("Bereinigung wurde abgebrochen.") from exc
-                raise SanitizationError(str(exc)) from exc
-            if destination.exists() or destination.is_symlink():
-                raise FileExistsError("Die Zieldatei existiert bereits oder ist ein symbolischer Link.")
-            os.link(staging, destination)
-            staging.unlink()
-            staging_created = False
-        except Exception:
-            if staging_created:
-                staging.unlink(missing_ok=True)
-            raise
-        return {
-            "status": "completed",
-            "input_bytes": total_bytes,
-            "output_bytes": destination.stat().st_size,
-            "lines_processed": line_count,
-            "replacements": replacement_count,
-            "validated": True,
-            "residual_matches": 0,
-            "validation_scope": "configured_rules_and_json_structure",
-        }
-
     try:
         with source.open("rb") as input_stream:
             _check_cancelled(cancel_check)
