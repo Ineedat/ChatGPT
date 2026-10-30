@@ -10,7 +10,7 @@ from pathlib import Path
 import regex as re
 
 from logsanitizer.mapping_store import get_or_create_indexed_mapping
-from logsanitizer.json_sanitizer import sanitize_json_stream, validate_json_stream
+from logsanitizer.json_sanitizer import JsonStreamError, sanitize_json_stream, validate_json_stream
 from logsanitizer.rule_config import RuleConfig, SanitizationRule
 
 MAX_LINE_BYTES = 1024 * 1024
@@ -147,23 +147,28 @@ def sanitize_file(
     staging_created = False
     if effective_format == "json":
         try:
-            with source.open("r", encoding="utf-8-sig", newline="") as input_stream:
-                with staging.open("x", encoding="utf-8", newline="") as output_stream:
-                    staging_created = True
-                    try:
-                        os.chmod(staging, 0o600)
-                    except OSError:
-                        pass
-                    replacement_count, line_count = sanitize_json_stream(
-                        input_stream, output_stream, compiled, project_id,
-                        cancel_check, progress_callback, total_bytes,
-                    )
-                    output_stream.flush()
-                    os.fsync(output_stream.fileno())
-            _check_cancelled(cancel_check)
-            with staging.open("r", encoding="utf-8", newline="") as validation_stream:
-                validate_json_stream(validation_stream, compiled, cancel_check)
-            _check_cancelled(cancel_check)
+            try:
+                with source.open("r", encoding="utf-8-sig", newline="") as input_stream:
+                    with staging.open("x", encoding="utf-8", newline="") as output_stream:
+                        staging_created = True
+                        try:
+                            os.chmod(staging, 0o600)
+                        except OSError:
+                            pass
+                        replacement_count, line_count = sanitize_json_stream(
+                            input_stream, output_stream, compiled, project_id,
+                            cancel_check, progress_callback, total_bytes,
+                        )
+                        output_stream.flush()
+                        os.fsync(output_stream.fileno())
+                _check_cancelled(cancel_check)
+                with staging.open("r", encoding="utf-8", newline="") as validation_stream:
+                    validate_json_stream(validation_stream, compiled, cancel_check)
+                _check_cancelled(cancel_check)
+            except JsonStreamError as exc:
+                if cancel_check is not None and cancel_check():
+                    raise SanitizationCancelled("Bereinigung wurde abgebrochen.") from exc
+                raise SanitizationError(str(exc)) from exc
             if destination.exists() or destination.is_symlink():
                 raise FileExistsError("Die Zieldatei existiert bereits oder ist ein symbolischer Link.")
             os.link(staging, destination)

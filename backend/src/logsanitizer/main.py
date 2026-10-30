@@ -393,8 +393,8 @@ def project_file_sanitize_start(
     selected_format = row["format_override"] or row["detected_format"]
     if source.is_symlink() or not source.is_file():
         raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
-    if selected_format not in {"text", "jsonl"}:
-        raise HTTPException(status_code=422, detail="Unterstützt werden derzeit nur Text und JSON Lines.")
+    if selected_format not in {"text", "jsonl", "json"}:
+        raise HTTPException(status_code=422, detail="Unterstützt werden derzeit Text, JSON und JSON Lines.")
     if not output.is_absolute():
         raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
     if output.is_symlink() or output.exists():
@@ -472,7 +472,7 @@ def project_file_sanitize_cancel(project_id: str, file_id: str, job_id: str) -> 
 def project_file_sanitize(
     project_id: str, file_id: str, payload: SanitizationRequest, request: Request
 ) -> dict[str, int | str | bool]:
-    """Apply local rules to supported UTF-8 text/JSONL and write a separate output file."""
+    """Apply local rules to supported UTF-8 text, JSON and JSONL files."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
@@ -495,10 +495,10 @@ def project_file_sanitize(
     if output.exists():
         raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
     selected_format = row["format_override"] or row["detected_format"]
-    if selected_format not in {"text", "jsonl"}:
+    if selected_format not in {"text", "jsonl", "json"}:
         raise HTTPException(
             status_code=422,
-            detail="Vor der Bereinigung muss das Format als Text oder JSON Lines ausgewählt bzw. erkannt sein.",
+            detail="Vor der Bereinigung muss das Format als Text, JSON oder JSON Lines ausgewählt bzw. erkannt sein.",
         )
     if not output.is_absolute():
         raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
