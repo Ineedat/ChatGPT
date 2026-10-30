@@ -20,13 +20,13 @@ Der erste Administrator wird einmalig über `LogSanitizer.exe --create-admin` be
 
 Für den Netzwerkbetrieb wird eine konkrete, für die vorgesehenen Clients erreichbare Schnittstellenadresse in `server.bind_host` konfiguriert. Der Netzwerkbetrieb bleibt auf das definierte isolierte Netz beschränkt; Firewall-Regeln sollen den Zugriff auf die vorgesehenen Clients begrenzen.
 
-Im Netzwerkprofil erfolgt die Anmeldung über LDAP/Active Directory; lokale Passwort-Fallback-Anmeldung ist deaktiviert. LDAP wird mit LDAPS oder StartTLS betrieben. Zu konfigurieren sind Host/Port, Bind-DN, User-Search-Base, Benutzerfilter, Gruppenattribut und explizite Gruppenzuordnung zu den Rollen admin, rule_owner, operator, reviewer und approver. Das Dienstkonto-Geheimnis wird ausschließlich über die lokale Prozessumgebung bereitgestellt. Optional kann eine CA-Datei angegeben werden.
+Das Netzwerkprofil unterstützt wahlweise lokale Benutzerkonten oder LDAP/Active Directory. Bei `auth.provider=local` und deaktiviertem LDAP werden lokale Konten verwendet; der erste Administrator kann wie im Standalone-Profil über `--create-admin` angelegt werden. Bei `auth.provider=ldap` muss `ldap.enabled=true` gesetzt sein; es gibt dann keinen lokalen Passwort-Fallback. LDAP wird mit LDAPS oder StartTLS betrieben. Zu konfigurieren sind Host/Port, Bind-DN, User-Search-Base, Benutzerfilter, Gruppenattribut und explizite Gruppenzuordnung zu den Rollen admin, rule_owner, operator, reviewer und approver. Das Dienstkonto-Geheimnis wird ausschließlich über die lokale Prozessumgebung bereitgestellt. Optional kann eine CA-Datei angegeben werden.
 
 SMTP kann für Benachrichtigungen über ausstehende Reviews und Rückgaben aktiviert werden. Host, Port, Sicherheitsmodus (STARTTLS oder SSL), Absender und Empfängerlisten werden über die Deployment-Konfiguration festgelegt. Zugangsdaten werden ausschließlich über lokale Umgebungsvariablen bereitgestellt und niemals in die JSON-Datei oder das portable Paket geschrieben. SMTP-Ausfälle dürfen die Verarbeitung nicht blockieren.
 
 Vor dem Start im Netzwerkprofil müssen echte LDAP-/SMTP-Endpunkte und Zertifikate aus der Zielumgebung eingetragen werden. Der Netzwerkzugriff bleibt auf das definierte Air-Gap-Netz begrenzt.
 
-TLS kann entsprechend der konkreten Netzwerkinfrastruktur eingesetzt werden. Es ist kein Produktziel, für einen vollständig isolierten, kontrollierten Air-Gap-Betrieb eine komplexe Zertifikats- und Geheimnisverwaltung zwingend vorauszusetzen. Die Netzfreigabe und die konkrete Transportabsicherung müssen zur jeweiligen Umgebung passen.
+Das Netzwerkprofil verwendet HTTPS und benötigt dafür ein Zertifikat sowie einen privaten Schlüssel. Für LDAP-Verbindungen sind LDAPS oder StartTLS zu verwenden. Die Zertifikate und LDAP-Gruppen müssen aus der konkreten Air-Gap-Umgebung stammen.
 
 ## Daten, Mapping und Backups
 

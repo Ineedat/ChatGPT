@@ -20,7 +20,7 @@ Für einen kurzen Funktionstest kann `--size-gib 0.01` verwendet werden. Die CI 
 
 ## Messwerte
 
-Der JSON-Bericht enthält Plattform und Python-Version, Eingabe-/Ausgabegröße, Wandzeit, CPU-Zeit, Durchsatz in MiB/s, Python-Tracemalloc-Spitze, maximalen Prozess-RSS (soweit verfügbar), Zeilen, Ersetzungen und Validierungsstatus.
+Der JSON-Bericht enthält Plattform und Python-Version, Eingabe-/Ausgabegröße, Wandzeit, CPU-Zeit, Durchsatz in MiB/s, Python-Tracemalloc-Spitze bei kleinen Läufen, maximalen Prozess-RSS (soweit verfügbar), Zeilen, Ersetzungen und Validierungsstatus. Beim 5-GiB-Lauf wird Tracemalloc bewusst deaktiviert, damit die Messung nicht durch die Speicherinstrumentierung verzerrt wird; dort ist der Prozess-RSS maßgeblich.
 
 ## Abnahmeprotokoll
 
@@ -30,7 +30,7 @@ Den 5-GiB-Lauf auf jeder tatsächlichen Zielplattform mindestens dreimal auf ein
 |---|---|
 | Dateigröße | mindestens 5 GiB |
 | Integrität | `validated=true`, Quelldatei unverändert |
-| Speicher | Prozess-RSS und Python-Tracemalloc-Spitze dokumentieren |
+| Speicher | Prozess-RSS dokumentieren; Python-Tracemalloc separat mit dem kleinen CI-Lauf prüfen |
 | Laufzeit | Wandzeit und CPU-Zeit dokumentieren |
 | Durchsatz | MiB/s dokumentieren |
 | Bedienbarkeit | UI während des Laufs bedienen; Statusaktualisierung und Abbruch messen |

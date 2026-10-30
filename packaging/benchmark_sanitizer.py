@@ -94,14 +94,19 @@ def main() -> int:
         }],
     })
 
-    tracemalloc.start()
+    track_python_heap = args.size_gib <= 0.1
+    if track_python_heap:
+        tracemalloc.start()
     wall_start = time.perf_counter()
     cpu_start = time.process_time()
     result = sanitize_file(source, output, config, format_name="text")
     wall_seconds = time.perf_counter() - wall_start
     cpu_seconds = time.process_time() - cpu_start
-    _current, peak_python = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    if track_python_heap:
+        _current, peak_python = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+    else:
+        peak_python = None
 
     report = {
         "platform": platform.platform(),

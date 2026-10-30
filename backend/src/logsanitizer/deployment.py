@@ -138,8 +138,6 @@ def load_settings() -> dict[str, Any]:
         if auth.get("provider") != "local":
             raise DeploymentConfigError("Standalone unterstützt ausschließlich lokale Anmeldung.")
     else:
-        if auth.get("provider") != "ldap" or ldap.get("enabled") is not True:
-            raise DeploymentConfigError("Netzwerkprofil erfordert aktiviertes LDAP als Anmeldeanbieter.")
         if server.get("bind_host") in {"127.0.0.1", "::1", "localhost", ""}:
             raise DeploymentConfigError("Netzwerkprofil benötigt eine explizite Netzwerk-Bind-Adresse.")
         certfile = server.get("tls_certfile")
@@ -150,15 +148,20 @@ def load_settings() -> dict[str, Any]:
             raise DeploymentConfigError(
                 "TLS-Privatschlüssel darf unter POSIX nicht für Gruppe (außer Lesen) oder andere freigegeben sein."
             )
-        if not os.environ.get("LOGSANITIZER_LDAP_BIND_PASSWORD"):
-            raise DeploymentConfigError("LOGSANITIZER_LDAP_BIND_PASSWORD ist nicht gesetzt.")
-        if not ldap.get("host") or not ldap.get("bind_dn") or not ldap.get("user_search_base"):
-            raise DeploymentConfigError("LDAP-Host, Bind-DN und User-Search-Base sind erforderlich.")
-        if not isinstance(ldap.get("role_groups"), dict) or not ldap["role_groups"]:
-            raise DeploymentConfigError("LDAP-Rollengruppen müssen explizit konfiguriert sein.")
-        ca_file = str(ldap.get("ca_certs_file") or "").strip()
-        if ca_file and not Path(ca_file).is_file():
-            raise DeploymentConfigError("Die konfigurierte LDAP-CA-Datei wurde nicht gefunden.")
+        if auth.get("provider") == "ldap":
+            if ldap.get("enabled") is not True:
+                raise DeploymentConfigError("LDAP-Anmeldung erfordert eine aktivierte LDAP-Konfiguration.")
+            if not os.environ.get("LOGSANITIZER_LDAP_BIND_PASSWORD"):
+                raise DeploymentConfigError("LOGSANITIZER_LDAP_BIND_PASSWORD ist nicht gesetzt.")
+            if not ldap.get("host") or not ldap.get("bind_dn") or not ldap.get("user_search_base"):
+                raise DeploymentConfigError("LDAP-Host, Bind-DN und User-Search-Base sind erforderlich.")
+            if not isinstance(ldap.get("role_groups"), dict) or not ldap["role_groups"]:
+                raise DeploymentConfigError("LDAP-Rollengruppen müssen explizit konfiguriert sein.")
+            ca_file = str(ldap.get("ca_certs_file") or "").strip()
+            if ca_file and not Path(ca_file).is_file():
+                raise DeploymentConfigError("Die konfigurierte LDAP-CA-Datei wurde nicht gefunden.")
+        elif ldap.get("enabled") is True:
+            raise DeploymentConfigError("LDAP ist aktiviert, aber auth.provider ist nicht 'ldap'.")
     if ldap.get("enabled") and ldap.get("use_ssl") is True and ldap.get("start_tls") is True:
         raise DeploymentConfigError("LDAP LDAPS und StartTLS dürfen nicht gleichzeitig aktiviert sein.")
     if ldap.get("enabled") and ldap.get("use_ssl") is not True and ldap.get("start_tls") is not True:

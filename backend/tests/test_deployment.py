@@ -154,3 +154,40 @@ def test_network_profile_rejects_plaintext_ldap(tmp_path, monkeypatch):
     monkeypatch.setenv("LOGSANITIZER_LDAP_BIND_PASSWORD", "test-only-secret")
     with pytest.raises(DeploymentConfigError, match="unverschlüsseltes LDAP"):
         load_settings()
+
+
+def test_network_profile_supports_local_accounts_when_ldap_is_disabled(tmp_path, monkeypatch):
+    _write_config(tmp_path, monkeypatch, {
+        "profile": "network",
+        "server": {"bind_host": "10.20.30.40", "port": 8000},
+        "auth": {"provider": "local"},
+        "ldap": {"enabled": False},
+        "smtp": {"enabled": False},
+    })
+    monkeypatch.delenv("LOGSANITIZER_LDAP_BIND_PASSWORD", raising=False)
+
+    settings = load_settings()
+
+    assert settings["profile"] == "network"
+    assert settings["auth"]["provider"] == "local"
+    assert settings["ldap"]["enabled"] is False
+
+
+def test_network_local_auth_can_bootstrap_first_admin(tmp_path, monkeypatch):
+    import sys
+    from logsanitizer import auth_cli
+    from logsanitizer.__main__ import main as launch
+
+    _write_config(tmp_path, monkeypatch, {
+        "profile": "network",
+        "server": {"bind_host": "10.20.30.40", "port": 8000},
+        "auth": {"provider": "local"},
+        "ldap": {"enabled": False},
+    })
+    called = []
+    monkeypatch.setattr(sys, "argv", ["LogSanitizer", "--create-admin"])
+    monkeypatch.setattr(auth_cli, "main", lambda: called.append(True))
+
+    launch()
+
+    assert called == [True]
