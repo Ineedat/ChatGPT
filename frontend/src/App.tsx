@@ -306,10 +306,10 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     </header>
     {tab === "overview" ? <>
       <section className="hero">
-        <span className="status-pill"><span className="status-dot" /> Entwicklungsgerüst</span>
+        <span className="status-pill"><span className="status-dot" /> Lokaler Arbeitsbereich</span>
         <h2>Logs sicher vorbereiten.</h2>
         <p>Die lokale Arbeitsumgebung für die regelbasierte Bereinigung von Anwendungslogs.</p>
-        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt derzeit UTF-8-Text und JSON Lines. Mapping-Verschlüsselung, umfassende Geheimniserkennung und der kontrollierte Prüf-/Freigabeprozess fehlen noch.</span></div>
+        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt derzeit UTF-8-Text und JSON Lines. Die Verarbeitung unterstützt derzeit UTF-8-Text und JSON Lines. Vor dem produktiven Einsatz müssen die Erkennungsregeln fachlich geprüft und die Verarbeitung großer Dateien auf Zielhardware gemessen werden. Prüf- und Freigabeworkflow sind bereits integriert.</span></div>
       </section>
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">ARBEITSBEREICH</p><h3>Projekt vorbereiten</h3></div>
@@ -335,7 +335,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
         <p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
-        <p className="field-help">Dateien werden nur registriert. Es findet noch keine Verarbeitung oder Bereinigung statt.</p>
+        <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
         <div className="import-grid">
           <form onSubmit={event => void registerSingleFile(event)} aria-label="Einzeldatei registrieren">
             <h4>Einzelne Datei</h4>
