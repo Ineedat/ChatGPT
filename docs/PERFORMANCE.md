@@ -63,3 +63,22 @@ Der vollständige synthetische 5-GiB-Lauf wurde in GitHub Actions auf einem geho
 | Ausgabevalidierung | erfolgreich |
 
 Der Lauf verwendete synthetische 512-Byte-Logeinträge mit einer einfachen Ersetzungsregel. Tracemalloc war für diesen großen Lauf deaktiviert, damit die Instrumentierung die Laufzeit nicht verzerrt. Die Python-Tracemalloc-Messung erfolgt separat im kleinen CI-Benchmark. Diese Werte sind ein CI-Referenzpunkt, keine zugesicherte Leistung auf dem Zielgerät.
+
+
+## Zweiter gemessener CI-Referenzlauf (2026-10-30)
+
+Der 5-GiB-Test wurde erneut im PR-CI-Lauf [41141244600](https://github.com/Ineedat/ChatGPT/actions/runs/41141244600) erfolgreich ausgeführt (Python 3.11.17, Linux 7.0.0-1017-azure-x86_64).
+
+| Messwert | Ergebnis |
+|---|---:|
+| Eingabe | 5,00 GiB (5.368.709.120 Byte) |
+| Ausgabe | 5.379.194.880 Byte |
+| Wandzeit | 70,038 s |
+| CPU-Zeit | 62,171 s |
+| Durchsatz | 73,10 MiB/s |
+| Maximaler Prozess-RSS | 40.546.304 Byte (ca. 38,7 MiB) |
+| Verarbeitete Zeilen | 10.485.760 |
+| Ersetzungen | 10.485.760 |
+| Ausgabevalidierung | erfolgreich |
+
+Auch dieser Lauf verwendet ausschließlich synthetische 512-Byte-Logeinträge und eine einfache Ersetzungsregel. Er ist ein CI-Referenzwert und ersetzt nicht die Messung auf der tatsächlichen Zielhardware.

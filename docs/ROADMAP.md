@@ -122,7 +122,7 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Regelkopien bleiben einzeln editierbar; Präfixe, Prioritäten und Feldmuster sind vorbereitet.
 - [x] Backend-Validierung und Regressionstests für Kategorien, Vorlagen, alle synthetischen Musterbeispiele und den read-only Bibliotheks-API-Endpunkt ergänzt.
 - [x] Offline-Hilfe und docs/RULE_LIBRARY.md ergänzt.
-- [ ] CI nach dieser Änderung vollständig abwarten und eventuelle Fehler beheben.
+- [x] CI vollständig abgewartet und erfolgreich: Push-Lauf [41139434088](https://github.com/Ineedat/ChatGPT/actions/runs/41139434088) und PR-Lauf [41139437697](https://github.com/Ineedat/ChatGPT/actions/runs/41139437697) mit allen fünf Jobs erfolgreich.
 
 
 ## Regeltests und Bereinigungsvorschau — Umsetzung (2026-10-30)
@@ -134,4 +134,4 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Indexierte Platzhalter werden in einem flüchtigen Vorschau-Mapping simuliert; es werden keine Projekt-Mappings angelegt oder verändert.
 - [x] Eingabe auf 65.536 Zeichen begrenzt; Regex-Ausführung hat ein Zeitlimit. Datei- und Originalpfade werden nicht angenommen oder geöffnet.
 - [x] Frontend-Reiter „Regeltest & Vorschau“, Backend-/Frontend-Tests und Offline-Hilfe ergänzt.
-- [ ] CI nach dieser Änderung vollständig abwarten und eventuelle Fehler beheben.
+- [x] CI vollständig erfolgreich: Push-Lauf [41141238296](https://github.com/Ineedat/ChatGPT/actions/runs/41141238296) und PR-Lauf [41141244600](https://github.com/Ineedat/ChatGPT/actions/runs/41141244600), jeweils alle fünf Jobs grün; einschließlich vollständigem 5-GiB-Benchmark (70,038 s, 73,10 MiB/s, 40.546.304 Byte maximaler Prozess-RSS).
