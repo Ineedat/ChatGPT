@@ -57,6 +57,7 @@ from logsanitizer.review_workflow import finish_run as finish_review_run
 from logsanitizer.review_workflow import initialize_review_database
 from logsanitizer.review_workflow import router as review_router
 from logsanitizer.review_workflow import set_run_running as set_review_run_running
+from logsanitizer.rule_library import list_rule_categories, list_rule_templates
 from logsanitizer.rule_config import (
     RuleConfig,
     find_rule_conflicts,
@@ -320,6 +321,12 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
     except OSError as exc:
         raise HTTPException(status_code=422, detail="Quelldatei konnte nicht geprüft werden.") from exc
     return {"file_id": file_id, **result}
+
+
+@app.get("/api/rules/library", tags=["rules"])
+def rules_library_get() -> dict[str, object]:
+    """Return built-in starter templates without modifying the active configuration."""
+    return {"categories": list_rule_categories(), "templates": list_rule_templates()}
 
 
 @app.get("/api/rules/config", response_model=RuleConfig, tags=["rules"])
