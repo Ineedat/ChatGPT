@@ -57,13 +57,13 @@ from logsanitizer.review_workflow import finish_run as finish_review_run
 from logsanitizer.review_workflow import initialize_review_database
 from logsanitizer.review_workflow import router as review_router
 from logsanitizer.review_workflow import set_run_running as set_review_run_running
-from logsanitizer.rule_library import list_rule_categories, list_rule_templates
 from logsanitizer.rule_config import (
     RuleConfig,
     find_rule_conflicts,
     load_rule_config,
     save_rule_config,
 )
+from logsanitizer.rule_library import list_rule_categories, list_rule_templates
 from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
