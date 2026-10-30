@@ -46,3 +46,13 @@ describe("rule test preview", () => {
     expect(body.config.rules.some((rule: { id: string }) => rule.id === "preview-draft")).toBe(true);
   });
 });
+
+  it("does not silently test the saved rule when the current draft is incomplete", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const invalidDraft = { ...draft, pattern: "" };
+    render(<RuleTestPanel config={config} draft={invalidDraft} selectedId="ip" draftDirty />);
+    fireEvent.click(screen.getByRole("button", { name: "Muster testen" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Regelentwurf ist unvollständig");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });

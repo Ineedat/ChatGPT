@@ -36,6 +36,11 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
 
   async function runPreview() {
     setRunning(true); setError(""); setResult(null);
+    if (draftDirty && (!draft.name.trim() || !draft.pattern.trim() || !draft.replacement.trim())) {
+      setError("Der aktuelle Regelentwurf ist unvollständig. Ergänze Name, Suchmuster und Ersetzung vor dem Test.");
+      setRunning(false);
+      return;
+    }
     const previewConfig = { ...config, rules: [...config.rules] };
     let testRuleId: string | null = null;
     if (draftDirty && draft.name.trim() && draft.pattern.trim() && draft.replacement.trim()) {
