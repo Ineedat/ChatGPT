@@ -48,18 +48,26 @@ def preview_file_window(
                     continue
                 raise RulePreviewError("Die Vorschau unterstützt ausschließlich gültige UTF-8-Logdateien.") from exc
 
-        was_truncated = len(decoded) > MAX_PREVIEW_CHARS
-        read_to_eof = stream.tell() >= size
-        if was_truncated:
-            decoded = decoded[:MAX_PREVIEW_CHARS]
-            raw = decoded.encode("utf-8")
-        if (not read_to_eof or was_truncated) and decoded and not decoded.endswith(("\n", "\r")):
-            last_newline = max(decoded.rfind("\n"), decoded.rfind("\r"))
-            if last_newline < 0:
-                raise RulePreviewError("Eine einzelne Logzeile überschreitet die maximale Vorschaufenstergröße.")
-            decoded = decoded[: last_newline + 1]
-            raw = decoded.encode("utf-8")
-        next_offset = start_offset + len(raw)
+        if from_end and len(decoded) > MAX_PREVIEW_CHARS:
+            removed = decoded[:-MAX_PREVIEW_CHARS]
+            start_offset += len(removed.encode("utf-8"))
+            decoded = decoded[-MAX_PREVIEW_CHARS:]
+            first_newline = max(decoded.find("\\n"), decoded.find("\\r"))
+            if first_newline >= 0:
+                removed_prefix = decoded[: first_newline + 1]
+                start_offset += len(removed_prefix.encode("utf-8"))
+                decoded = decoded[first_newline + 1:]
+        else:
+            was_truncated = len(decoded) > MAX_PREVIEW_CHARS
+            read_to_eof = stream.tell() >= size
+            if was_truncated:
+                decoded = decoded[:MAX_PREVIEW_CHARS]
+            if (not read_to_eof or was_truncated) and decoded and not decoded.endswith(("\\n", "\\r")):
+                last_newline = max(decoded.rfind("\\n"), decoded.rfind("\\r"))
+                if last_newline < 0:
+                    raise RulePreviewError("Eine einzelne Logzeile überschreitet die maximale Vorschaufenstergröße.")
+                decoded = decoded[: last_newline + 1]
+        next_offset = start_offset + len(decoded.encode("utf-8"))
 
     after = source.stat()
     if before.st_size != after.st_size or before.st_mtime_ns != after.st_mtime_ns:
