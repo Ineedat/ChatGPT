@@ -1,9 +1,12 @@
 import json
 import os
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
 
+from logsanitizer import auth_cli
+from logsanitizer.__main__ import main as launch
 from logsanitizer.auth import create_user, upsert_external_user
 from logsanitizer.deployment import DeploymentConfigError, load_settings
 from logsanitizer.main import app
@@ -174,10 +177,6 @@ def test_network_profile_supports_local_accounts_when_ldap_is_disabled(tmp_path,
 
 
 def test_network_local_auth_can_bootstrap_first_admin(tmp_path, monkeypatch):
-    import sys
-    from logsanitizer import auth_cli
-    from logsanitizer.__main__ import main as launch
-
     _write_config(tmp_path, monkeypatch, {
         "profile": "network",
         "server": {"bind_host": "10.20.30.40", "port": 8000},
