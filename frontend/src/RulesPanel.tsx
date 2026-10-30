@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RuleLibraryPanel } from "./RuleLibraryPanel";
 
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SanitizationRule = {
@@ -9,6 +10,7 @@ type SanitizationRule = {
 };
 type RuleConfig = { schema_version: 1; profiles: RuleProfile[]; rules: SanitizationRule[] };
 type Conflict = { rule_id: string; conflicts_with: string; reason: string };
+type RuleTemplate = { id: string; name: string; category: string; pattern: string; mapping_prefix: string; priority: number; match_type: "regex"; replacement_mode: "indexed"; replacement: string; case_sensitive: boolean; enabled: boolean; profile_id: null };
 const emptyRule = (): SanitizationRule => ({
   id: "", name: "", category: "IP-Adresse", match_type: "regex", pattern: "",
   replacement: "[IP]", replacement_mode: "fixed", mapping_prefix: "IP",
@@ -34,7 +36,7 @@ export function RulesPanel() {
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<SanitizationRule>(emptyRule());
   const [profileDraft, setProfileDraft] = useState<RuleProfile>({ id: "", name: "", source_hint: "" });
-  const [section, setSection] = useState<"rules" | "profiles">("rules");
+  const [section, setSection] = useState<"rules" | "profiles" | "library">("rules");
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -93,6 +95,22 @@ export function RulesPanel() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Speichern fehlgeschlagen."); }
     finally { setSaving(false); }
   }
+  function addTemplate(template: RuleTemplate) {
+    if (!confirmDiscardDraft()) return;
+    const id = makeId(template.id, config.rules.map(rule => rule.id));
+    const next: SanitizationRule = {
+      id, name: template.name, category: template.category, match_type: template.match_type,
+      pattern: template.pattern, replacement: `[${template.mapping_prefix}_1]`,
+      replacement_mode: template.replacement_mode, mapping_prefix: template.mapping_prefix,
+      case_sensitive: template.case_sensitive, priority: template.priority, profile_id: null,
+      enabled: false
+    };
+    setConfig(current => ({ ...current, rules: [...current.rules, next] }));
+    setSelectedId(id); setDraft(next); setDraftDirty(false); setDirty(true); setSection("rules");
+    setMessage("Vorlage übernommen und zunächst deaktiviert. Prüfe das Muster und aktiviere die Regel erst nach einem erfolgreichen Test.");
+    setError("");
+  }
+
   function addProfile() {
     if (!profileDraft.name.trim()) { setError("Bitte einen Profilnamen eingeben."); return; }
     const id = profileDraft.id || makeId(profileDraft.name, config.profiles.map(profile => profile.id));
@@ -110,7 +128,7 @@ export function RulesPanel() {
   if (loadFailed) return <section className="rules-page"><h2>Bereinigungsregeln</h2><p className="error-message" role="alert">{error || "Regelkonfiguration konnte nicht geladen werden."} Die bestehende Konfiguration bleibt unverändert; Speichern ist deaktiviert.</p></section>;
   return <section className="rules-page">
     <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div>
-    <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button></nav>
+    <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "library" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("library"); }}>Vorlagenbibliothek</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button></nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
     {conflicts.length > 0 && <div className="rules-conflicts" role="alert"><strong>Konflikte gefunden</strong><ul>{conflicts.map(item => <li key={item.rule_id}>{item.rule_id} ↔ {item.conflicts_with}: {item.reason}</li>)}</ul></div>}
@@ -135,9 +153,9 @@ export function RulesPanel() {
         </div>
         <div className="rule-editor-footer"><span className="field-help">ID: {selectedId || "wird beim Übernehmen automatisch erzeugt"}</span><button className="secondary-button" onClick={saveDraft}>Regel übernehmen</button></div>
       </div>
-    </div> : <div className="profile-workspace">
+    </div> : section === "profiles" ? <div className="profile-workspace">
       <div className="profile-form"><h3>{profileDraft.id ? "Quellprofil bearbeiten" : "Quellprofil anlegen"}</h3><label>Profilname<input value={profileDraft.name} onChange={event => setProfileDraft(current => ({ ...current, name: event.target.value }))} placeholder="z. B. Webserver" maxLength={100} /></label><label>Quellhinweis (optional)<input value={profileDraft.source_hint || ""} onChange={event => setProfileDraft(current => ({ ...current, source_hint: event.target.value }))} placeholder="z. B. nginx" maxLength={200} /></label><div className="rule-actions"><button className="secondary-button" onClick={addProfile}>Profil übernehmen</button>{profileDraft.id && <button className="text-button" onClick={() => setProfileDraft({ id: "", name: "", source_hint: "" })}>Abbrechen</button>}</div></div>
       <div className="profile-list"><h3>Vorhandene Quellprofile</h3>{config.profiles.map(profile => <div className="profile-item" key={profile.id}><div><strong>{profile.name}</strong><small>{profile.source_hint || "Kein Quellhinweis"} · ID: {profile.id}</small></div><div className="rule-actions"><button className="text-button" onClick={() => { setProfileDraft({ ...profile, source_hint: profile.source_hint || "" }); setError(""); }}>Bearbeiten</button><button className="text-button danger-text" onClick={() => removeProfile(profile.id)}>Löschen</button></div></div>)}{config.profiles.length === 0 && <p className="muted-message">Noch keine Quellprofile angelegt.</p>}</div>
-    </div>}
+    </div> : <RuleLibraryPanel onAddTemplate={addTemplate} />}
   </section>;
 }
