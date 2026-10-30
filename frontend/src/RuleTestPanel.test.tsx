@@ -82,7 +82,7 @@ it("loads a registered file into synchronized original and sanitized panes", asy
   fireEvent.click(screen.getByRole("button", { name: "Anfang" }));
   expect(await screen.findByText("Original")).toBeInTheDocument();
   expect(screen.getByText("Bereinigte Vorschau")).toBeInTheDocument();
-  expect(screen.getByText("client=192.0.2.17")).toBeInTheDocument();
-  expect(screen.getByText("client=[IP]")).toBeInTheDocument();
+  expect(screen.getByText("192.0.2.17")).toHaveClass("rule-file-hit");
+  expect(screen.getByText("[IP]")).toHaveClass("rule-file-replacement");
   expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/files/file-1/preview"))).toBe(true);
 });
