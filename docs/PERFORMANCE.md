@@ -16,7 +16,7 @@ py -m pip install -e "backend[dev]"
 py packaging/benchmark_sanitizer.py --size-gib 5 --work-dir C:\LogSanitizer-Benchmark
 ```
 
-Für einen kurzen Funktionstest kann `--size-gib 0.01` verwendet werden. Die CI führt diesen kleinen Lauf unter Windows und Linux aus.
+Für einen kurzen Funktionstest kann `--size-gib 0.01` verwendet werden. Die CI führt diesen kleinen Lauf unter Windows und Linux aus und zusätzlich einen vollständigen 5-GiB-Lauf auf einem GitHub-gehosteten Linux-Runner. Dieser Runner-Lauf ist ein reproduzierbarer Referenzwert, ersetzt aber nicht die Messung auf der tatsächlichen Zielhardware.
 
 ## Messwerte
 

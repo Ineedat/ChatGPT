@@ -30,6 +30,8 @@ jobs:
         run: pytest tests/test_mapping_encryption.py
       - run: ruff check src tests
       - run: python ../packaging/benchmark_sanitizer.py --size-gib 0.01 --work-dir ../.benchmark-ci
+      - if: runner.os == 'Linux'
+        run: python ../packaging/benchmark_sanitizer.py --size-gib 5 --work-dir ../.benchmark-5gb
 
   frontend:
     runs-on: ubuntu-latest

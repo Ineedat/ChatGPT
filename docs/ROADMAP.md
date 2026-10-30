@@ -44,7 +44,7 @@
 - [x] Portable Windows-/Linux-CI-Paketierung: PyInstaller-One-Folder-Build und Standalone-Health-Smoke-Test auf `windows-latest` und `ubuntu-latest` erfolgreich (GitHub Actions Lauf 40936541846, 2026-10-29). Dies bestätigt den CI-Build, ersetzt aber noch keine Installationstests auf den tatsächlich unterstützten Zielversionen.
 - [ ] Offline-Handbuch und portable Pakete auf den tatsächlichen Zielversionen von Windows/Linux prüfen; Netzwerkprofil zusätzlich separat paketiert und gegen die Zielumgebung testen.
 - [x] Streaming-Speicherregression: 64-MiB-Testdatei mit begrenztem Python-Speicherverbrauch in CI; zusätzlicher optionaler 5-GiB-End-to-End-Test über `LOGSANITIZER_RUN_5GB_TEST=1`.
-- [x] Reproduzierbares synthetisches Performance-Benchmark-Skript mit Laufzeit, CPU, Durchsatz, Python-Tracemalloc und Prozess-RSS ergänzt; kleiner Benchmark wird in CI ausgeführt.
+- [x] Reproduzierbares synthetisches Performance-Benchmark-Skript mit Laufzeit, CPU, Durchsatz, Python-Tracemalloc und Prozess-RSS ergänzt; kleiner Benchmark unter Windows/Linux und vollständiger 5-GiB-Lauf auf GitHub-Linux-Runner in CI vorgesehen.
 - [ ] 5-GiB-Test auf dedizierter Zielhardware ausführen und Laufzeit, RAM/CPU sowie UI-Reaktionsfähigkeit dokumentieren; Bedienbarkeit und typische Arbeitsabläufe testen. Siehe PERFORMANCE.md.
 
 ## Aktueller Validierungsstand (2026-10-30)
