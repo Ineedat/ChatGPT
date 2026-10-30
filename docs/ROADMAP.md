@@ -68,3 +68,38 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Deployment-Dokumentation auf v2.8 ausgerichtet: Standalone-Laptop und definiertes Air-Gap-Netz; LDAP/SMTP als optionale Netzwerkfunktionen. Die Laufzeitumstellung ist davon getrennt und noch offen.
 - [x] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit mit Regressionstests abgesichert; CI erfolgreich.
 - [ ] Performance- und Usability-Schwerpunkt: 5-GiB-Lauf auf tatsächlicher Zielhardware, CPU-/RAM-/Laufzeitprofile, UI-Reaktionszeiten und kurze Bedienwege. CI-Referenzmessung liegt vor; die Zielhardware-Abnahme ist weiterhin offen.
+
+
+## Priorisierte nächste Entwicklungsschritte
+
+### Priorität 1 — Regelverwaltung und erste fachlich nutzbare Konfiguration
+- [ ] Grafischer Regeleditor: Regeln anlegen, bearbeiten, kopieren, löschen und aktivieren/deaktivieren; globale und quellprofilspezifische Regeln; Kategorien, Suchart, Ersetzung, Mapping-Präfix und Priorität.
+- [ ] Quellprofile in der Oberfläche anlegen, bearbeiten und löschen; verwendete Profile vor versehentlichem Löschen schützen.
+- [ ] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
+- [ ] Integrierte Musterprüfung/Vorschau mit synthetischen Beispielen und Anzeige der Treffer/Ersetzungen.
+- [ ] Fachlich geprüfte Standard-Regelbibliothek für IP-Adressen, Hostnamen/Domains, Benutzer, E-Mail-Adressen, personenbezogene Daten, Passwörter/Tokens/API-Keys, Pfade und Infrastrukturinformationen.
+- [ ] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Vorschau und Validierung vor Übernahme.
+- [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
+
+### Priorität 2 — Abnahme und Freigabe
+- [ ] End-to-End-Berechtigungstests für Regelverwaltung: Administrator/Rule Owner dürfen Regeln ändern; Processor darf Regeln anwenden, aber nicht bearbeiten.
+- [ ] Review-/Freigabeablauf in der GUI vervollständigen und mit dem vollständigen Bereinigungsablauf verbinden.
+- [ ] Zielsystem-Abnahme unter unterstützten Windows-/Linux-Versionen, inklusive 5-GiB-Datei, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit.
+- [ ] LDAP/AD-Gruppenzuordnung, TLS-Zertifikate und SMTP-Versand in der tatsächlichen Air-Gap-Umgebung testen.
+- [ ] Offline-Handbuch und portable Pakete final auf Zielsystemen prüfen.
+
+### Priorität 3 — Qualität und Erweiterung
+- [ ] Zusätzliche Muster-/Formatfälle und synthetische Testkorpora (IPv6, URL-Encoding, mehrzeilige Stacktraces, überlappende Regeln).
+- [ ] CSV-/XML-Bereinigung fachlich entscheiden und bei Freigabe implementieren; derzeit nur Validierung.
+- [ ] Performance bei vielen Regeln und typischen Anwendungslogs messen und gezielt optimieren.
+- [ ] Release-Pakete, Versionierung und Changelog mit einem echten Testrelease prüfen.
+
+## UI-Gestaltungsrichtlinien (bei Umsetzung der jeweiligen UI-Roadmap-Punkte)
+
+Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils anstehenden Oberflächen umgesetzt und ziehen keine späteren Roadmap-Arbeiten vor:
+
+- Eine Bildschirmseite soll die für den aktuellen Arbeitsschritt nötigen Informationen und Aktionen möglichst vollständig zeigen; unnötiges seitenweites Scrollen vermeiden.
+- Menüs und Reiter zur klaren Gliederung einsetzen.
+- Dropdowns und Select-Listen Freitextfeldern vorziehen, wenn die Auswahlmenge bekannt und begrenzt ist.
+- Pfade und Dateien über einen geeigneten Dateibrowser auswählen, nicht manuell in Textfelder eingeben.
+- Mouseover-/Fokus-Hilfen und die Offline-Hilfe sollen die Bedienung verständlich erklären.
