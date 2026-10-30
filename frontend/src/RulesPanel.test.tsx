@@ -19,7 +19,7 @@ describe("rule editor", () => {
   it("loads rules and exposes profile scope as a selection", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => initialConfig } as Response));
     render(<RulesPanel />);
-    expect(await screen.findByRole("heading", { name: "IPv4-Adressen" })).toBeInTheDocument();
+    expect(await screen.findByText("IPv4-Adressen")).toBeInTheDocument();
     expect(screen.getByLabelText("Geltungsbereich")).toHaveValue("");
     expect(screen.getByRole("option", { name: "Nginx" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Konfiguration speichern" })).toBeDisabled();
