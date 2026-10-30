@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { RuleLibraryPanel } from "./RuleLibraryPanel";
+import { RuleTestPanel } from "./RuleTestPanel";
 
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SanitizationRule = {
@@ -36,7 +37,7 @@ export function RulesPanel() {
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<SanitizationRule>(emptyRule());
   const [profileDraft, setProfileDraft] = useState<RuleProfile>({ id: "", name: "", source_hint: "" });
-  const [section, setSection] = useState<"rules" | "profiles" | "library">("rules");
+  const [section, setSection] = useState<"rules" | "profiles" | "library" | "test">("rules");
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -128,7 +129,7 @@ export function RulesPanel() {
   if (loadFailed) return <section className="rules-page"><h2>Bereinigungsregeln</h2><p className="error-message" role="alert">{error || "Regelkonfiguration konnte nicht geladen werden."} Die bestehende Konfiguration bleibt unverändert; Speichern ist deaktiviert.</p></section>;
   return <section className="rules-page">
     <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div>
-    <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "library" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("library"); }}>Vorlagenbibliothek</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button></nav>
+    <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "library" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("library"); }}>Vorlagenbibliothek</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button><button className={section === "test" ? "active" : ""} onClick={() => setSection("test")}>Regeltest & Vorschau</button></nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
     {conflicts.length > 0 && <div className="rules-conflicts" role="alert"><strong>Konflikte gefunden</strong><ul>{conflicts.map(item => <li key={item.rule_id}>{item.rule_id} ↔ {item.conflicts_with}: {item.reason}</li>)}</ul></div>}
@@ -156,6 +157,6 @@ export function RulesPanel() {
     </div> : section === "profiles" ? <div className="profile-workspace">
       <div className="profile-form"><h3>{profileDraft.id ? "Quellprofil bearbeiten" : "Quellprofil anlegen"}</h3><label>Profilname<input value={profileDraft.name} onChange={event => setProfileDraft(current => ({ ...current, name: event.target.value }))} placeholder="z. B. Webserver" maxLength={100} /></label><label>Quellhinweis (optional)<input value={profileDraft.source_hint || ""} onChange={event => setProfileDraft(current => ({ ...current, source_hint: event.target.value }))} placeholder="z. B. nginx" maxLength={200} /></label><div className="rule-actions"><button className="secondary-button" onClick={addProfile}>Profil übernehmen</button>{profileDraft.id && <button className="text-button" onClick={() => setProfileDraft({ id: "", name: "", source_hint: "" })}>Abbrechen</button>}</div></div>
       <div className="profile-list"><h3>Vorhandene Quellprofile</h3>{config.profiles.map(profile => <div className="profile-item" key={profile.id}><div><strong>{profile.name}</strong><small>{profile.source_hint || "Kein Quellhinweis"} · ID: {profile.id}</small></div><div className="rule-actions"><button className="text-button" onClick={() => { setProfileDraft({ ...profile, source_hint: profile.source_hint || "" }); setError(""); }}>Bearbeiten</button><button className="text-button danger-text" onClick={() => removeProfile(profile.id)}>Löschen</button></div></div>)}{config.profiles.length === 0 && <p className="muted-message">Noch keine Quellprofile angelegt.</p>}</div>
-    </div> : <RuleLibraryPanel onAddTemplate={addTemplate} />}
+    </div> : section === "library" ? <RuleLibraryPanel onAddTemplate={addTemplate} /> : <RuleTestPanel config={config} draft={draft} selectedId={selectedId} draftDirty={draftDirty} />}
   </section>;
 }

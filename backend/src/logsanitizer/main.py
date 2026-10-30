@@ -64,6 +64,7 @@ from logsanitizer.rule_config import (
     save_rule_config,
 )
 from logsanitizer.rule_library import list_rule_categories, list_rule_templates
+from logsanitizer.rule_preview import RulePreviewError, preview_rules
 from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
@@ -327,6 +328,25 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
 def rules_library_get() -> dict[str, object]:
     """Return built-in starter templates without modifying the active configuration."""
     return {"categories": list_rule_categories(), "templates": list_rule_templates()}
+
+
+class RulePreviewRequest(BaseModel):
+    config: RuleConfig
+    sample_text: str = Field(min_length=1, max_length=65_536)
+    profile_id: str | None = Field(default=None, max_length=64)
+    rule_id: str | None = Field(default=None, max_length=64)
+
+
+@app.post("/api/rules/preview", tags=["rules"])
+def rules_preview(payload: RulePreviewRequest) -> dict[str, object]:
+    """Simulate a rule or active rule set on supplied text without file or mapping writes."""
+    try:
+        return {
+            **preview_rules(payload.sample_text, payload.config, payload.profile_id, payload.rule_id),
+            "conflicts": find_rule_conflicts(payload.config),
+        }
+    except RulePreviewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/rules/config", response_model=RuleConfig, tags=["rules"])

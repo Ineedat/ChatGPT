@@ -76,7 +76,7 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Grafischer Regeleditor: Regeln anlegen, bearbeiten, kopieren, löschen und aktivieren/deaktivieren; globale und quellprofilspezifische Regeln; Kategorien, Suchart, Ersetzung, Mapping-Präfix und Priorität.
 - [x] Quellprofile in der Oberfläche anlegen, bearbeiten und löschen; verwendete Profile vor versehentlichem Löschen schützen.
 - [x] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
-- [ ] Integrierte Musterprüfung/Vorschau mit synthetischen Beispielen und Anzeige der Treffer/Ersetzungen.
+- [x] Integrierte Musterprüfung/Vorschau: einzelne Regeln (auch deaktivierte Entwürfe) und aktive Regelsets mit Profilfilter testen; Treffer/Ersetzungen, Prioritätsreihenfolge, Folgetreffer und überlappende Fundstellen anzeigen. Vorschau läuft ausschließlich im Speicher und verändert weder Quelldateien noch dauerhafte Projekt-Mappings.
 - [x] Offline-Regelbibliothek mit 20 kategorisierten, einzeln übernehmbaren und editierbaren Startvorlagen für IPv4/IPv6, FQDN/Hostnamen, Benutzer, E-Mail, ausgewählte personenbezogene Daten, Passwort-/Token-/API-Key-Felder, Windows-/Unix-Pfade und Infrastrukturwerte; Vorlagen werden zunächst deaktiviert eingefügt. Regex-Tests, API und GUI sind abgedeckt.
 - [ ] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Vorschau und Validierung vor Übernahme.
 - [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
@@ -122,4 +122,16 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Regelkopien bleiben einzeln editierbar; Präfixe, Prioritäten und Feldmuster sind vorbereitet.
 - [x] Backend-Validierung und Regressionstests für Kategorien, Vorlagen, alle synthetischen Musterbeispiele und den read-only Bibliotheks-API-Endpunkt ergänzt.
 - [x] Offline-Hilfe und docs/RULE_LIBRARY.md ergänzt.
+- [ ] CI nach dieser Änderung vollständig abwarten und eventuelle Fehler beheben.
+
+
+## Regeltests und Bereinigungsvorschau — Umsetzung (2026-10-30)
+
+- [x] Backend-Endpunkt `POST /api/rules/preview` ergänzt; Konfiguration und synthetischer Beispieltext werden direkt übergeben, ohne die gespeicherte Konfiguration zu verändern.
+- [x] Einzelregeltest auch für deaktivierte oder noch nicht gespeicherte Entwürfe sowie Simulation aller aktiven Regeln in Prioritätsreihenfolge ergänzt.
+- [x] Trefferpositionen, Beispielwerte, Ersetzungen, Trefferzahlen und abgeschnittene Trefferlisten werden angezeigt.
+- [x] Überlappende Treffer im ursprünglichen Beispiel und Folgetreffer auf zuvor erzeugte Ersetzungen werden sichtbar gemacht.
+- [x] Indexierte Platzhalter werden in einem flüchtigen Vorschau-Mapping simuliert; es werden keine Projekt-Mappings angelegt oder verändert.
+- [x] Eingabe auf 65.536 Zeichen begrenzt; Regex-Ausführung hat ein Zeitlimit. Datei- und Originalpfade werden nicht angenommen oder geöffnet.
+- [x] Frontend-Reiter „Regeltest & Vorschau“, Backend-/Frontend-Tests und Offline-Hilfe ergänzt.
 - [ ] CI nach dieser Änderung vollständig abwarten und eventuelle Fehler beheben.
