@@ -68,14 +68,15 @@ export function RulesPanel() {
     setSelectedId(id); setDraft(next); setDraftDirty(false); setDirty(true); setMessage("Änderung vorgemerkt. Mit „Konfiguration speichern“ dauerhaft übernehmen.");
   }
   function duplicateRule(rule: SanitizationRule) {
+    if (!confirmDiscardDraft()) return;
     const copy = { ...rule, id: makeId(rule.id + "-kopie", config.rules.map(item => item.id)), name: rule.name + " (Kopie)" };
     setConfig(current => ({ ...current, rules: [...current.rules, copy] }));
-    selectRule(copy); setDirty(true);
+    setSelectedId(copy.id); setDraft(copy); setDraftDirty(false); setDirty(true);
   }
   function deleteRule(rule: SanitizationRule) {
-    if (!window.confirm(`Regel „${rule.name}“ wirklich löschen?`)) return;
+    if (!confirmDiscardDraft() || !window.confirm(`Regel „${rule.name}“ wirklich löschen?`)) return;
     setConfig(current => ({ ...current, rules: current.rules.filter(item => item.id !== rule.id) }));
-    if (selectedId === rule.id) newRule();
+    if (selectedId === rule.id) { setSelectedId(""); setDraft(emptyRule()); setDraftDirty(false); }
     setDirty(true);
   }
   async function persist() {
