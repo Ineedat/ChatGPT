@@ -8,6 +8,7 @@ from logsanitizer.rule_config import RuleConfig
 from logsanitizer.rule_preview import MAX_PREVIEW_CHARS, RulePreviewError, preview_rules
 
 MAX_PREVIEW_BYTES = MAX_PREVIEW_CHARS * 4
+MAX_LINE_BYTES = 1024 * 1024
 
 
 def preview_file_window(
@@ -35,7 +36,9 @@ def preview_file_window(
             previous_byte = stream.read(1)
             stream.seek(byte_offset)
             if previous_byte != b"\n":
-                stream.readline(1024 * 1024 + 1)
+                discarded = stream.readline(MAX_LINE_BYTES + 1)
+                if len(discarded) > MAX_LINE_BYTES and not discarded.endswith(b"\n"):
+                    raise RulePreviewError("Eine Logzeile überschreitet die maximale Zeilenlänge von 1 MiB.")
         start_offset = stream.tell()
         raw = stream.read(MAX_PREVIEW_BYTES)
         while True:
