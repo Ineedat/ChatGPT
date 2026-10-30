@@ -239,8 +239,12 @@ def login(payload: Login, request: Request, response: Response):
     response.set_cookie(
         COOKIE, token, max_age=TTL, httponly=True, secure=secure, samesite="strict", path="/api"
     )
+    # The frontend runs at "/" and must be able to read this non-HttpOnly
+    # token via document.cookie. Keep the session cookie restricted to /api.
+    # Remove the legacy /api-scoped CSRF cookie to avoid duplicate cookie names.
+    response.delete_cookie(CSRF, path="/api", samesite="strict")
     response.set_cookie(
-        CSRF, csrf, max_age=TTL, httponly=False, secure=secure, samesite="strict", path="/api"
+        CSRF, csrf, max_age=TTL, httponly=False, secure=secure, samesite="strict", path="/"
     )
     return {"authenticated": True}
 
@@ -250,6 +254,7 @@ def logout(request: Request, response: Response):
     if token:
         with _db() as db: db.execute("DELETE FROM sessions WHERE token_hash=?",(hashlib.sha256(token.encode()).hexdigest(),))
     response.delete_cookie(COOKIE,path="/api",samesite="strict")
+    response.delete_cookie(CSRF,path="/",samesite="strict")
     response.delete_cookie(CSRF,path="/api",samesite="strict")
     return {"authenticated":False}
 

@@ -130,3 +130,36 @@ def test_role_matrix_keeps_operator_and_review_permissions_separate(tmp_path, mo
         assert set(combined.get("/api/auth/me").json()["roles"]) == {"operator", "reviewer"}
         assert combined.post("/api/projects", json={"name": "Combined project"}).status_code == 201
         assert combined.get("/api/reviews/queue").status_code == 200
+
+
+def test_csrf_cookie_is_readable_from_frontend_root_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("csrf-admin", "csrf-admin-password-123", ["admin", "operator"])
+
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/auth/login",
+            json={"username": "csrf-admin", "password": "csrf-admin-password-123"},
+        )
+        assert login.status_code == 200
+        set_cookie_headers = login.headers.get_list("set-cookie")
+        csrf_cookie = next(
+            header for header in set_cookie_headers
+            if header.startswith("logsanitizer_csrf=") and "Max-Age=0" not in header
+        )
+        session_cookie = next(
+            header for header in set_cookie_headers
+            if header.startswith("logsanitizer_session=")
+        )
+        assert "Path=/" in csrf_cookie
+        assert "HttpOnly" not in csrf_cookie
+        assert "Path=/api" in session_cookie
+        assert "HttpOnly" in session_cookie
+
+        csrf = client.cookies.get("logsanitizer_csrf")
+        created = client.post(
+            "/api/projects",
+            json={"name": "CSRF cookie project"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert created.status_code == 201
