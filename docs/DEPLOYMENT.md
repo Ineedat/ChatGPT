@@ -51,3 +51,10 @@ Ist ein Reviewer/Freigeber zugewiesen, bleibt die bewusste Prüfung und Freigabe
 ## Portable Builds
 
 Die PyInstaller-Spezifikation erstellt ein portables Paket mit lokalem Frontend, Offline-Hilfe, Dokumentation und Beispielkonfiguration. Windows- und Linux-Pakete werden jeweils auf dem entsprechenden Betriebssystem gebaut. Die CI führt Frontend-Tests, Backend-Tests, Paket-Builds und Standalone-Smoke-Tests aus. Ein erfolgreicher Standalone-Smoke-Test beweist nicht die LDAP-/SMTP-Erreichbarkeit. Vor Freigabe sind mindestens erfolgreiche LDAP-Anmeldungen für die relevanten Rollen, ein abgewiesener Benutzer ohne passende Gruppe, Zertifikatsprüfung sowie SMTP-Zustellung für Review und Rückgabe im echten Air-Gap-Netz zu protokollieren.
+
+
+## Automatisierte Netzwerkprofil-Prüfung
+
+Die CI startet das portable Paket zusätzlich einmal mit dem Netzwerkprofil, einem zur Laufzeit erzeugten lokalen TLS-Zertifikat sowie synthetischer LDAP- und SMTP-Konfiguration. Damit werden PyInstaller-Start, Konfigurationsprüfung und HTTPS-Erreichbarkeit des Netzwerkprofils auf Windows und Linux abgedeckt.
+
+Dieser Smoke-Test verbindet sich absichtlich nicht mit einem echten LDAP- oder SMTP-Server. Vor der Inbetriebnahme im Air-Gap-Netz sind deshalb echte LDAP-Anmeldung, Gruppenzuordnung, Zertifikatskette und SMTP-Zustellung gemäß der obigen Abnahmeliste zu testen.
