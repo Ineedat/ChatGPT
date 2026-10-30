@@ -222,8 +222,16 @@ def detect_format_from_sample(path: Path) -> str:
         except json.JSONDecodeError:
             pass
         lines = [line for line in stripped.splitlines() if line.strip()]
-        if len(lines) > 1 and all(_is_json_line(line) for line in lines):
+        sample_truncated = path.stat().st_size > len(sample)
+        if sample_truncated and lines and not stripped.endswith(("\\n", "\\r")):
+            lines = lines[:-1]
+        if lines and all(_is_json_line(line) for line in lines):
             return "jsonl"
+        if sample_truncated:
+            # A document that extends beyond the bounded sample is classified as
+            # JSON when it is not a sequence of complete JSON Lines. Full syntax
+            # validation remains an explicit later step.
+            return "json"
         return "unknown"
     if chr(0) in text:
         return "unknown"

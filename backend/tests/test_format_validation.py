@@ -83,3 +83,17 @@ def test_validation_endpoint_uses_manual_override_and_keeps_original(tmp_path, m
         assert missing.status_code == 404
 
     assert source.read_bytes() == original
+
+
+def test_bounded_detection_recognizes_large_json_documents_and_jsonl(tmp_path):
+    from logsanitizer.main import detect_format_from_sample
+
+    document = tmp_path / "large-document.json"
+    document.write_text('{"events":[\n' + ",".join('{"message":"event-%05d"}' % i for i in range(5000)) + "\n]}", encoding="utf-8")
+    assert document.stat().st_size > 64 * 1024
+    assert detect_format_from_sample(document) == "json"
+
+    lines = tmp_path / "large-events.jsonl"
+    lines.write_text("".join('{"event":%d}\n' % i for i in range(10000)), encoding="utf-8")
+    assert lines.stat().st_size > 64 * 1024
+    assert detect_format_from_sample(lines) == "jsonl"
