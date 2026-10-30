@@ -44,3 +44,22 @@ Es wird kein pauschaler Durchsatzwert versprochen: Datenträger, CPU, Dateisyste
 - Der maximale Prozess-RSS ist der bessere Gesamtindikator; auf manchen Plattformen kann dieser Wert fehlen.
 - Der Durchsatz beinhaltet die zweite vollständige Lesepassage für Ausgabevalidierung und Restmustersuche.
 - Der Benchmark misst die Text-Streaming-Pipeline. JSON-Dokumente und JSON Lines haben zusätzliches Parsing und sollten mit repräsentativen synthetischen Beispielen separat gemessen werden.
+
+
+## Gemessener CI-Referenzlauf (2026-10-30)
+
+Der vollständige synthetische 5-GiB-Lauf wurde in GitHub Actions auf einem gehosteten Linux-Runner erfolgreich ausgeführt (Python 3.11.17, Linux 7.0.0-1017-azure-x86_64, Lauf #41128457176).
+
+| Messwert | Ergebnis |
+|---|---:|
+| Eingabe | 5,00 GiB (5.368.709.120 Byte) |
+| Ausgabe | 5.379.194.880 Byte |
+| Wandzeit | 96,806 s |
+| CPU-Zeit | 93,708 s |
+| Durchsatz | 52,89 MiB/s |
+| Maximaler Prozess-RSS | 40.443.904 Byte (ca. 38,6 MiB) |
+| Verarbeitete Zeilen | 10.485.760 |
+| Ersetzungen | 10.485.760 |
+| Ausgabevalidierung | erfolgreich |
+
+Der Lauf verwendete synthetische 512-Byte-Logeinträge mit einer einfachen Ersetzungsregel. Tracemalloc war für diesen großen Lauf deaktiviert, damit die Instrumentierung die Laufzeit nicht verzerrt. Die Python-Tracemalloc-Messung erfolgt separat im kleinen CI-Benchmark. Diese Werte sind ein CI-Referenzpunkt, keine zugesicherte Leistung auf dem Zielgerät.

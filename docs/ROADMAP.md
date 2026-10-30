@@ -51,10 +51,10 @@
 
 - [x] Vollständige JSON-Dokumente sind jetzt als Bereinigungsformat freigegeben und werden mit einem Streaming-Parser verarbeitet; Ausgabe wird erneut strukturell und auf Resttreffer geprüft.
 - [x] Offline-Hilfe wurde um konkrete Arbeitsabläufe, JSON-Verhalten, große Dateien und Deployment erweitert; F1 öffnet die Hilfe.
-- [x] Portable-Paket-CI startet weiterhin Standalone-Smoke-Tests unter Windows und Linux. Netzwerkprofil-/LDAP-/SMTP-Zielintegration bleibt ein manueller Abnahmeschritt, da keine echten Air-Gap-Verzeichnis- oder Mailserver verfügbar sind.
-- [x] Benchmark-Skript und Dokumentation für die 5-GiB-Messung ergänzt; Zielhardwaremessung bleibt offen.
+- [x] Portable-Paket-CI prüft Standalone und HTTPS-Netzwerkprofil unter Windows und Linux; lokaler Netzwerk-Login und LDAP-Konfigurationspfad sind durch Backend-Tests abgedeckt. Echte LDAP-/SMTP-Zielintegration bleibt ein manueller Abnahmeschritt, da keine Air-Gap-Verzeichnis- oder Mailserver verfügbar sind.
+- [x] Vollständiger synthetischer 5-GiB-CI-Referenzlauf erfolgreich: 96,806 s, 52,89 MiB/s, maximaler Prozess-RSS 40.443.904 Byte; Messprotokoll in PERFORMANCE.md. Zielhardwaremessung bleibt offen.
 
-- [x] CI-Lauf 40960974895 (Commit f8f57ab): Backend Linux, Frontend, portable Builds/Smoke-Tests Linux und Windows erfolgreich.
+- [x] CI-Lauf 41128457176 (Commit 19f7e53): alle fünf Jobs erfolgreich; vollständiger 5-GiB-Referenzlauf auf Linux erfolgreich. Push-CI-Lauf 41128449589 ebenfalls vollständig erfolgreich.
 - [x] Backend-Windows-Job erfolgreich; dieser Job führt aktuell nur den gezielten Mapping-Test aus, nicht die vollständige Backend-Suite.
 - [x] Rollenmatrix, Review-Entscheidungen, Operator-Berechtigungsgrenzen und Rückgabe-Benachrichtigung sind durch Tests abgedeckt.
 - [x] Issue #3 zur verpflichtenden Workspace-Allowlist gemäß v2.8 als nicht mehr geplant geschlossen; dies ist keine Aussage über Race-Resistenz der bisherigen Implementierung.
@@ -67,4 +67,4 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Backend-Ausgabeort ohne verpflichtende Workspace-Allowlist umgesetzt; die veraltete Deployment-Einstellung wurde entfernt.
 - [x] Deployment-Dokumentation auf v2.8 ausgerichtet: Standalone-Laptop und definiertes Air-Gap-Netz; LDAP/SMTP als optionale Netzwerkfunktionen. Die Laufzeitumstellung ist davon getrennt und noch offen.
 - [x] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit mit Regressionstests abgesichert; CI erfolgreich.
-- [ ] Performance- und Usability-Schwerpunkt: 5-GiB-Lauf auf Zielhardware, CPU-/RAM-/Laufzeitprofile, UI-Reaktionszeiten und kurze Bedienwege.
+- [ ] Performance- und Usability-Schwerpunkt: 5-GiB-Lauf auf tatsächlicher Zielhardware, CPU-/RAM-/Laufzeitprofile, UI-Reaktionszeiten und kurze Bedienwege. CI-Referenzmessung liegt vor; die Zielhardware-Abnahme ist weiterhin offen.
