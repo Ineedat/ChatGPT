@@ -73,9 +73,9 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 ## Priorisierte nächste Entwicklungsschritte
 
 ### Priorität 1 — Regelverwaltung und erste fachlich nutzbare Konfiguration
-- [ ] Grafischer Regeleditor: Regeln anlegen, bearbeiten, kopieren, löschen und aktivieren/deaktivieren; globale und quellprofilspezifische Regeln; Kategorien, Suchart, Ersetzung, Mapping-Präfix und Priorität.
-- [ ] Quellprofile in der Oberfläche anlegen, bearbeiten und löschen; verwendete Profile vor versehentlichem Löschen schützen.
-- [ ] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
+- [x] Grafischer Regeleditor: Regeln anlegen, bearbeiten, kopieren, löschen und aktivieren/deaktivieren; globale und quellprofilspezifische Regeln; Kategorien, Suchart, Ersetzung, Mapping-Präfix und Priorität.
+- [x] Quellprofile in der Oberfläche anlegen, bearbeiten und löschen; verwendete Profile vor versehentlichem Löschen schützen.
+- [x] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
 - [ ] Integrierte Musterprüfung/Vorschau mit synthetischen Beispielen und Anzeige der Treffer/Ersetzungen.
 - [ ] Fachlich geprüfte Standard-Regelbibliothek für IP-Adressen, Hostnamen/Domains, Benutzer, E-Mail-Adressen, personenbezogene Daten, Passwörter/Tokens/API-Keys, Pfade und Infrastrukturinformationen.
 - [ ] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Vorschau und Validierung vor Übernahme.
@@ -103,3 +103,12 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - Dropdowns und Select-Listen Freitextfeldern vorziehen, wenn die Auswahlmenge bekannt und begrenzt ist.
 - Pfade und Dateien über einen geeigneten Dateibrowser auswählen, nicht manuell in Textfelder eingeben.
 - Mouseover-/Fokus-Hilfen und die Offline-Hilfe sollen die Bedienung verständlich erklären.
+
+
+## Regelverwaltungs-Meilenstein — CI-Nachweis (2026-10-30)
+
+- [x] Frontend-Tests und TypeScript-/Vite-Build erfolgreich.
+- [x] Backend-Suite: 86 passed, 1 skipped; Ruff ohne Befund.
+- [x] Portable Windows- und Linux-Builds sowie Standalone-/Netzwerk-Smoke-Tests erfolgreich.
+- [x] 5-GiB-Referenzlauf erneut erfolgreich: 98,201 s, 52,14 MiB/s, CPU 95,069 s, maximaler Prozess-RSS 40.345.600 Byte; 10.485.760 Zeilen/Ersetzungen, Ausgabevalidierung erfolgreich.
+- [x] Push-CI-Lauf [41135496635](https://github.com/Ineedat/ChatGPT/actions/runs/41135496635) und PR-CI-Lauf [41135503242](https://github.com/Ineedat/ChatGPT/actions/runs/41135503242) vollständig grün (je fünf Jobs).
