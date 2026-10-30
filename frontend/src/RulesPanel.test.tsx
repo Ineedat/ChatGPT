@@ -49,4 +49,31 @@ describe("rule editor", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/rules/config", expect.objectContaining({ method: "PUT" }));
     expect(await screen.findByText("Regelkonfiguration wurde lokal gespeichert.")).toBeInTheDocument();
   });
+
+  it("adds a categorized library template as a disabled editable rule", async () => {
+    const library = {
+      categories: [{ name: "IP-Adresse", description: "IPv4 und IPv6", template_count: 1 }],
+      templates: [{
+        id: "ipv4-addresses", name: "IPv4-Adressen", category: "IP-Adresse",
+        description: "Erkennt IPv4-Adressen.", pattern: String.raw`(?<![\\w.])(?:25[0-5]\\.){3}25[0-5](?![\\w.])`,
+        mapping_prefix: "IP", priority: 100, example_before: "client=192.0.2.17",
+        example_after: "client=[IP_1]", notes: "Synthetisches Beispiel.",
+        match_type: "regex", replacement: "", replacement_mode: "indexed",
+        case_sensitive: false, enabled: false, profile_id: null
+      }]
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ schema_version: 1, profiles: [], rules: [] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => library } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<RulesPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Vorlagenbibliothek" }));
+    expect(await screen.findByText("IPv4-Adressen")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Vorlage übernehmen" }));
+    expect(await screen.findByLabelText("Regelname")).toHaveValue("IPv4-Adressen");
+    expect(screen.getByLabelText("Regel aktiviert")).not.toBeChecked();
+    expect(screen.getByLabelText("Platzhalter-Präfix")).toHaveValue("IP");
+    expect(screen.getByRole("button", { name: "Konfiguration speichern" })).toBeEnabled();
+  });
+
 });
