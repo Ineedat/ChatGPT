@@ -70,7 +70,8 @@ def main() -> int:
     source.unlink(missing_ok=True)
     output.unlink(missing_ok=True)
 
-    line = b"timestamp=2026-10-30T12:00:00Z user=alice ip=192.0.2.10 event=synthetic-test\n"
+    prefix = b"timestamp=2026-10-30T12:00:00Z user=alice ip=192.0.2.10 event=synthetic-test payload="
+    line = prefix + (b"x" * (511 - len(prefix))) + b"\n"
     target_bytes = int(args.size_gib * 1024**3)
     block = line * max(1, (4 * 1024 * 1024) // len(line))
     written = 0
