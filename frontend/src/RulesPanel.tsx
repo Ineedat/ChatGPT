@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RuleLibraryPanel } from "./RuleLibraryPanel";
 import { RuleTestPanel } from "./RuleTestPanel";
 
@@ -46,6 +46,8 @@ export function RulesPanel() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importPreview, setImportPreview] = useState<{ config: RuleConfig; fileName: string; conflicts: Conflict[] } | null>(null);
 
   useEffect(() => {
     void request("/api/rules/config").then(async response => {
@@ -82,6 +84,56 @@ export function RulesPanel() {
     if (selectedId === rule.id) { setSelectedId(""); setDraft(emptyRule()); setDraftDirty(false); }
     setDirty(true);
   }
+  function exportConfig() {
+    if (draftDirty) { setError("Bitte übernehmen oder verwerfen Sie zuerst den offenen Regelentwurf."); return; }
+    const payload = JSON.stringify(config, null, 2) + "\\n";
+    const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "logsanitizer-rules-v1.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage("Regelkonfiguration wurde als versionierte JSON-Datei exportiert.");
+    setError("");
+  }
+
+  async function inspectImport(file: File | undefined) {
+    if (!file) return;
+    setError(""); setMessage(""); setImportPreview(null);
+    if (file.size > 2 * 1024 * 1024) { setError("Die JSON-Regeldatei darf höchstens 2 MiB groß sein."); return; }
+    try {
+      const parsed = JSON.parse(await file.text()) as RuleConfig;
+      if (!parsed || parsed.schema_version !== 1 || !Array.isArray(parsed.rules) || !Array.isArray(parsed.profiles)) {
+        throw new Error("Unbekanntes oder unvollständiges Regelkonfigurationsformat. Unterstützt wird schema_version 1.");
+      }
+      const response = await request("/api/rules/config/validate", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed)
+      });
+      const checked = await response.json() as { valid?: boolean; conflicts?: Conflict[]; detail?: unknown };
+      if (!response.ok) throw new Error(typeof checked.detail === "string" ? checked.detail : "Die Regeldatei ist schema- oder musterungültig.");
+      setImportPreview({ config: parsed, fileName: file.name, conflicts: checked.conflicts || [] });
+      if (checked.valid) setMessage("Datei gelesen und serverseitig validiert. Die aktive Konfiguration wurde noch nicht verändert.");
+      else setError("Die Datei enthält Regelkonflikte. Beheben Sie diese in der Quelldatei und prüfen Sie sie erneut; ein Import ist nicht möglich.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "JSON-Datei konnte nicht geprüft werden.");
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+    }
+  }
+
+  function stageImport() {
+    if (!importPreview || importPreview.conflicts.length || !confirmDiscardDraft()) return;
+    setConfig(importPreview.config);
+    setSelectedId(importPreview.config.rules[0]?.id || "");
+    setDraft(importPreview.config.rules[0] ? { ...importPreview.config.rules[0] } : emptyRule());
+    setDraftDirty(false); setDirty(true); setImportPreview(null); setSection("rules");
+    setMessage("Import übernommen und als ungespeicherter Entwurf geladen. Erst „Konfiguration speichern“ aktiviert ihn lokal.");
+    setError("");
+  }
+
   async function persist() {
     setSaving(true); setError(""); setMessage(""); setConflicts([]);
     try {
@@ -128,11 +180,12 @@ export function RulesPanel() {
   if (loading) return <section className="rules-page"><p role="status">Regelkonfiguration wird geladen …</p></section>;
   if (loadFailed) return <section className="rules-page"><h2>Bereinigungsregeln</h2><p className="error-message" role="alert">{error || "Regelkonfiguration konnte nicht geladen werden."} Die bestehende Konfiguration bleibt unverändert; Speichern ist deaktiviert.</p></section>;
   return <section className="rules-page">
-    <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div>
+    <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><div className="rule-actions"><button className="secondary-button" type="button" onClick={exportConfig} disabled={draftDirty}>JSON exportieren</button><button className="secondary-button" type="button" onClick={() => importInput.current?.click()}>JSON importieren</button><input ref={importInput} type="file" accept="application/json,.json" hidden onChange={event => void inspectImport(event.target.files?.[0])} /><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div></div>
     <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "library" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("library"); }}>Vorlagenbibliothek</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button><button className={section === "test" ? "active" : ""} onClick={() => setSection("test")}>Regeltest & Vorschau</button></nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
     {conflicts.length > 0 && <div className="rules-conflicts" role="alert"><strong>Konflikte gefunden</strong><ul>{conflicts.map(item => <li key={item.rule_id}>{item.rule_id} ↔ {item.conflicts_with}: {item.reason}</li>)}</ul></div>}
+    {importPreview && <section className="rules-conflicts" aria-label="Importvorschau"><strong>Importvorschau: {importPreview.fileName}</strong><p>{importPreview.config.rules.length} Regeln · {importPreview.config.profiles.length} Quellprofile · Schema v{importPreview.config.schema_version}</p>{importPreview.conflicts.length > 0 ? <><p role="alert">Import wegen Regelkonflikten gesperrt:</p><ul>{importPreview.conflicts.map(item => <li key={item.rule_id}>{item.rule_id} ↔ {item.conflicts_with}: {item.reason}</li>)}</ul></> : <p>Schema und Regelkonflikte sind gültig. Die aktive Konfiguration bleibt bis zur ausdrücklichen Übernahme und anschließendem Speichern unverändert.</p>}<div className="rule-actions"><button className="secondary-button" type="button" onClick={() => setImportPreview(null)}>Vorschau schließen</button><button className="primary-button" type="button" onClick={stageImport} disabled={importPreview.conflicts.length > 0}>In Entwurf übernehmen</button></div></section>}
     {section === "rules" ? <div className="rules-workspace">
       <aside className="rules-list-panel"><div className="rules-list-heading"><h3>Regelliste</h3><button className="secondary-button" onClick={newRule}>Neue Regel</button></div>
         <div className="rules-list">{config.rules.map(rule => <button key={rule.id} className={selectedId === rule.id ? "rule-list-item selected" : "rule-list-item"} onClick={() => selectRule(rule)}><span className={rule.enabled ? "rule-state enabled" : "rule-state"} /> <span><strong>{rule.name}</strong><small>{rule.category} · Priorität {rule.priority}{rule.profile_id ? " · Quellprofil" : " · Global"}</small></span></button>)}</div>
