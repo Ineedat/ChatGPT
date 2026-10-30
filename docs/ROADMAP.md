@@ -77,7 +77,7 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Quellprofile in der Oberfläche anlegen, bearbeiten und löschen; verwendete Profile vor versehentlichem Löschen schützen.
 - [x] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
 - [ ] Integrierte Musterprüfung/Vorschau mit synthetischen Beispielen und Anzeige der Treffer/Ersetzungen.
-- [ ] Fachlich geprüfte Standard-Regelbibliothek für IP-Adressen, Hostnamen/Domains, Benutzer, E-Mail-Adressen, personenbezogene Daten, Passwörter/Tokens/API-Keys, Pfade und Infrastrukturinformationen.
+- [x] Offline-Regelbibliothek mit 20 kategorisierten, einzeln übernehmbaren und editierbaren Startvorlagen für IPv4/IPv6, FQDN/Hostnamen, Benutzer, E-Mail, ausgewählte personenbezogene Daten, Passwort-/Token-/API-Key-Felder, Windows-/Unix-Pfade und Infrastrukturwerte; Vorlagen werden zunächst deaktiviert eingefügt. Regex-Tests, API und GUI sind abgedeckt.
 - [ ] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Vorschau und Validierung vor Übernahme.
 - [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
 
@@ -112,3 +112,14 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Portable Windows- und Linux-Builds sowie Standalone-/Netzwerk-Smoke-Tests erfolgreich.
 - [x] 5-GiB-Referenzlauf erneut erfolgreich: 98,201 s, 52,14 MiB/s, CPU 95,069 s, maximaler Prozess-RSS 40.345.600 Byte; 10.485.760 Zeilen/Ersetzungen, Ausgabevalidierung erfolgreich.
 - [x] Push-CI-Lauf [41135496635](https://github.com/Ineedat/ChatGPT/actions/runs/41135496635) und PR-CI-Lauf [41135503242](https://github.com/Ineedat/ChatGPT/actions/runs/41135503242) vollständig grün (je fünf Jobs).
+
+
+## Regelbibliothek — Umsetzung (2026-10-30)
+
+- [x] 20 Startvorlagen in acht Kategorien ergänzt; alle Vorlagen werden als deaktivierte Regelkopien in die aktive Konfiguration übernommen.
+- [x] Offline-API-Endpunkt für Kategorien und Vorlagen ergänzt; Bibliothek verändert die gespeicherte Regelkonfiguration nicht.
+- [x] GUI-Reiter mit Kategorieauswahl, Musterbeschreibung, synthetischen Beispielen und fachlichen Warnhinweisen ergänzt.
+- [x] Regelkopien bleiben einzeln editierbar; Präfixe, Prioritäten und Feldmuster sind vorbereitet.
+- [x] Backend-Validierung und Regressionstests für Kategorien, Vorlagen, Regex-Schema und IPv4-Beispiel ergänzt.
+- [x] Offline-Hilfe und docs/RULE_LIBRARY.md ergänzt.
+- [ ] CI nach dieser Änderung vollständig abwarten und eventuelle Fehler beheben.
