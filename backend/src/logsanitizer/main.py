@@ -65,6 +65,7 @@ from logsanitizer.rule_config import (
 )
 from logsanitizer.rule_library import list_rule_categories, list_rule_templates
 from logsanitizer.rule_preview import RulePreviewError, preview_rules
+from logsanitizer.rule_file_preview import preview_file_window
 from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
 
 
@@ -345,6 +346,44 @@ def rules_preview(payload: RulePreviewRequest) -> dict[str, object]:
             **preview_rules(payload.sample_text, payload.config, payload.profile_id, payload.rule_id),
             "conflicts": find_rule_conflicts(payload.config),
         }
+    except RulePreviewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class RuleFilePreviewRequest(BaseModel):
+    config: RuleConfig
+    byte_offset: int = Field(default=0, ge=0)
+    from_end: bool = False
+    profile_id: str | None = Field(default=None, max_length=64)
+    rule_id: str | None = Field(default=None, max_length=64)
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/preview", tags=["files"])
+def project_file_preview(project_id: str, file_id: str, payload: RuleFilePreviewRequest) -> dict[str, object]:
+    """Return a bounded, read-only source window and its in-memory sanitization preview."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    selected_format = row["format_override"] or row["detected_format"]
+    if selected_format not in {"text", "jsonl"}:
+        raise HTTPException(status_code=422, detail="Die Dateivorschau unterstützt derzeit Text- und JSON-Lines-Dateien.")
+    try:
+        return preview_file_window(
+            Path(row["source_path"]), payload.config,
+            byte_offset=payload.byte_offset, from_end=payload.from_end,
+            profile_id=payload.profile_id, rule_id=payload.rule_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Quelldatei konnte nicht gelesen werden.") from exc
     except RulePreviewError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
