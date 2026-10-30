@@ -38,7 +38,7 @@ Das Projekt ist ausdrücklich keine Hochsicherheitsplattform. Zusätzliche Schut
 
 - Projekte können mehrere Logdateien und Quellenprofile enthalten; globale und profilspezifische Regeln.
 - Format automatisch erkennen, manuelle Auswahl ermöglichen; unbekannte Formate nicht stillschweigend zuordnen.
-- Strukturierte Erkennung (einschließlich JSON) und Text-/Regex-Regeln kombinieren; Multiline-Events und Stacktraces nach Möglichkeit erhalten.
+- Strukturierte Erkennung (einschließlich JSON) und Text-/Regex-Regeln kombinieren; vollständige JSON-Dokumente streamend verarbeiten. Regeln werden auf JSON-Zeichenketten in Objekt-Schlüsseln und Werten angewendet; Zahlen, boolesche Werte und null bleiben unverändert. Text/JSONL-Zeilen und einzelne JSON-Strings sind auf 1 MiB begrenzt. Multiline-Events und Stacktraces nach Möglichkeit erhalten.
 - Regeln mit Name, aktiv/inaktiv, Literal oder Regex, Groß-/Kleinschreibung, Ersetzungsvorlage, Priorität und Profil.
 - Regeln über GUI bearbeiten sowie versionierte JSON-Konfigurationen importieren/exportieren; Konflikte prüfen.
 - Gleicher Originalwert muss innerhalb eines Projekts über Dateien und spätere Läufe konsistent ersetzt werden. Zuweisung unabhängig von Dateireihenfolge.
@@ -86,7 +86,7 @@ Nicht entfallen: Benutzerrollen, Anmeldung, Berechtigungsprüfungen, Prüferfrei
 
 - Portable Windows-/Linux-Anwendung, vollständig offline lauffähig.
 - Standalone-Betrieb auf einem Laptop und optionaler Betrieb in einem definierten Air-Gap-Netz.
-- Mindestens 5-GB-Streaming mit dokumentiertem Speicher- und Laufzeitverhalten.
+- Mindestens 5-GB-Streaming mit dokumentiertem Speicher- und Laufzeitverhalten; synthetischer Benchmark unter docs/PERFORMANCE.md.
 - Quelldateien bleiben unverändert; fehlgeschlagene/unvollständige Ausgabe wird nicht freigegeben.
 - Konsistente projektweite Platzhalter und einfach bedienbare Regelverwaltung.
 - Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit bleiben funktionsfähig.

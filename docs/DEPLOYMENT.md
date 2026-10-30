@@ -20,7 +20,11 @@ Der erste Administrator wird einmalig über `LogSanitizer.exe --create-admin` be
 
 Für den Netzwerkbetrieb wird eine konkrete, für die vorgesehenen Clients erreichbare Schnittstellenadresse in `server.bind_host` konfiguriert. Der Netzwerkbetrieb bleibt auf das definierte isolierte Netz beschränkt; Firewall-Regeln sollen den Zugriff auf die vorgesehenen Clients begrenzen.
 
-Die Anmeldung kann über lokale Benutzerkonten oder optional über LDAP/Active Directory erfolgen. Bei LDAP werden Server, Suchbasis und Gruppenzuordnung zu den LogSanitizer-Rollen konfiguriert. SMTP kann optional für Benachrichtigungen über ausstehende Reviews und Rückgaben aktiviert werden. Ohne LDAP und SMTP bleibt die Anwendung auch im isolierten Netz nutzbar.
+Im Netzwerkprofil erfolgt die Anmeldung über LDAP/Active Directory; lokale Passwort-Fallback-Anmeldung ist deaktiviert. LDAP wird mit LDAPS oder StartTLS betrieben. Zu konfigurieren sind Host/Port, Bind-DN, User-Search-Base, Benutzerfilter, Gruppenattribut und explizite Gruppenzuordnung zu den Rollen admin, rule_owner, operator, reviewer und approver. Das Dienstkonto-Geheimnis wird ausschließlich über die lokale Prozessumgebung bereitgestellt. Optional kann eine CA-Datei angegeben werden.
+
+SMTP kann für Benachrichtigungen über ausstehende Reviews und Rückgaben aktiviert werden. Host, Port, Sicherheitsmodus (STARTTLS oder SSL), Absender und Empfängerlisten werden über die Deployment-Konfiguration festgelegt. Zugangsdaten werden ausschließlich über lokale Umgebungsvariablen bereitgestellt und niemals in die JSON-Datei oder das portable Paket geschrieben. SMTP-Ausfälle dürfen die Verarbeitung nicht blockieren.
+
+Vor dem Start im Netzwerkprofil müssen echte LDAP-/SMTP-Endpunkte und Zertifikate aus der Zielumgebung eingetragen werden. Der Netzwerkzugriff bleibt auf das definierte Air-Gap-Netz begrenzt.
 
 TLS kann entsprechend der konkreten Netzwerkinfrastruktur eingesetzt werden. Es ist kein Produktziel, für einen vollständig isolierten, kontrollierten Air-Gap-Betrieb eine komplexe Zertifikats- und Geheimnisverwaltung zwingend vorauszusetzen. Die Netzfreigabe und die konkrete Transportabsicherung müssen zur jeweiligen Umgebung passen.
 
@@ -46,4 +50,4 @@ Ist ein Reviewer/Freigeber zugewiesen, bleibt die bewusste Prüfung und Freigabe
 
 ## Portable Builds
 
-Die PyInstaller-Spezifikation erstellt ein portables Paket. Windows- und Linux-Pakete werden jeweils auf dem entsprechenden Betriebssystem gebaut. Die CI führt Frontend-Tests, Backend-Tests, Paket-Builds und Smoke-Tests aus. Ein erfolgreicher Smoke-Test ersetzt keinen Integrationstest mit einer konkreten LDAP-/SMTP-Umgebung.
+Die PyInstaller-Spezifikation erstellt ein portables Paket mit lokalem Frontend, Offline-Hilfe, Dokumentation und Beispielkonfiguration. Windows- und Linux-Pakete werden jeweils auf dem entsprechenden Betriebssystem gebaut. Die CI führt Frontend-Tests, Backend-Tests, Paket-Builds und Standalone-Smoke-Tests aus. Ein erfolgreicher Standalone-Smoke-Test beweist nicht die LDAP-/SMTP-Erreichbarkeit. Vor Freigabe sind mindestens erfolgreiche LDAP-Anmeldungen für die relevanten Rollen, ein abgewiesener Benutzer ohne passende Gruppe, Zertifikatsprüfung sowie SMTP-Zustellung für Review und Rückgabe im echten Air-Gap-Netz zu protokollieren.

@@ -20,7 +20,7 @@
 - [x] Manuelle Format-Auswahl pro Datei speichern und wieder entfernen.
 - [x] Explizite vollständige Formatvalidierung für Text, JSON, JSON Lines, CSV und XML über Backend-Endpunkt und UI; unbekannte Formate werden nicht als gültig bestätigt. Die Validierung prüft Syntax, nicht die Erkennung sensibler Daten.
 - [x] Versionierte JSON-Regelkonfiguration v1 mit Schema-, Regex-, Profilreferenz- und Konfliktprüfung; lokale atomare Speicherung über API. Die Regeln werden auf unterstützte Text- und JSONL-Dateien angewendet.
-- [x] Erste zeilenweise Streaming-Ausführung für UTF-8-Text und JSON Lines mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung; maximale Eingabezeile 1 MiB. Vollständige JSON-Dokumente und weitere Formate bleiben offen.
+- [x] Streaming-Ausführung für UTF-8-Text, JSON Lines und vollständige JSON-Dokumente mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung. Text/JSONL-Zeilen und einzelne JSON-Strings sind auf 1 MiB begrenzt; JSON-Schlüssel und -Werte werden regelbasiert verarbeitet. XML/CSV bleiben Validierungs-, keine Bereinigungsformate.
 - [x] Neue Mapping-Speicherung auf einfache lokale SQLite-Struktur zurückgeführt; produktive Nutzung beginnt mit einer frischen Datenbank. Keine Migration von Entwicklungs-/Testbeständen.
 - [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
 - [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
@@ -44,9 +44,15 @@
 - [x] Portable Windows-/Linux-CI-Paketierung: PyInstaller-One-Folder-Build und Standalone-Health-Smoke-Test auf `windows-latest` und `ubuntu-latest` erfolgreich (GitHub Actions Lauf 40936541846, 2026-10-29). Dies bestätigt den CI-Build, ersetzt aber noch keine Installationstests auf den tatsächlich unterstützten Zielversionen.
 - [ ] Offline-Handbuch und portable Pakete auf den tatsächlichen Zielversionen von Windows/Linux prüfen; Netzwerkprofil zusätzlich separat paketiert und gegen die Zielumgebung testen.
 - [x] Streaming-Speicherregression: 64-MiB-Testdatei mit begrenztem Python-Speicherverbrauch in CI; zusätzlicher optionaler 5-GiB-End-to-End-Test über `LOGSANITIZER_RUN_5GB_TEST=1`.
-- [ ] 5-GiB-Test auf dedizierter Zielhardware ausführen und Laufzeit, RAM/CPU sowie UI-Reaktionsfähigkeit dokumentieren; Bedienbarkeit und typische Arbeitsabläufe testen.
+- [x] Reproduzierbares synthetisches Performance-Benchmark-Skript mit Laufzeit, CPU, Durchsatz, Python-Tracemalloc und Prozess-RSS ergänzt; kleiner Benchmark wird in CI ausgeführt.
+- [ ] 5-GiB-Test auf dedizierter Zielhardware ausführen und Laufzeit, RAM/CPU sowie UI-Reaktionsfähigkeit dokumentieren; Bedienbarkeit und typische Arbeitsabläufe testen. Siehe PERFORMANCE.md.
 
-## Aktueller Validierungsstand (2026-10-29)
+## Aktueller Validierungsstand (2026-10-30)
+
+- [x] Vollständige JSON-Dokumente sind jetzt als Bereinigungsformat freigegeben und werden mit einem Streaming-Parser verarbeitet; Ausgabe wird erneut strukturell und auf Resttreffer geprüft.
+- [x] Offline-Hilfe wurde um konkrete Arbeitsabläufe, JSON-Verhalten, große Dateien und Deployment erweitert; F1 öffnet die Hilfe.
+- [x] Portable-Paket-CI startet weiterhin Standalone-Smoke-Tests unter Windows und Linux. Netzwerkprofil-/LDAP-/SMTP-Zielintegration bleibt ein manueller Abnahmeschritt, da keine echten Air-Gap-Verzeichnis- oder Mailserver verfügbar sind.
+- [x] Benchmark-Skript und Dokumentation für die 5-GiB-Messung ergänzt; Zielhardwaremessung bleibt offen.
 
 - [x] CI-Lauf 40960974895 (Commit f8f57ab): Backend Linux, Frontend, portable Builds/Smoke-Tests Linux und Windows erfolgreich.
 - [x] Backend-Windows-Job erfolgreich; dieser Job führt aktuell nur den gezielten Mapping-Test aus, nicht die vollständige Backend-Suite.

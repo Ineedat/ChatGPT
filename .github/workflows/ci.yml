@@ -29,6 +29,7 @@ jobs:
       - if: runner.os == 'Windows'
         run: pytest tests/test_mapping_encryption.py
       - run: ruff check src tests
+      - run: python ../packaging/benchmark_sanitizer.py --size-gib 0.01 --work-dir ../.benchmark-ci
 
   frontend:
     runs-on: ubuntu-latest

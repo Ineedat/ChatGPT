@@ -1,0 +1,3 @@
+# Performance acceptance
+
+Use the synthetic benchmark script at `packaging/benchmark_sanitizer.py` with `--size-gib 5`. Run it on each supported target OS and record runtime, CPU time, throughput, Python allocation peak and process RSS. Repeat three times on an idle machine. Verify the source remains unchanged and the output validates. Test UI responsiveness, progress and cancellation during the run. See this repository's benchmark script for exact invocation.
