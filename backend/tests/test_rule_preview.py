@@ -12,7 +12,7 @@ def sample_config() -> RuleConfig:
         "rules": [
             {
                 "id": "ip", "name": "IP-Adresse", "category": "IP",
-                "match_type": "regex", "pattern": r"192\\.0\\.2\\.\\d+",
+                "match_type": "regex", "pattern": r"192\.0\.2\.\d+",
                 "replacement": "[IP]", "replacement_mode": "indexed",
                 "mapping_prefix": "IP", "priority": 10, "enabled": True,
             },
@@ -23,7 +23,7 @@ def sample_config() -> RuleConfig:
             },
             {
                 "id": "email", "name": "E-Mail", "category": "E-Mail",
-                "match_type": "regex", "pattern": r"[a-z]+@example\\.test",
+                "match_type": "regex", "pattern": r"[a-z]+@example\.test",
                 "replacement": "[EMAIL]", "priority": 30, "enabled": False,
             },
         ],
