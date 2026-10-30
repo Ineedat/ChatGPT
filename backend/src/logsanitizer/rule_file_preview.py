@@ -34,7 +34,7 @@ def preview_file_window(
             stream.seek(byte_offset - 1)
             previous_byte = stream.read(1)
             stream.seek(byte_offset)
-            if previous_byte != b"\\n":
+            if previous_byte != b"\n":
                 stream.readline(1024 * 1024 + 1)
         start_offset = stream.tell()
         raw = stream.read(MAX_PREVIEW_BYTES)
