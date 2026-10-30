@@ -120,6 +120,6 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Offline-API-Endpunkt für Kategorien und Vorlagen ergänzt; Bibliothek verändert die gespeicherte Regelkonfiguration nicht.
 - [x] GUI-Reiter mit Kategorieauswahl, Musterbeschreibung, synthetischen Beispielen und fachlichen Warnhinweisen ergänzt.
 - [x] Regelkopien bleiben einzeln editierbar; Präfixe, Prioritäten und Feldmuster sind vorbereitet.
-- [x] Backend-Validierung und Regressionstests für Kategorien, Vorlagen, Regex-Schema und IPv4-Beispiel ergänzt.
+- [x] Backend-Validierung und Regressionstests für Kategorien, Vorlagen, alle synthetischen Musterbeispiele und den read-only Bibliotheks-API-Endpunkt ergänzt.
 - [x] Offline-Hilfe und docs/RULE_LIBRARY.md ergänzt.
 - [ ] CI nach dieser Änderung vollständig abwarten und eventuelle Fehler beheben.
