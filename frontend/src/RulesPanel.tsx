@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SanitizationRule = {
@@ -41,6 +41,7 @@ export function RulesPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [draftDirty, setDraftDirty] = useState(false);
 
   useEffect(() => {
     void request("/api/rules/config").then(async response => {
@@ -52,22 +53,17 @@ export function RulesPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  const selectedProfile = useMemo(() => config.profiles.find(profile => profile.id === profileDraft.id), [config.profiles, profileDraft.id]);
-  function selectRule(rule: SanitizationRule) { setSelectedId(rule.id); setDraft({ ...rule }); setMessage(""); }
+  function selectRule(rule: SanitizationRule) { setSelectedId(rule.id); setDraft({ ...rule }); setDraftDirty(false); setMessage(""); }
   function updateDraft<K extends keyof SanitizationRule>(key: K, value: SanitizationRule[K]) {
-    setDraft(current => ({ ...current, [key]: value })); setDirty(true); setMessage(""); setError("");
+    setDraft(current => ({ ...current, [key]: value })); setDraftDirty(true); setMessage(""); setError("");
   }
-  function newRule() { setSelectedId(""); setDraft(emptyRule()); setMessage(""); }
+  function newRule() { setSelectedId(""); setDraft(emptyRule()); setDraftDirty(false); setMessage(""); }
   function saveDraft() {
     if (!draft.name.trim() || !draft.pattern.trim() || !draft.replacement.trim()) { setError("Name, Suchmuster und Ersetzung sind Pflichtfelder."); return; }
     const id = selectedId || makeId(draft.name, config.rules.map(rule => rule.id));
     const next = { ...draft, id, profile_id: draft.profile_id || null, mapping_prefix: draft.replacement_mode === "indexed" ? (draft.mapping_prefix || "VALUE") : null };
     setConfig(current => ({ ...current, rules: selectedId ? current.rules.map(rule => rule.id === selectedId ? next : rule) : [...current.rules, next] }));
-    setSelectedId(id); setDraft(next); setDirty(true); setMessage("Änderung vorgemerkt. Mit „Konfiguration speichern“ dauerhaft übernehmen.");
-  }
-  function toggleRule(rule: SanitizationRule) {
-    setConfig(current => ({ ...current, rules: current.rules.map(item => item.id === rule.id ? { ...item, enabled: !item.enabled } : item) }));
-    setDirty(true);
+    setSelectedId(id); setDraft(next); setDraftDirty(false); setDirty(true); setMessage("Änderung vorgemerkt. Mit „Konfiguration speichern“ dauerhaft übernehmen.");
   }
   function duplicateRule(rule: SanitizationRule) {
     const copy = { ...rule, id: makeId(rule.id + "-kopie", config.rules.map(item => item.id)), name: rule.name + " (Kopie)" };
@@ -109,7 +105,7 @@ export function RulesPanel() {
 
   if (loading) return <section className="rules-page"><p role="status">Regelkonfiguration wird geladen …</p></section>;
   return <section className="rules-page">
-    <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div>
+    <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div>
     <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => setSection("rules")}>Regeln ({config.rules.length})</button><button className={section === "profiles" ? "active" : ""} onClick={() => setSection("profiles")}>Quellprofile ({config.profiles.length})</button></nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
