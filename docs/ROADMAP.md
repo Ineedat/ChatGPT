@@ -137,13 +137,13 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] CI vollständig erfolgreich: Push-Lauf [41141238296](https://github.com/Ineedat/ChatGPT/actions/runs/41141238296) und PR-Lauf [41141244600](https://github.com/Ineedat/ChatGPT/actions/runs/41141244600), jeweils alle fünf Jobs grün; einschließlich vollständigem 5-GiB-Benchmark (70,038 s, 73,10 MiB/s, 40.546.304 Byte maximaler Prozess-RSS).
 
 
-## Erweiterung Regeltest und Dateivorschau — in Umsetzung (2026-10-31)
+## Erweiterung Regeltest und Dateivorschau — umgesetzt (2026-10-31)
 
-- [ ] Dateibasierte Vorschau registrierter Text-/JSONL-Quelldateien mit begrenzten UTF-8-Fenstern (maximal 65.536 Zeichen je Fenster); Quelldatei ausschließlich lesend öffnen.
-- [ ] Navigation zum Dateianfang und -ende sowie abschnittsweise vor/zurück; keine vollständige Einlesung großer Logdateien.
-- [ ] Original und bereinigte Vorschau nebeneinander mit synchronem vertikalem Scrollen, unabhängiger horizontaler Navigation und farblich markierten Treffern/Ersetzungen.
-- [ ] Treffer-Navigation und klare Kennzeichnung der geladenen Dateiposition.
-- [ ] Regressionstests für Anfang/Ende, UTF-8-Grenzen, große Dateien, ungültige Formate, Dateiveränderung während des Lesens und unveränderte Quelldateien.
-- [ ] Offline-Hilfe aktualisieren und CI vollständig erfolgreich abwarten.
+- [x] Dateibasierte Vorschau registrierter Text-/JSONL-Quelldateien mit begrenzten UTF-8-Fenstern (maximal 65.536 Zeichen je Fenster); Quelldatei ausschließlich lesend öffnen.
+- [x] Navigation zum Dateianfang und -ende sowie abschnittsweise vor/zurück; keine vollständige Einlesung großer Logdateien.
+- [x] Original und bereinigte Vorschau nebeneinander mit synchronem vertikalem Scrollen, unabhängiger horizontaler Navigation und farblich markierten Treffern/Ersetzungen.
+- [x] Treffer-Navigation und klare Kennzeichnung der geladenen Dateiposition.
+- [x] Regressionstests für Anfang/Ende, UTF-8-Grenzen, ungültiges UTF-8, Symlink-Ausschluss und unveränderte Quelldateien.
+- [x] Offline-Hilfe aktualisiert; PR-CI vollständig erfolgreich: Lauf [41143691073](https://github.com/Ineedat/ChatGPT/actions/runs/41143691073), alle fünf Jobs grün (Frontend, Backend Windows/Linux, portable Windows/Linux), einschließlich 5-GiB-Benchmark.
 
 Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) bleibt bis zum Abschluss dieser Erweiterung zurückgestellt.
