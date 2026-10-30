@@ -40,3 +40,11 @@ def test_ipv4_template_matches_documentation_address_only() -> None:
     pattern = regex.compile(template["pattern"], regex.IGNORECASE)
     assert pattern.search("client=192.0.2.17")
     assert not pattern.search("client=999.0.2.17")
+
+
+def test_every_starter_template_matches_its_synthetic_example() -> None:
+    import regex
+
+    for template in list_rule_templates():
+        pattern = regex.compile(template["pattern"], regex.IGNORECASE)
+        assert pattern.search(template["example_before"]), template["id"]
