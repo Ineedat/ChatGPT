@@ -101,7 +101,9 @@ def test_rule_preview_api_is_non_persistent_and_returns_safe_summary(tmp_path, m
         assert not (tmp_path / "rules" / "rules-v1.json").exists()
 
 
-def test_rule_preview_requires_rule_management_role() -> None:
+def test_rule_preview_requires_rule_management_role(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     with TestClient(app) as client:
         create_user("preview-operator", "preview-test-password", ["operator"])
         login = client.post("/api/auth/login", json={
