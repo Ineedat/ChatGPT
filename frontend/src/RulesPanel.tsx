@@ -125,7 +125,7 @@ export function RulesPanel() {
   }
 
   function stageImport() {
-    if (!importPreview || importPreview.conflicts.length || !confirmDiscardDraft()) return;
+    if (!importPreview || importPreview.conflicts.length || (dirty && !window.confirm("Ungespeicherte Änderungen durch den Import ersetzen?")) || !confirmDiscardDraft()) return;
     setConfig(importPreview.config);
     setSelectedId(importPreview.config.rules[0]?.id || "");
     setDraft(importPreview.config.rules[0] ? { ...importPreview.config.rules[0] } : emptyRule());
