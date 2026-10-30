@@ -65,8 +65,8 @@ def preview_file_window(
             read_to_eof = stream.tell() >= size
             if was_truncated:
                 decoded = decoded[:MAX_PREVIEW_CHARS]
-            if (not read_to_eof or was_truncated) and decoded and not decoded.endswith(("\\n", "\\r")):
-                last_newline = max(decoded.rfind("\\n"), decoded.rfind("\\r"))
+            if (not read_to_eof or was_truncated) and decoded and not decoded.endswith(("\n", "\r")):
+                last_newline = max(decoded.rfind("\n"), decoded.rfind("\r"))
                 if last_newline < 0:
                     raise RulePreviewError("Eine einzelne Logzeile überschreitet die maximale Vorschaufenstergröße.")
                 decoded = decoded[: last_newline + 1]
