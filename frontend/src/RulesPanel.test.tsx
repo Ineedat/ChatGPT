@@ -62,7 +62,8 @@ describe("rule editor", () => {
     render(<RulesPanel />);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
-    const file = new File([JSON.stringify(config)], "rules.json", { type: "application/json" });
+    const file = new File(["{}"], "rules.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => JSON.stringify(config) });
     fireEvent.change(fileInput, { target: { files: [file] } });
     expect(await screen.findByText(/Importvorschau: rules.json/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rules/config/validate", expect.objectContaining({ method: "POST" }));
