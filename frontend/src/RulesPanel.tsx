@@ -39,6 +39,7 @@ export function RulesPanel() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
@@ -49,15 +50,16 @@ export function RulesPanel() {
       const data = await response.json() as RuleConfig;
       setConfig(data);
       if (data.rules[0]) { setSelectedId(data.rules[0].id); setDraft(data.rules[0]); }
-    }).catch(cause => setError(cause instanceof Error ? cause.message : "Ladefehler."))
+    }).catch(cause => { setLoadFailed(true); setError(cause instanceof Error ? cause.message : "Ladefehler."); })
       .finally(() => setLoading(false));
   }, []);
 
-  function selectRule(rule: SanitizationRule) { setSelectedId(rule.id); setDraft({ ...rule }); setDraftDirty(false); setMessage(""); }
+  function confirmDiscardDraft() { return !draftDirty || window.confirm("Nicht übernommene Regeländerungen verwerfen?"); }
+  function selectRule(rule: SanitizationRule) { if (!confirmDiscardDraft()) return; setSelectedId(rule.id); setDraft({ ...rule }); setDraftDirty(false); setMessage(""); }
   function updateDraft<K extends keyof SanitizationRule>(key: K, value: SanitizationRule[K]) {
     setDraft(current => ({ ...current, [key]: value })); setDraftDirty(true); setMessage(""); setError("");
   }
-  function newRule() { setSelectedId(""); setDraft(emptyRule()); setDraftDirty(false); setMessage(""); }
+  function newRule() { if (!confirmDiscardDraft()) return; setSelectedId(""); setDraft(emptyRule()); setDraftDirty(false); setMessage(""); }
   function saveDraft() {
     if (!draft.name.trim() || !draft.pattern.trim() || !draft.replacement.trim()) { setError("Name, Suchmuster und Ersetzung sind Pflichtfelder."); return; }
     const id = selectedId || makeId(draft.name, config.rules.map(rule => rule.id));
@@ -104,9 +106,10 @@ export function RulesPanel() {
   }
 
   if (loading) return <section className="rules-page"><p role="status">Regelkonfiguration wird geladen …</p></section>;
+  if (loadFailed) return <section className="rules-page"><h2>Bereinigungsregeln</h2><p className="error-message" role="alert">{error || "Regelkonfiguration konnte nicht geladen werden."} Die bestehende Konfiguration bleibt unverändert; Speichern ist deaktiviert.</p></section>;
   return <section className="rules-page">
     <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Änderungen werden erst nach dem Speichern aktiv.</p></div><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div>
-    <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => setSection("rules")}>Regeln ({config.rules.length})</button><button className={section === "profiles" ? "active" : ""} onClick={() => setSection("profiles")}>Quellprofile ({config.profiles.length})</button></nav>
+    <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button></nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
     {conflicts.length > 0 && <div className="rules-conflicts" role="alert"><strong>Konflikte gefunden</strong><ul>{conflicts.map(item => <li key={item.rule_id}>{item.rule_id} ↔ {item.conflicts_with}: {item.reason}</li>)}</ul></div>}
