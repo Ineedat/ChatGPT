@@ -199,7 +199,7 @@ export function RuleTestPanel({ config, draft, selectedId, draftDirty }: Props) 
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: 0 })} disabled={fileLoading || !fileId}>Anfang</button>
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ fromEnd: true })} disabled={fileLoading || !fileId}>Ende</button>
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: filePreview?.next_offset ?? 0 })} disabled={fileLoading || !filePreview?.has_next}>Weiter</button>
-          <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: Math.max(0, (filePreview?.source_offset ?? 0) - 262144) })} disabled={fileLoading || !filePreview?.has_previous}>Zurück</button>
+          <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: Math.max(0, (filePreview?.source_offset ?? 0) - 65536) })} disabled={fileLoading || !filePreview?.has_previous}>Zurück</button>
           <button className="secondary-button" type="button" onClick={() => void loadFileWindow({ byteOffset: 0 })} disabled={fileLoading || !fileId}>Neu laden</button>
           <button className="secondary-button" type="button" onClick={() => jumpToMatch(-1)} disabled={!filePreview?.rule_results.some(item => item.matches.length)}>Vorheriger Treffer</button>
           <button className="secondary-button" type="button" onClick={() => jumpToMatch(1)} disabled={!filePreview?.rule_results.some(item => item.matches.length)}>Nächster Treffer</button>
