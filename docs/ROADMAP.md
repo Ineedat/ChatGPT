@@ -79,6 +79,7 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Integrierte Musterprüfung/Vorschau: einzelne Regeln (auch deaktivierte Entwürfe) und aktive Regelsets mit Profilfilter testen; Treffer/Ersetzungen, Prioritätsreihenfolge, Folgetreffer und überlappende Fundstellen anzeigen. Vorschau läuft ausschließlich im Speicher und verändert weder Quelldateien noch dauerhafte Projekt-Mappings.
 - [x] Offline-Regelbibliothek mit 20 kategorisierten, einzeln übernehmbaren und editierbaren Startvorlagen für IPv4/IPv6, FQDN/Hostnamen, Benutzer, E-Mail, ausgewählte personenbezogene Daten, Passwort-/Token-/API-Key-Felder, Windows-/Unix-Pfade und Infrastrukturwerte; Vorlagen werden zunächst deaktiviert eingefügt. Regex-Tests, API und GUI sind abgedeckt.
 - [x] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Dateigrößenbegrenzung, Schema-/Regex-/Profil-/Konfliktprüfung, Importvorschau und expliziter Übernahme in einen ungespeicherten Entwurf; dauerhafte Aktivierung erst nach separatem Speichern. Exporte enthalten keine Projekt-Mappings.
+- [x] Quellprofil pro registrierter Datei in der Projektoberfläche auswählen und an den Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln. Nach erfolgreichem Lauf direkter Wechsel zu Prüfung & Verlauf.
 - [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
 
 ### Priorität 2 — Abnahme und Freigabe
