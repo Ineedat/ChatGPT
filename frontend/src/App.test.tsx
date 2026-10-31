@@ -290,5 +290,6 @@ describe("compact registered file workspace", () => {
     expect(within(card as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("button", { name: "Format lokal prüfen" })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("button", { name: "Bereinigung starten" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "Projektprinzipien" })).not.toBeInTheDocument();
   });
 });
