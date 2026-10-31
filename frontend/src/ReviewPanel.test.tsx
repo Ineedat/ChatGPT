@@ -84,4 +84,40 @@ describe("review workflow UI", () => {
     expect(screen.queryByRole("heading", { name: /Warteschlange/ })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith("/api/reviews/queue", expect.anything());
   });
+
+  it("loads source profiles and reuses the selected profile for a returned run", async () => {
+    const returnedRun = { ...run, status: "returned" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [returnedRun] } as Response;
+      if (url === "/api/reviews/queue") return { ok: true, json: async () => [] } as Response;
+      if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+      if (url === "/api/rules/config") return { ok: true, json: async () => ({ profiles: [{ id: "nginx", name: "Nginx" }] }) } as Response;
+      if (url.endsWith("/sanitize-jobs") && init?.method === "POST") return { ok: true, json: async () => ({ id: "retry-job" }) } as Response;
+      return { ok: true, json: async () => [returnedRun] } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["operator"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+    const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für die Überarbeitung" });
+    expect(await screen.findByRole("option", { name: "Nginx" })).toBeInTheDocument();
+    fireEvent.change(profileSelect, { target: { value: "nginx" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /Neuer absoluter Ausgabepfad/ }), {
+      target: { value: "/tmp/clean-app-reworked.log" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Erneut bereinigen" }));
+    expect(await screen.findByText(/Überarbeitete Bereinigung wurde gestartet/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/files/file-1/sanitize-jobs",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          output_path: "/tmp/clean-app-reworked.log",
+          retry_of_run_id: "run-1",
+          profile_id: "nginx"
+        })
+      })
+    );
+  });
+
 });
