@@ -59,7 +59,7 @@ describe("review workflow UI", () => {
       if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
-      if (url.includes("/search?")) return { ok: true, json: async () => ({ query: "token\\\\s*=.*", match_type: "regex", match_count: 1, truncated: false, results: [{ line_number: 2, snippet: "token=REDACTED" }] }) } as Response;
+      if (url.includes("/search?")) return { ok: true, json: async () => ({ query: "token\\s*=.*", match_type: "regex", match_count: 1, truncated: false, results: [{ line_number: 2, snippet: "token=REDACTED" }] }) } as Response;
       if (url === "/api/reviews/saved-searches" && init?.method === "POST") return { ok: true, json: async () => ({ id: "saved-1" }) } as Response;
       return { ok: true, json: async () => [] } as Response;
     });
@@ -67,18 +67,18 @@ describe("review workflow UI", () => {
     render(<ReviewPanel roles={["reviewer"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Prüfen" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Suchart" }), { target: { value: "regex" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Suchbegriff" }), { target: { value: "token\\\\s*=.*" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Suchbegriff" }), { target: { value: "token\\s*=.*" } });
     fireEvent.click(screen.getByRole("button", { name: "Ausgabe durchsuchen" }));
     expect(await screen.findByText("token=REDACTED")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/reviews/runs/run-1/search?q=token%5C%5Cs%3D.*&match_type=regex",
+      "/api/reviews/runs/run-1/search?q=token%5Cs%3D.*&match_type=regex",
       expect.anything()
     );
     fireEvent.change(screen.getByRole("textbox", { name: /Name für eigenes Suchmuster/ }), { target: { value: "Token regex" } });
     fireEvent.click(screen.getByRole("button", { name: "Suchmuster speichern" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/reviews/saved-searches", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ name: "Token regex", query: "token\\\\s*=.*", match_type: "regex" })
+      body: JSON.stringify({ name: "Token regex", query: "token\\s*=.*", match_type: "regex" })
     }));
   });
 
