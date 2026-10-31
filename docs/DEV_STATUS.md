@@ -4,7 +4,7 @@ Stand: 2026-10-31
 Repository: `Ineedat/ChatGPT`
 Arbeitsbranch: `feature/project-management-sqlite`
 Pull Request: [#2](https://github.com/Ineedat/ChatGPT/pull/2) — offen, nicht gemergt
-Letzter Code-Commit: `90f02701e94dc7bf2776a880bc9b451ae31abcca`
+Letzter Code-/Dokumentations-Commit vor aktueller Fortsetzung: `d307cc450d4a26d35b1fd701dc79d064ee76ecbb`
 Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
 
 ## Projektleitplanken
@@ -33,6 +33,14 @@ Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
    - Die Auswahl wird als `profile_id` an den Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln.
    - Nach erfolgreichem Lauf führt eine Schaltfläche direkt zu „Prüfung & Verlauf“.
    - Offline-Hilfe erklärt die Profilwahl; Hinweistext nennt UTF-8-Text, JSON Lines und vollständige JSON-Dokumente korrekt.
+
+## Fortsetzung nach erfolgreichem CI-Lauf
+
+- CI-Lauf `41227523826` für Commit `c0482d0` ist vollständig erfolgreich: Frontend-Tests/Build, Backend Linux, Backend Windows (gezielter Mapping-Test), portable Linux und portable Windows.
+- Der Linux-Backend-Job hat auch den vollständigen synthetischen 5-GiB-Benchmark erfolgreich ausgeführt. Der Windows-Backend-Job überspringt den 5-GiB-Lauf weiterhin; der dedizierte Zielhardwaretest bleibt offen.
+- In der Review-Oberfläche wurde eine Lücke behoben: Bei zurückgegebenen Läufen kann der Operator nun das Quellprofil erneut auswählen. Die Auswahl wird als `profile_id` an den neuen Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln.
+- Offline-Hilfe und Roadmap wurden um den Review-/Überarbeitungsablauf ergänzt.
+- Neue Frontend-Tests prüfen die Quellprofilwahl bei Überarbeitungen. Diese Änderungen sind noch nicht CI-verifiziert; den aktuellen Head und den neuesten Workflow prüfen.
 
 ## CI-/PR-Status
 
