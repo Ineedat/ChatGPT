@@ -63,6 +63,7 @@ describe("rule editor", () => {
     Object.assign(MockURL, { createObjectURL: createUrl, revokeObjectURL: revokeUrl });
     vi.stubGlobal("URL", MockURL);
     render(<RulesPanel />);
+    await screen.findByRole("button", { name: "JSON importieren" });
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
     const file = new File(["{}"], "rules.json", { type: "application/json" });
