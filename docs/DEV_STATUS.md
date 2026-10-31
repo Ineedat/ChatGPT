@@ -111,3 +111,12 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Der bestehende tag-basierte Release-Workflow bleibt unverändert.
 - Die neue Workflow-Aufteilung muss nach dem Commit noch durch die normale CI und einen manuell gestarteten Meilensteinlauf bestätigt werden.
 - Anleitung: [docs/CI.md](CI.md).
+
+
+## Projektworkflow-Navigation (2026-10-31)
+
+- Das geöffnete Projekt bietet jetzt einen direkten Einstieg in die Regel- und Quellprofilverwaltung.
+- Regelverwaltung und Prüfung/Verlauf bieten eine Rücknavigation in den Projektarbeitsbereich.
+- Der direkte Sprung aus einem erfolgreich abgeschlossenen Bereinigungslauf in die Prüfung bleibt erhalten.
+- Frontend-Regressionstests decken die Hin- und Rücknavigation ab.
+- CI-Verifizierung des aktuellen Branch-Heads steht noch aus.
