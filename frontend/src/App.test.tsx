@@ -285,7 +285,7 @@ describe("compact registered file workspace", () => {
     const card = fileName.closest("li");
     expect(card).toHaveClass("registered-file-card");
     expect(within(card as HTMLElement).getByText("4.096 Byte")).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText("Erkannt:")).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText(/Erkannt: JSON/)).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("combobox", { name: "Format für events.json" })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("button", { name: "Format lokal prüfen" })).toBeInTheDocument();
