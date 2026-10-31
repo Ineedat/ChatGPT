@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 from test_client import TestClient
 
+from logsanitizer.auth import create_user
 from logsanitizer.main import app
 from logsanitizer.rule_config import (
     RuleConfig,
@@ -113,6 +114,34 @@ def test_rule_api_validates_and_persists_only_conflict_free_config(tmp_path, mon
         invalid = client.put("/api/rules/config", json={"schema_version": 2, "rules": []})
         assert invalid.status_code == 422
 
+
+def test_rule_management_permissions_allow_admin_and_rule_owner_but_deny_operator(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    create_user("rule-admin", "admin-password-123", ["admin"])
+    create_user("rule-owner", "owner-password-123", ["rule_owner"])
+    create_user("rule-processor", "processor-password-123", ["operator"])
+
+    for username, password, expected in (
+        ("rule-admin", "admin-password-123", 200),
+        ("rule-owner", "owner-password-123", 200),
+        ("rule-processor", "processor-password-123", 403),
+    ):
+        with TestClient(app) as client:
+            login = client.post("/api/auth/login", json={"username": username, "password": password})
+            assert login.status_code == 200
+            csrf = client.cookies.get("logsanitizer_csrf")
+            response = client.put(
+                "/api/rules/config",
+                json=sample_config(),
+                headers={"X-CSRF-Token": csrf},
+            )
+            assert response.status_code == expected
+
+    with TestClient(app) as client:
+        client.post("/api/auth/login", json={"username": "rule-processor", "password": "processor-password-123"})
+        assert client.post("/api/rules/config/validate", json=sample_config()).status_code == 403
+        assert client.post("/api/rules/preview", json={"config": sample_config(), "sample_text": "client=10.0.0.1"}).status_code == 403
 
 def test_rule_library_api_returns_templates_without_changing_active_config(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
