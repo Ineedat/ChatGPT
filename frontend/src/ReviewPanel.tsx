@@ -315,7 +315,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
         <p>{matchCount} Treffer angezeigt (maximal 20). {searchTruncated ? "Weitere Treffer können vorhanden sein." : ""}</p>
         <ol>{matches.map(match => <li key={match.line_number}><span>Zeile {match.line_number}</span><code>{match.snippet}</code></li>)}</ol>
       </div>}
-      {matchCount === 0 && message.startsWith("Suche nach") && <p className="muted-message">Keine Treffer für diese Suche.</p>}
+      {matchCount === 0 && message.includes("Suche nach") && <p className="muted-message">Keine Treffer für diese Suche.</p>}
       <form className="review-save-search" onSubmit={event => void saveSearch(event)}>
         <label>Name für eigenes Suchmuster<input value={searchName} maxLength={80} onChange={event => setSearchName(event.target.value)} placeholder="z. B. Prüfmuster für Tokens" /></label>
         <button className="secondary-button" type="submit" disabled={busy || !searchName.trim() || !query.trim()}>Suchmuster speichern</button>
@@ -358,7 +358,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
       <div className="section-heading"><h3>Laufhistorie ({filteredHistory.length} von {history.length})</h3></div>
       <div className="review-history-filters">
         <label>Suche in Läufen<input value={historyQuery} onChange={event => setHistoryQuery(event.target.value)} placeholder="Datei, Ausgabe, Lauf-ID oder Kommentar" /></label>
-        <label>Status<select value={historyStatus} onChange={event => setHistoryStatus(event.target.value)}><option value="all">Alle Status</option><option value="pending_review">Prüfung ausstehend</option><option value="returned">Zur Überarbeitung zurückgegeben</option><option value="approved">Freigegeben</option><option value="approved_with_exception">Mit Ausnahme freigegeben</option><option value="failed">Fehlgeschlagen</option><option value="stopped">Gestoppt</option><option value="cancelled">Abgebrochen</option></select></label>
+        <label>Status<select value={historyStatus} onChange={event => setHistoryStatus(event.target.value)}><option value="all">Alle Status</option><option value="queued">Wartet</option><option value="running">In Bearbeitung</option><option value="pending_review">Prüfung ausstehend</option><option value="returned">Zur Überarbeitung zurückgegeben</option><option value="approved">Freigegeben</option><option value="approved_with_exception">Mit Ausnahme freigegeben</option><option value="failed">Fehlgeschlagen</option><option value="stopped">Gestoppt</option><option value="cancelled">Abgebrochen</option></select></label>
       </div>
       {history.length === 0 ? <p className="muted-message">Noch keine Bereinigungsläufe gespeichert.</p> : filteredHistory.length === 0 ? <p className="muted-message">Keine Läufe passen zu den gewählten Filtern.</p> : <ul className="review-run-list">{filteredHistory.map(run =>
         <li key={run.id} className={selectedId === run.id ? "selected" : ""}>
