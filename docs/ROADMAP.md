@@ -208,3 +208,6 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Bereinigungsaktion als primäre Schaltfläche kenntlich machen; weiterhin deaktivieren, wenn Format oder Ausgabepfad ungeeignet ist.
 - [x] Frontend-Regressionstest für Gruppierung und direkte Erreichbarkeit der Aktionen ergänzen.
 - [ ] Visuelle Abnahme bei typischen Desktop-Auflösungen und schmalen Fenstern; insbesondere lange Dateinamen und viele registrierte Dateien prüfen.
+
+
+- [x] Allgemeine Projektprinzipien-Karten ausblenden, sobald ein Projekt geöffnet ist; sie bleiben in der Projektübersicht ohne Auswahl sichtbar und beanspruchen nicht länger Platz im aktiven Arbeitsbereich.
