@@ -56,7 +56,7 @@ async function reviewFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export function ReviewPanel({ roles }: { roles: string[] }) {
+export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBackToProject?: () => void }) {
   const canReview = roles.some(role => ["admin", "reviewer", "approver"].includes(role));
   const [queue, setQueue] = useState<ReviewRun[]>([]);
   const [history, setHistory] = useState<ReviewRun[]>([]);
@@ -283,7 +283,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   return <section className="review-page" aria-label="Prüfung und Laufhistorie">
     <div className="review-heading">
       <div><p className="eyebrow">NACHVOLLZIEHBAR · LOKAL</p><h2>Prüfung &amp; Verlauf</h2></div>
-      <button className="secondary-button" type="button" onClick={() => void refresh()} disabled={busy}>Aktualisieren</button>
+      <div className="review-actions"><button className="secondary-button" type="button" onClick={() => void refresh()} disabled={busy}>Aktualisieren</button>{onBackToProject && <button className="secondary-button" type="button" onClick={onBackToProject}>Zurück zum Projekt</button>}</div>
     </div>
     <p className="review-intro">Nur erfolgreich validierte Bereinigungen können in die Prüfer-Warteschlange gelangen. Die Suche durchsucht ausschließlich die bereinigte Ausgabe, niemals die Originaldatei.</p>
     {error && <p className="error-message" role="alert">{error}</p>}
