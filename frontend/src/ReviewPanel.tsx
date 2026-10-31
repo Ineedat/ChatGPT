@@ -20,7 +20,7 @@ type ReviewRun = {
   last_comment: string;
   exception_reason: string;
 };
-type SavedSearch = { id: string; name: string; query: string; created_at: string };
+type SavedSearch = { id: string; name: string; query: string; match_type: "literal" | "regex"; created_at: string };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SearchResult = { line_number: number; snippet: string };
 type AuditEvent = {
@@ -65,6 +65,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
   const [savedSearchId, setSavedSearchId] = useState("");
+  const [searchMode, setSearchMode] = useState<"literal" | "regex">("literal");
   const [matches, setMatches] = useState<SearchResult[]>([]);
   const [matchCount, setMatchCount] = useState(0);
   const [searchTruncated, setSearchTruncated] = useState(false);
@@ -133,16 +134,16 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
     try {
       const params = new URLSearchParams();
       if (savedSearchId) params.set("saved_search_id", savedSearchId);
-      else params.set("q", query);
+      else { params.set("q", query); params.set("match_type", searchMode); }
       const response = await reviewFetch(
         `/api/reviews/runs/${encodeURIComponent(selectedRun.id)}/search?${params.toString()}`
       );
-      const body = await response.json() as { detail?: string; results?: SearchResult[]; match_count?: number; truncated?: boolean; query?: string };
+      const body = await response.json() as { detail?: string; results?: SearchResult[]; match_count?: number; truncated?: boolean; query?: string; match_type?: string };
       if (!response.ok) throw new Error(body.detail || "Suche fehlgeschlagen.");
       setMatches(body.results || []);
       setMatchCount(body.match_count || 0);
       setSearchTruncated(Boolean(body.truncated));
-      setMessage(`Suche nach „${body.query}“: ${body.match_count} Treffer angezeigt.`);
+      setMessage(`${body.match_type === "regex" ? "Regex-Suche" : "Wörtliche Suche"} nach „${body.query}“: ${body.match_count} Treffer angezeigt.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Suche fehlgeschlagen.");
       setMatches([]);
@@ -161,7 +162,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
       const response = await reviewFetch("/api/reviews/saved-searches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: searchName, query })
+        body: JSON.stringify({ name: searchName, query, match_type: searchMode })
       });
       const body = await response.json() as { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Suchmuster konnte nicht gespeichert werden.");
@@ -289,13 +290,14 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
     {canReview && selectedRun?.status === "pending_review" && <section className="review-section" aria-label="Ausgabe prüfen">
       <h3>Stichprobensuche: {selectedRun.display_name}</h3>
       <form className="review-search-form" onSubmit={event => void searchOutput(event)}>
-        <label>Suchbegriff (wörtlich, ohne Regex)
+        <label>Suchbegriff
           <input value={query} maxLength={200} onChange={event => { setQuery(event.target.value); setSavedSearchId(""); }} placeholder="z. B. REDACTED oder ein erwarteter Platzhalter" />
         </label>
+        <label>Suchart<select value={searchMode} onChange={event => { setSearchMode(event.target.value as "literal" | "regex"); setSavedSearchId(""); }}><option value="literal">Wörtlich (sicher)</option><option value="regex">Regulärer Ausdruck (Regex)</option></select></label>
         <label>Eigenes gespeichertes Suchmuster
-          <select value={savedSearchId} onChange={event => { setSavedSearchId(event.target.value); const saved = savedSearches.find(item => item.id === event.target.value); if (saved) setQuery(saved.query); }}>
+          <select value={savedSearchId} onChange={event => { setSavedSearchId(event.target.value); const saved = savedSearches.find(item => item.id === event.target.value); if (saved) { setQuery(saved.query); setSearchMode(saved.match_type); } }}>
             <option value="">Ad-hoc-Suche verwenden</option>
-            {savedSearches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            {savedSearches.map(item => <option key={item.id} value={item.id}>{item.name} ({item.match_type === "regex" ? "Regex" : "wörtlich"})</option>)}
           </select>
         </label>
         <button className="secondary-button" type="submit" disabled={busy || (!query.trim() && !savedSearchId)}>Ausgabe durchsuchen</button>
@@ -309,7 +311,7 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
         <label>Name für eigenes Suchmuster<input value={searchName} maxLength={80} onChange={event => setSearchName(event.target.value)} placeholder="z. B. Prüfmuster für Tokens" /></label>
         <button className="secondary-button" type="submit" disabled={busy || !searchName.trim() || !query.trim()}>Suchmuster speichern</button>
       </form>
-      {savedSearches.length > 0 && <div className="saved-search-list"><strong>Eigene Suchmuster</strong><ul>{savedSearches.map(item => <li key={item.id}><span>{item.name}: {item.query}</span><button type="button" className="text-button" onClick={() => void deleteSearch(item.id)}>Löschen</button></li>)}</ul></div>}
+      {savedSearches.length > 0 && <div className="saved-search-list"><strong>Eigene Suchmuster</strong><ul>{savedSearches.map(item => <li key={item.id}><span>{item.name} ({item.match_type === "regex" ? "Regex" : "wörtlich"}): {item.query}</span><button type="button" className="text-button" onClick={() => void deleteSearch(item.id)}>Löschen</button></li>)}</ul></div>}
       <label className="review-comment-label">Kommentar (optional für Entscheidung)
         <textarea value={comment} maxLength={1000} onChange={event => setComment(event.target.value)} rows={3} placeholder="Prüfhinweise, Rückgabegrund oder Freigabekommentar" />
       </label>
