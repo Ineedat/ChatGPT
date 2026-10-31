@@ -15,6 +15,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
 
 type Tab = "overview" | "rules" | "review" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
+type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type FormatValidationResult = { file_id: string; format: string; valid: boolean; bytes_checked: number; error?: string };
 type SanitizationJob = {
@@ -67,6 +68,10 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [validationResults, setValidationResults] = useState<Record<string, FormatValidationResult>>({});
   const [outputPaths, setOutputPaths] = useState<Record<string, string>>({});
   const [sanitizationJobs, setSanitizationJobs] = useState<Record<string, SanitizationJob>>({});
+  const [sourceProfiles, setSourceProfiles] = useState<RuleProfile[]>([]);
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [profileSelections, setProfileSelections] = useState<Record<string, string>>({});
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -194,6 +199,22 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     }
   }
 
+  async function loadSourceProfiles() {
+    if (profilesLoaded || loadingProfiles) return;
+    setLoadingProfiles(true);
+    try {
+      const response = await apiFetch("/api/rules/config");
+      if (!response.ok) throw new Error("Quellprofile konnten nicht geladen werden.");
+      const body = await response.json() as { profiles?: RuleProfile[] };
+      setSourceProfiles(body.profiles || []);
+      setProfilesLoaded(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Quellprofile konnten nicht geladen werden.");
+    } finally {
+      setLoadingProfiles(false);
+    }
+  }
+
   async function startSanitization(file: ImportedFile) {
     if (!selectedProject || !outputPaths[file.id]?.trim() || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return;
     setError("");
@@ -201,7 +222,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ output_path: outputPaths[file.id] })
+        body: JSON.stringify({ output_path: outputPaths[file.id], profile_id: profileSelections[file.id] || null })
       });
       const body = await response.json() as { id?: string; detail?: string };
       if (!response.ok || !body.id) throw new Error(body.detail || "Bereinigung konnte nicht gestartet werden.");
@@ -322,7 +343,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <span className="status-pill"><span className="status-dot" /> Lokaler Arbeitsbereich</span>
         <h2>Logs sicher vorbereiten.</h2>
         <p>Die lokale Arbeitsumgebung für die regelbasierte Bereinigung von Anwendungslogs.</p>
-        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt derzeit UTF-8-Text und JSON Lines. Die Verarbeitung unterstützt derzeit UTF-8-Text und JSON Lines. Vor dem produktiven Einsatz müssen die Erkennungsregeln fachlich geprüft und die Verarbeitung großer Dateien auf Zielhardware gemessen werden. Prüf- und Freigabeworkflow sind bereits integriert.</span></div>
+        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt UTF-8-Text, JSON Lines und vollständige JSON-Dokumente. Vor dem produktiven Einsatz müssen die Erkennungsregeln fachlich geprüft und die Verarbeitung großer Dateien auf Zielhardware gemessen werden. Prüf- und Freigabeworkflow sind bereits integriert.</span></div>
       </section>
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">ARBEITSBEREICH</p><h3>Projekt vorbereiten</h3></div>
@@ -371,6 +392,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
         <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
         {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li key={file.id}><div><strong>{file.display_name}</strong><span>{file.state === "registered" ? "Registriert" : file.state}</span><span>Endungs-Hinweis: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span><span>Erkannt: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</span><label>Format manuell festlegen <select aria-label={`Format für ${file.display_name}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)}><option value="">Automatisch (Erkennung verwenden)</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option></select></label><button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)}>Format lokal prüfen</button><button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Validiert …" : "Vollständig validieren"}</button>{validationResults[file.id] && <p className={validationResults[file.id].valid ? "success-message" : "error-message"} role="status">{validationResults[file.id].valid ? "Format gültig" : "Format ungültig"} · {validationResults[file.id].format} · {validationResults[file.id].bytes_checked.toLocaleString("de-DE")} Byte geprüft{validationResults[file.id].error ? ` · ${validationResults[file.id].error}` : ""}</p>}
+          <label>Quellprofil für Bereinigung <select aria-label={`Quellprofil für ${file.display_name}`} value={profileSelections[file.id] || ""} onFocus={() => void loadSourceProfiles()} onChange={event => setProfileSelections(current => ({ ...current, [file.id]: event.target.value }))}><option value="">Globale Regeln (kein Quellprofil)</option>{sourceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>
+          {loadingProfiles && <p className="field-help">Quellprofile werden geladen …</p>}
           <label>Ausgabepfad für Bereinigung <input aria-label={`Ausgabepfad für ${file.display_name}`} value={outputPaths[file.id] || ""} onChange={event => setOutputPaths(current => ({ ...current, [file.id]: event.target.value }))} placeholder="Absoluter neuer Zielpfad" maxLength={4096} /></label>
           <button className="secondary-button" type="button" onClick={() => void startSanitization(file)} disabled={!outputPaths[file.id]?.trim() || !["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") || Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))}>Bereinigung starten</button>
           {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}</div>}</div><span>{file.size_bytes.toLocaleString("de-DE")} Byte</span></li>)}</ul>}
