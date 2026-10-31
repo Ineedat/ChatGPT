@@ -150,4 +150,24 @@ describe("review workflow UI", () => {
     );
   });
 
+  it("filters run history and navigates between a returned run and its rework", async () => {
+    const child = { ...run, id: "run-2", display_name: "app-reworked.log", output_name: "clean-app-reworked.log", status: "returned", parent_run_id: "run-1" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [child, run] } as Response;
+      if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["operator"]} />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Details" }))[1]);
+    expect(await screen.findByRole("button", { name: /app-reworked.log.*returned/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Suche in Läufen" }), { target: { value: "app-reworked" } });
+    expect(screen.getByText("Laufhistorie (1 von 2)")).toBeInTheDocument();
+    expect(screen.getByText("app-reworked.log")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "returned" } });
+    expect(screen.getByText("Laufhistorie (1 von 2)")).toBeInTheDocument();
+  });
+
 });
