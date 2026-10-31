@@ -21,6 +21,30 @@ describe("LogSanitizer app shell", () => {
     await screen.findByText(/Noch keine Projekte vorhanden/);
   });
 
+  it("navigates from the project workspace to rule management and back", async () => {
+    vi.mocked(fetch).mockImplementation(async input => {
+      if (String(input) === "/api/rules/config") {
+        return { ok: true, json: async () => ({ schema_version: 1, profiles: [], rules: [] }) } as Response;
+      }
+      return { ok: true, json: async () => [] } as Response;
+    });
+    render(<App />);
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+    fireEvent.click(screen.getByRole("button", { name: "Regeln" }));
+    expect(await screen.findByRole("heading", { name: "Bereinigungsregeln" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zum Projekt" }));
+    expect(await screen.findByRole("heading", { name: "Projekt vorbereiten" })).toBeInTheDocument();
+  });
+
+  it("navigates from review history back to the project workspace", async () => {
+    render(<App />);
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung & Verlauf" }));
+    expect(await screen.findByRole("heading", { name: "Prüfung & Verlauf" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zum Projekt" }));
+    expect(await screen.findByRole("heading", { name: "Projekt vorbereiten" })).toBeInTheDocument();
+  });
+
   it("offers local help topics", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Hilfe" }));
