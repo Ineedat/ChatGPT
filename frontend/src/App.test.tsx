@@ -269,3 +269,26 @@ describe("source profile selection for project sanitization", () => {
     );
   });
 });
+
+
+describe("compact registered file workspace", () => {
+  it("keeps file metadata, format controls and sanitization actions grouped in a compact card", async () => {
+    const project = { id: "project-compact", name: "Kompakt", description: "", status: "active", created_at: "2026-10-31T10:00:00+00:00", updated_at: "2026-10-31T10:00:00+00:00" };
+    const file = { id: "file-compact", project_id: project.id, display_name: "events.json", size_bytes: 4096, modified_at: "2026-10-31T10:00:00+00:00", imported_at: "2026-10-31T10:00:00+00:00", state: "registered", format_hint: "json", detected_format: "json", format_override: null };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    const fileName = await screen.findByText("events.json");
+    const card = fileName.closest("li");
+    expect(card).toHaveClass("registered-file-card");
+    expect(within(card as HTMLElement).getByText("4.096 Byte")).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText("Erkannt:")).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("combobox", { name: "Format für events.json" })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("button", { name: "Format lokal prüfen" })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("button", { name: "Bereinigung starten" })).toBeDisabled();
+  });
+});
