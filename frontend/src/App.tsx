@@ -397,8 +397,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
             <span className="file-size">{file.size_bytes.toLocaleString("de-DE")} Byte</span>
           </div>
           <div className="file-format-summary">
-            <span>Endung: <strong>{({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</strong></span>
-            <span>Erkannt: <strong>{({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</strong></span>
+            <span>Endung: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span>
+            <span>Erkannt: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</span>
             {file.format_override && <span>Manuell: <strong>{file.format_override.toUpperCase()}</strong></span>}
           </div>
           <div className="file-card-controls">
