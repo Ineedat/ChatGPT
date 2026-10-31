@@ -105,7 +105,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         assert foreign_search.status_code == 404
 
         # Replacing the output after validation must block both further sampling and approval.
-        output.write_text("secret=alpha\\n", encoding="utf-8")
+        output.write_text("secret=alpha\n", encoding="utf-8")
         changed_search = client.get(
             f"/api/reviews/runs/{run['id']}/search", params={"q": "secret"}
         )
@@ -259,12 +259,12 @@ def test_review_search_supports_bounded_regex_and_saved_regex_patterns(tmp_path,
 
     with TestClient(app) as client:
         response, _, _, _ = _sanitized_run(
-            client, tmp_path, contents=b"token=REDACTED\\nuser=REDACTED\\nother=value\\n"
+            client, tmp_path, contents=b"token=REDACTED\nuser=REDACTED\nother=value\n"
         )
         run_id = response.json()["review_run_id"]
         regex_result = client.get(
             f"/api/reviews/runs/{run_id}/search",
-            params={"q": r"token\\s*=\\s*REDACTED", "match_type": "regex"},
+            params={"q": r"token\s*=\s*REDACTED", "match_type": "regex"},
         )
         assert regex_result.status_code == 200
         assert regex_result.json()["match_type"] == "regex"
@@ -273,7 +273,7 @@ def test_review_search_supports_bounded_regex_and_saved_regex_patterns(tmp_path,
 
         saved = client.post("/api/reviews/saved-searches", json={
             "name": "Token assignments",
-            "query": r"token\\s*=\\s*REDACTED",
+            "query": r"token\s*=\s*REDACTED",
             "match_type": "regex",
         })
         assert saved.status_code == 201
