@@ -349,3 +349,81 @@ footer { margin-top: 14px; padding-top: 8px; border-color: #bdbdbd; }
   .hero { padding: 10px 0; }
   .panel, .review-section { padding: 9px; }
 }
+
+
+/* Dense, scan-friendly registered file cards */
+.registered-file-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  list-style: none;
+}
+.registered-file-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: #ffffff;
+}
+.file-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #d6d6d6;
+}
+.file-title { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; min-width: 0; }
+.file-title strong { overflow-wrap: anywhere; font-weight: 650; }
+.file-state {
+  display: inline-flex;
+  padding: 2px 6px;
+  border: 1px solid #a87920;
+  border-radius: 3px;
+  background: #fff4ce;
+  color: #4b3500 !important;
+}
+.file-state-ready {
+  border-color: #39834a;
+  background: #e8f4e8;
+  color: #174d25 !important;
+}
+.file-size { flex: 0 0 auto; color: #505050 !important; white-space: nowrap; }
+.file-format-summary { display: flex; flex-wrap: wrap; gap: 5px 14px; color: #505050 !important; }
+.file-format-summary strong { color: #1f1f1f !important; font-weight: 650; }
+.file-card-controls, .file-run-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 7px;
+}
+.file-card-controls label, .file-run-controls label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  color: #303030;
+  font-weight: 600;
+}
+.file-card-controls select, .file-run-controls select,
+.file-run-controls input { width: 100%; min-width: 0; }
+.file-format-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 5px; }
+.file-format-actions button { flex: 1 1 auto; }
+.file-sanitize-button { min-height: 27px; }
+.registered-file-card .success-message,
+.registered-file-card .error-message { margin: 0; padding: 6px 8px; }
+.registered-file-card .job-status { margin: 0; padding: 7px; gap: 5px; }
+@media (max-width: 760px) {
+  .registered-file-list { grid-template-columns: 1fr; }
+  .file-card-controls, .file-run-controls { grid-template-columns: 1fr; }
+  .file-card-heading { align-items: flex-start; }
+  .file-format-actions { align-items: stretch; }
+}
