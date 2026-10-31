@@ -120,3 +120,11 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Der direkte Sprung aus einem erfolgreich abgeschlossenen Bereinigungslauf in die Prüfung bleibt erhalten.
 - Frontend-Regressionstests decken die Hin- und Rücknavigation ab.
 - CI-Verifizierung des aktuellen Branch-Heads steht noch aus.
+
+
+## UI-Fortsetzung (2026-10-31)
+
+- Neuer kompakter UI-Grundstil auf Branch `feature/project-management-sqlite`: helle Windows-orientierte Farbpalette, Segoe UI, 10-px-Schrift, klare Rahmen und Fokusindikatoren.
+- Bedienelemente, Karten, Abstände und Arbeitsbereiche wurden verdichtet; Warn-, Fehler- und Erfolgsmeldungen behalten unterscheidbare kontrastreiche Zustände.
+- Visuelle Abnahme auf realen Windows-/Linux-Zielsystemen steht noch aus; nächster Implementierungsschritt ist die weitere Verdichtung des Projektarbeitsbereichs und der Dateiliste.
+- CI für diesen UI-Stand muss noch vollständig durchlaufen.
