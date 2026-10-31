@@ -198,3 +198,13 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Grundabstände, Eingabefelder, Schaltflächen und Karten kompakter gestaltet, um mehr Arbeitsinhalt auf einer Bildschirmseite unterzubringen.
 - [ ] Kontrast und Lesbarkeit bei realen Windows-/Linux-Bildschirmauflösungen visuell prüfen; besonders Regelvorschau, Review und Login.
 - [ ] Im nächsten UI-Schritt Projektarbeitsbereich und Dateiliste weiter verdichten, ohne Funktionen oder Statusinformationen zu verstecken.
+
+
+## Projektarbeitsbereich — kompakte Dateikarten (2026-10-31)
+
+- [x] Registrierte Dateien als kompakte Karten in responsivem Raster darstellen.
+- [x] Dateiname, Registrierungsstatus, Dateigröße sowie Endungs-Hinweis und erkannter Typ auf einen Blick zusammenfassen.
+- [x] Formatauswahl, lokale Erkennung, vollständige Validierung, Quellprofil, Ausgabepfad und Bereinigungsaktion gruppieren; keine Aktionen hinter zusätzlichen Menüs verstecken.
+- [x] Bereinigungsaktion als primäre Schaltfläche kenntlich machen; weiterhin deaktivieren, wenn Format oder Ausgabepfad ungeeignet ist.
+- [x] Frontend-Regressionstest für Gruppierung und direkte Erreichbarkeit der Aktionen ergänzen.
+- [ ] Visuelle Abnahme bei typischen Desktop-Auflösungen und schmalen Fenstern; insbesondere lange Dateinamen und viele registrierte Dateien prüfen.
