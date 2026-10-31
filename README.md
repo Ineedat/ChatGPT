@@ -1,33 +1,54 @@
 # LogSanitizer
 
-A portable, offline-first application for sanitizing application log files on Windows and Linux.
+Portable, offline-first application for sanitizing application logs on Windows and Linux.
 
-> **Project status:** Early development scaffold. This repository does not yet provide a production-ready sanitization workflow. Do not use it to release real or sensitive logs until the security and validation requirements are implemented and tested.
+> **Project status:** Active development. The current branch contains a development implementation; not all planned formats, large-file performance targets, or deployment scenarios have been fully verified.
+
+## Product direction — requirements v2.8
+
+LogSanitizer runs only on a standalone laptop or inside a defined, internet-disconnected Air-Gap network. It is not intended for public or untrusted networks. The product is deliberately not a high-security platform: prioritize **performance, low resource consumption, ease of use and maintainability** over elaborate local encryption, key custody, filesystem ACL engineering or mandatory output-path restrictions.
+
+The user and workflow model remains important: administrator, Rule Owner, Processor and Reviewer/Releaser roles; review queue; approval/return/stop; run history and audit trail.
 
 ## Goals
 
-- Process large log files (target: at least 5 GB) using streaming, without loading whole files into memory.
-- Leave source files unchanged.
-- Apply configurable, testable sanitization rules to text logs and structured JSON.
+- Stream large log files (target: at least 5 GB) without loading whole files into memory.
+- Keep source files unchanged.
+- Apply configurable rules to text logs and structured formats.
 - Keep placeholder mappings consistent across all files in a project.
 - Work fully offline, including documentation and UI assets.
-- Support review, validation, audit, and controlled release workflows.
+- Provide clear progress, cancellation, validation and review workflows.
+- Offer a simple portable Windows/Linux deployment for standalone and defined Air-Gap operation.
+
+## Deployment
+
+**Standalone:** local account, loopback binding, local data.
+
+**Air-Gap network:** explicitly configured interface and network profile; optional LDAP/Active Directory role mapping and SMTP review notifications. Network operation is limited to the defined isolated network. No cloud or internet dependency.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the example deployment configuration.
 
 ## Technology
 
 - Backend: Python 3.11+ and FastAPI
 - Frontend: React and TypeScript
-- Metadata: SQLite
+- Metadata and local mappings: SQLite
 - Configuration: versioned JSON
 - Tests: pytest and frontend test tooling
 
-## Current scope
+## Functional scope
 
-The initial milestone establishes the project structure, API health endpoint, frontend shell, and development instructions. The rule engine, streaming pipeline, persistent mapping store, authentication, review workflow, and packaging are planned work and must not be considered implemented until documented and tested.
+The development branch includes project and source-file registration, heuristic format detection, manual format selection, format validation, versioned rule configuration, shared rules and source profiles, streaming text/JSONL processing, project-scoped indexed placeholders, cancellable background jobs, persistent run history, local accounts, role checks and the review workflow.
 
-## Requirements
+The current implementation still contains some high-security mechanisms from the previous requirements baseline (including encrypted mapping storage and enforced output-workspace checks). These are transitional implementation details, not requirements under v2.8; they are scheduled for simplification. Do not assume that the implementation has already been simplified merely because the requirements changed.
 
-See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for the current requirements baseline (v2.7) and [docs/ROADMAP.md](docs/ROADMAP.md) for milestones.
+Not all formats are supported by the sanitization engine yet. Comprehensive sensitive-data detection and measured 5-GB performance are also outstanding. A validation scan only checks configured rules and format integrity; it does not prove that every sensitive value has been detected.
+
+## Requirements and roadmap
+
+- [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) — current baseline **v2.8**
+- [docs/ROADMAP.md](docs/ROADMAP.md) — implementation milestones
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture decisions
 
 ## Development
 
@@ -50,15 +71,15 @@ npm install
 npm run dev
 ```
 
-Keep the backend bound to `127.0.0.1` during development. Do not expose it to a network until authentication, authorization, secure configuration, and network-binding safeguards have been implemented and reviewed.
+Keep local development bound to 127.0.0.1. Only configure a network bind for the defined Air-Gap deployment.
 
-## Security principles
+## Operating principles
 
-- Never upload log contents, secrets, or mapping data to this repository.
-- Never commit real log files, credentials, tokens, local databases, generated outputs, or user data.
+- Never commit real log files, credentials, tokens, local databases, generated outputs or user data.
 - Source files are read-only inputs and must not be modified or deleted by the application.
-- A successful validation scan is not proof that every sensitive value has been detected.
-- Incomplete or failed runs must never be treated as releasable output.
+- Failed or incomplete runs must not be marked successful or approved.
+- User roles, reviewer decisions and audit history remain part of the product.
+- No runtime internet access, cloud service or external asset dependency.
 
 ## License
 

@@ -1,10 +1,89 @@
 """FastAPI application entry point.
 
-Development scaffold only: sanitization, authentication, and release controls
-are not implemented yet.
+Local project management and sanitization are development features. Release
+controls and production security hardening remain incomplete.
 """
-from fastapi import FastAPI
+import csv
+import io
+import json
+import os
+import sys
+import threading
+import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from logsanitizer.auth import AuthMiddleware, initialize_auth_database
+from logsanitizer.auth import router as auth_router
+from logsanitizer.database import (
+    FileAlreadyRegisteredError,
+    FileImportRequest,
+    FolderImportIssue,
+    FolderImportRequest,
+    FolderImportResult,
+    FormatOverrideRequest,
+    ImportedFile,
+    Project,
+    ProjectCreate,
+    connect_database,
+    create_project,
+    get_project,
+    initialize_database,
+    list_imported_files,
+    list_projects,
+    register_imported_file,
+    update_detected_format,
+    update_format_override,
+)
+from logsanitizer.deployment import load_settings
+from logsanitizer.format_validation import validate_file
+from logsanitizer.job_store import (
+    create_job,
+    get_job,
+    initialize_job_database,
+    pop_recovered_job_ids,
+    update_job,
+)
+from logsanitizer.notifications import notify_pending_review
+from logsanitizer.review_workflow import create_run as create_review_run
+from logsanitizer.review_workflow import fail_run as fail_review_run
+from logsanitizer.review_workflow import finish_run as finish_review_run
+from logsanitizer.review_workflow import initialize_review_database
+from logsanitizer.review_workflow import router as review_router
+from logsanitizer.review_workflow import set_run_running as set_review_run_running
+from logsanitizer.rule_config import (
+    RuleConfig,
+    find_rule_conflicts,
+    load_rule_config,
+    save_rule_config,
+)
+from logsanitizer.rule_file_preview import preview_file_window
+from logsanitizer.rule_library import list_rule_categories, list_rule_templates
+from logsanitizer.rule_preview import RulePreviewError, preview_rules
+from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    load_settings()
+    initialize_database()
+    initialize_auth_database()
+    initialize_review_database()
+    initialize_job_database()
+    for recovered_job_id in pop_recovered_job_ids():
+        fail_review_run(
+            recovered_job_id,
+            "failed",
+            "Der Backend-Prozess wurde vor Abschluss beendet; bitte den Lauf erneut starten.",
+        )
+    yield
+
 
 app = FastAPI(
     title="LogSanitizer API",
@@ -13,6 +92,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url=None,
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 
@@ -20,3 +100,747 @@ app = FastAPI(
 def health() -> JSONResponse:
     """Return minimal liveness status without exposing local data."""
     return JSONResponse(content={"status": "ok", "application": "LogSanitizer"})
+
+
+@app.get("/api/projects", response_model=list[Project], tags=["projects"])
+def projects_list() -> list[Project]:
+    """List project metadata without reading project files."""
+    return list_projects()
+
+
+@app.post(
+    "/api/projects",
+    response_model=Project,
+    status_code=status.HTTP_201_CREATED,
+    tags=["projects"],
+)
+def projects_create(payload: ProjectCreate) -> Project:
+    """Create a project metadata record; no files are imported or processed."""
+    return create_project(payload)
+
+
+@app.get("/api/projects/{project_id}", response_model=Project, tags=["projects"])
+def projects_get(project_id: str) -> Project:
+    """Return a project or a generic not-found response."""
+    project = get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+    return project
+
+
+@app.get(
+    "/api/projects/{project_id}/files",
+    response_model=list[ImportedFile],
+    tags=["files"],
+)
+def project_files_list(project_id: str) -> list[ImportedFile]:
+    """List registered source-file metadata for a project."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+    return list_imported_files(project_id)
+
+
+@app.post(
+    "/api/projects/{project_id}/files",
+    response_model=ImportedFile,
+    status_code=status.HTTP_201_CREATED,
+    tags=["files"],
+)
+def project_file_register(project_id: str, payload: FileImportRequest) -> ImportedFile:
+    """Register a source path only; this endpoint never reads log contents."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+
+    source = Path(payload.path).expanduser()
+    if not source.is_absolute():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Bitte einen absoluten lokalen Dateipfad angeben.",
+        )
+    if source.is_symlink():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Symbolische Links werden nicht als Quelldateien akzeptiert.",
+        )
+    try:
+        resolved = source.resolve(strict=True)
+        if not resolved.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Der Quellpfad muss auf eine reguläre Datei zeigen.",
+            )
+        return register_imported_file(project_id, resolved)
+    except FileAlreadyRegisteredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Diese Quelldatei ist bereits in diesem Projekt registriert.",
+        ) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quelldatei nicht gefunden.",
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Kein Zugriff auf die Quelldatei.",
+        ) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Quelldatei kann nicht registriert werden.",
+        ) from exc
+
+
+MAX_FORMAT_SAMPLE_BYTES = 64 * 1024
+
+def _is_json_line(line: str) -> bool:
+    try:
+        value = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(value, (dict, list))
+
+
+def detect_format_from_sample(path: Path) -> str:
+    """Classify a bounded local sample without returning source content."""
+    with path.open("rb") as source:
+        sample = source.read(MAX_FORMAT_SAMPLE_BYTES)
+    if not sample:
+        return "unknown"
+    try:
+        text = sample.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return "unknown"
+    stripped = text.lstrip()
+    if not stripped:
+        return "text"
+    if stripped.startswith(("<?xml", "<")):
+        return "xml"
+    if stripped.startswith(("{", "[")):
+        try:
+            _, end = json.JSONDecoder().raw_decode(stripped)
+            if not stripped[end:].strip():
+                return "json"
+        except json.JSONDecodeError:
+            pass
+        lines = [line for line in stripped.splitlines() if line.strip()]
+        sample_truncated = path.stat().st_size > len(sample)
+        if sample_truncated and lines and not stripped.endswith(("\n", "\r")):
+            lines = lines[:-1]
+        if lines and all(_is_json_line(line) for line in lines):
+            return "jsonl"
+        if sample_truncated and path.suffix.casefold() in {".jsonl", ".ndjson"}:
+            return "jsonl"
+        if sample_truncated:
+            # A document that extends beyond the bounded sample is classified as
+            # JSON when it is not a sequence of complete JSON Lines. Full syntax
+            # validation remains an explicit later step.
+            return "json"
+        return "unknown"
+    if chr(0) in text:
+        return "unknown"
+    try:
+        dialect = csv.Sniffer().sniff(stripped[:8192], delimiters=",;\t|")
+        rows = list(csv.reader(io.StringIO(stripped[:8192]), dialect))
+        if len(rows) >= 2 and len(rows[0]) > 1 and all(len(row) == len(rows[0]) for row in rows[:20]):
+            return "csv"
+    except csv.Error:
+        pass
+    return "text"
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/detect-format", tags=["files"])
+def project_file_detect_format(project_id: str, file_id: str) -> dict[str, str | int | None]:
+    """Inspect a bounded local sample and return only its classification."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path FROM imported_files WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    source = Path(row["source_path"])
+    try:
+        if source.is_symlink() or not source.is_file():
+            raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
+        detected = detect_format_from_sample(source)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Dateiformat konnte nicht geprüft werden.") from exc
+    updated = update_detected_format(project_id, file_id, detected)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    return {
+        "file_id": file_id,
+        "detected_format": updated.detected_format,
+        "format_override": updated.format_override,
+        "sample_limit_bytes": MAX_FORMAT_SAMPLE_BYTES,
+    }
+
+
+@app.put(
+    "/api/projects/{project_id}/files/{file_id}/format",
+    response_model=ImportedFile,
+    tags=["files"],
+)
+def project_file_set_format(
+    project_id: str, file_id: str, payload: FormatOverrideRequest
+) -> ImportedFile:
+    """Persist a manual format override, or clear it with null."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    updated = update_format_override(project_id, file_id, payload.format_override)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    return updated
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/validate-format", tags=["files"])
+def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str | int | bool]:
+    """Validate the entire source file locally using the effective selected format."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    source = Path(row["source_path"])
+    if source.is_symlink() or not source.is_file():
+        raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
+    selected_format = row["format_override"] or row["detected_format"]
+    try:
+        result = validate_file(source, selected_format)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Quelldatei konnte nicht geprüft werden.") from exc
+    return {"file_id": file_id, **result}
+
+
+@app.get("/api/rules/library", tags=["rules"])
+def rules_library_get() -> dict[str, object]:
+    """Return built-in starter templates without modifying the active configuration."""
+    return {"categories": list_rule_categories(), "templates": list_rule_templates()}
+
+
+class RulePreviewRequest(BaseModel):
+    config: RuleConfig
+    sample_text: str = Field(min_length=1, max_length=65_536)
+    profile_id: str | None = Field(default=None, max_length=64)
+    rule_id: str | None = Field(default=None, max_length=64)
+
+
+@app.post("/api/rules/preview", tags=["rules"])
+def rules_preview(payload: RulePreviewRequest) -> dict[str, object]:
+    """Simulate a rule or active rule set on supplied text without file or mapping writes."""
+    try:
+        return {
+            **preview_rules(payload.sample_text, payload.config, payload.profile_id, payload.rule_id),
+            "conflicts": find_rule_conflicts(payload.config),
+        }
+    except RulePreviewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class RuleFilePreviewRequest(BaseModel):
+    config: RuleConfig
+    byte_offset: int = Field(default=0, ge=0)
+    from_end: bool = False
+    profile_id: str | None = Field(default=None, max_length=64)
+    rule_id: str | None = Field(default=None, max_length=64)
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/preview", tags=["files"])
+def project_file_preview(project_id: str, file_id: str, payload: RuleFilePreviewRequest) -> dict[str, object]:
+    """Return a bounded, read-only source window and its in-memory sanitization preview."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    selected_format = row["format_override"] or row["detected_format"]
+    if selected_format not in {"text", "jsonl"}:
+        raise HTTPException(status_code=422, detail="Die Dateivorschau unterstützt derzeit Text- und JSON-Lines-Dateien.")
+    try:
+        return preview_file_window(
+            Path(row["source_path"]), payload.config,
+            byte_offset=payload.byte_offset, from_end=payload.from_end,
+            profile_id=payload.profile_id, rule_id=payload.rule_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf die Quelldatei.") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Quelldatei konnte nicht gelesen werden.") from exc
+    except RulePreviewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/rules/config", response_model=RuleConfig, tags=["rules"])
+def rules_config_get() -> RuleConfig:
+    """Return the local versioned rule configuration."""
+    try:
+        return load_rule_config()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/api/rules/config/validate", tags=["rules"])
+def rules_config_validate(payload: RuleConfig) -> dict[str, object]:
+    """Validate schema and report exact-priority conflicts without saving."""
+    conflicts = find_rule_conflicts(payload)
+    return {
+        "schema_version": payload.schema_version,
+        "valid": not conflicts,
+        "rule_count": len(payload.rules),
+        "profile_count": len(payload.profiles),
+        "conflicts": conflicts,
+    }
+
+
+@app.put("/api/rules/config", response_model=RuleConfig, tags=["rules"])
+def rules_config_put(payload: RuleConfig) -> RuleConfig:
+    """Persist only schema-valid, conflict-free rules using an atomic local write."""
+    conflicts = find_rule_conflicts(payload)
+    if conflicts:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "Regelkonflikte müssen vor dem Speichern behoben werden.", "conflicts": conflicts},
+        )
+    try:
+        save_rule_config(payload)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration konnte nicht gespeichert werden.") from exc
+    return payload
+
+
+class SanitizationRequest(BaseModel):
+    output_path: str = Field(min_length=1, max_length=4096)
+    profile_id: str | None = Field(default=None, max_length=64)
+    retry_of_run_id: str | None = Field(default=None, max_length=80)
+
+
+
+@app.post(
+    "/api/projects/{project_id}/files/{file_id}/sanitize-jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["sanitization"],
+)
+def project_file_sanitize_start(
+    project_id: str,
+    file_id: str,
+    payload: SanitizationRequest,
+    background_tasks: BackgroundTasks,
+    request: Request,
+) -> dict[str, object]:
+    """Start a cancellable local sanitization job and return immediately."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    source = Path(row["source_path"])
+    output = Path(payload.output_path).expanduser()
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    if not output.parent.is_dir():
+        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    if output.resolve(strict=False) == source.resolve(strict=False):
+        raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
+    if output.exists():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
+    selected_format = row["format_override"] or row["detected_format"]
+    if source.is_symlink() or not source.is_file():
+        raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
+    if selected_format not in {"text", "jsonl", "json"}:
+        raise HTTPException(status_code=422, detail="Unterstützt werden derzeit Text, JSON und JSON Lines.")
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    if output.is_symlink() or output.exists():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
+    if not output.parent.is_dir():
+        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    try:
+        config = load_rule_config()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
+    if find_rule_conflicts(config):
+        raise HTTPException(status_code=409, detail="Regelkonflikte müssen vor der Bereinigung behoben werden.")
+    if payload.profile_id is not None and payload.profile_id not in {p.id for p in config.profiles}:
+        raise HTTPException(status_code=422, detail="Das angegebene Quellprofil ist nicht definiert.")
+
+    job_id = uuid.uuid4().hex
+    user = request.state.user
+    try:
+        create_review_run(
+            job_id, project_id, file_id, row["display_name"], output,
+            int(user["id"]), str(user["username"]), payload.retry_of_run_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        create_job(job_id, project_id, file_id, source, output, source.stat().st_size)
+    except (OSError, RuntimeError) as exc:
+        fail_review_run(job_id, "failed", "Der Laufstatus konnte nicht dauerhaft gespeichert werden.")
+        raise HTTPException(status_code=500, detail="Laufstatus konnte nicht gespeichert werden.") from exc
+    with _SANITIZATION_LOCK:
+        _SANITIZATION_CANCEL[job_id] = threading.Event()
+    background_tasks.add_task(
+        _run_sanitization_job, job_id, project_id, file_id, source, output,
+        config, payload.profile_id, selected_format,
+    )
+    return {"id": job_id, "status": "queued", "status_url": f"/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}"}
+
+
+@app.get(
+    "/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}",
+    tags=["sanitization"],
+)
+def project_file_sanitize_status(project_id: str, file_id: str, job_id: str) -> dict[str, object]:
+    """Return progress and status without exposing source paths or log contents."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    job = get_job(job_id)
+    if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
+        raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+    return {key: value for key, value in job.items() if key not in {"project_id", "file_id"}}
+
+
+@app.post(
+    "/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}/cancel",
+    tags=["sanitization"],
+)
+def project_file_sanitize_cancel(project_id: str, file_id: str, job_id: str) -> dict[str, object]:
+    """Request cooperative cancellation; the worker removes its staging file."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    job = get_job(job_id)
+    if job is None or job["project_id"] != project_id or job["file_id"] != file_id:
+        raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+    if job["status"] in {"completed", "failed", "cancelled", "interrupted"}:
+        return {"id": job_id, "status": job["status"]}
+    with _SANITIZATION_LOCK:
+        event = _SANITIZATION_CANCEL.get(job_id)
+        if event is not None:
+            event.set()
+            update_job(job_id, status="cancelling", phase="cancelling")
+    return {"id": job_id, "status": "cancelling"}
+
+
+@app.post("/api/projects/{project_id}/files/{file_id}/sanitize", tags=["sanitization"])
+def project_file_sanitize(
+    project_id: str, file_id: str, payload: SanitizationRequest, request: Request
+) -> dict[str, int | str | bool]:
+    """Apply local rules to supported UTF-8 text, JSON and JSONL files."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
+            "WHERE project_id = ? AND id = ?",
+            (project_id, file_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+
+    source = Path(row["source_path"])
+    output = Path(payload.output_path).expanduser()
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    if not output.parent.is_dir():
+        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    if output.resolve(strict=False) == source.resolve(strict=False):
+        raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
+    if output.exists():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
+    selected_format = row["format_override"] or row["detected_format"]
+    if selected_format not in {"text", "jsonl", "json"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Vor der Bereinigung muss das Format als Text, JSON oder JSON Lines ausgewählt bzw. erkannt sein.",
+        )
+    if not output.is_absolute():
+        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
+    try:
+        config = load_rule_config()
+        if find_rule_conflicts(config):
+            raise HTTPException(status_code=409, detail="Regelkonflikte müssen vor der Bereinigung behoben werden.")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
+    user = request.state.user
+    run_id = uuid.uuid4().hex
+    try:
+        create_review_run(
+            run_id, project_id, file_id, row["display_name"], output,
+            int(user["id"]), str(user["username"]), payload.retry_of_run_id,
+        )
+        set_review_run_running(run_id)
+        result = sanitize_file(source, output, config, payload.profile_id, selected_format, project_id)
+        review_run = finish_review_run(run_id, result)
+        notify_pending_review(review_run)
+        return {
+            "file_id": file_id,
+            "output_name": output.name,
+            "review_run_id": run_id,
+            "review_status": review_run["status"],
+            **result,
+        }
+    except SanitizationError as exc:
+        fail_review_run(run_id, "failed", "Sanitisierung oder Pflichtvalidierung fehlgeschlagen.")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileExistsError as exc:
+        fail_review_run(run_id, "failed", "Die Zieldatei existiert bereits.")
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.") from exc
+    except PermissionError as exc:
+        fail_review_run(run_id, "failed", "Kein Zugriff auf Quell- oder Zieldatei.")
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf Quell- oder Zieldatei.") from exc
+    except RuntimeError as exc:
+        fail_review_run(run_id, "failed", "Datei konnte nicht sicher verarbeitet werden.")
+        raise HTTPException(status_code=500, detail="Regelkonfiguration kann nicht gelesen werden.") from exc
+    except OSError as exc:
+        fail_review_run(run_id, "failed", "Datei konnte nicht sicher verarbeitet werden.")
+        raise HTTPException(status_code=422, detail="Datei konnte nicht bereinigt werden.") from exc
+
+
+
+_SANITIZATION_CANCEL: dict[str, threading.Event] = {}
+_SANITIZATION_LAST_PERSISTED: dict[str, tuple[int, str]] = {}
+_SANITIZATION_LOCK = threading.Lock()
+
+
+def _set_job(job_id: str, **changes: object) -> None:
+    # Durable state is authoritative; the in-memory dictionary only holds cancellation events.
+    update_job(job_id, **changes)
+
+
+def _job_progress(job_id: str, progress: dict[str, int | str]) -> None:
+    # Persist at phase boundaries and in 1 MiB increments, not on every log line.
+    processed = int(progress.get("processed_bytes", 0))
+    phase = str(progress.get("phase", ""))
+    with _SANITIZATION_LOCK:
+        previous_bytes, previous_phase = _SANITIZATION_LAST_PERSISTED.get(job_id, (0, ""))
+        if phase == previous_phase and processed - previous_bytes < 1024 * 1024:
+            return
+        _SANITIZATION_LAST_PERSISTED[job_id] = (processed, phase)
+    _set_job(job_id, **progress)
+
+
+def _run_sanitization_job(
+    job_id: str,
+    project_id: str,
+    file_id: str,
+    source: Path,
+    output: Path,
+    config: RuleConfig,
+    profile_id: str | None,
+    selected_format: str,
+) -> None:
+    with _SANITIZATION_LOCK:
+        cancel_event = _SANITIZATION_CANCEL.get(job_id)
+    if cancel_event is None:
+        fail_review_run(job_id, "failed", "Abbruchsteuerung des Laufs ist nicht verfügbar.")
+        _set_job(job_id, status="failed", phase="failed", error="Abbruchsteuerung des Laufs ist nicht verfügbar.")
+        return
+    _set_job(job_id, status="running", phase="sanitizing")
+    set_review_run_running(job_id)
+    try:
+        result = sanitize_file(
+            source,
+            output,
+            config,
+            profile_id,
+            selected_format,
+            project_id,
+            progress_callback=lambda progress: _job_progress(job_id, progress),
+            cancel_check=cancel_event.is_set,
+        )
+        review_run = finish_review_run(job_id, result)
+        _set_job(job_id, status="completed", phase="completed", result={
+            "file_id": file_id, "output_name": output.name, "review_status": review_run["status"], **result,
+        })
+        notify_pending_review(review_run)
+    except SanitizationCancelled:
+        fail_review_run(job_id, "cancelled", "Bereinigung wurde abgebrochen.")
+        _set_job(job_id, status="cancelled", phase="cancelled", error="Bereinigung wurde abgebrochen.")
+    except FileExistsError:
+        fail_review_run(job_id, "failed", "Die Zieldatei existiert bereits.")
+        _set_job(job_id, status="failed", phase="failed", error="Die Zieldatei existiert bereits.")
+    except SanitizationError as exc:
+        fail_review_run(job_id, "failed", "Sanitisierung oder Pflichtvalidierung fehlgeschlagen.")
+        _set_job(job_id, status="failed", phase="failed", error=str(exc))
+    except PermissionError:
+        fail_review_run(job_id, "failed", "Kein Zugriff auf Quell- oder Zieldatei.")
+        _set_job(job_id, status="failed", phase="failed", error="Kein Zugriff auf Quell- oder Zieldatei.")
+    except (OSError, RuntimeError):
+        fail_review_run(job_id, "failed", "Datei konnte nicht sicher verarbeitet werden.")
+        _set_job(job_id, status="failed", phase="failed", error="Datei konnte nicht bereinigt werden.")
+    finally:
+        with _SANITIZATION_LOCK:
+            _SANITIZATION_CANCEL.pop(job_id, None)
+            _SANITIZATION_LAST_PERSISTED.pop(job_id, None)
+
+
+MAX_FOLDER_FILES = 5000
+
+
+@app.post(
+    "/api/projects/{project_id}/files/import-folder",
+    response_model=FolderImportResult,
+    status_code=status.HTTP_200_OK,
+    tags=["files"],
+)
+def project_folder_import(
+    project_id: str, payload: FolderImportRequest
+) -> FolderImportResult:
+    """Register files under a folder; never reads their contents."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+
+    folder = Path(payload.path).expanduser()
+    if not folder.is_absolute():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Bitte einen absoluten lokalen Ordnerpfad angeben.",
+        )
+    if folder.is_symlink():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Symbolische Links werden nicht als Importordner akzeptiert.",
+        )
+    try:
+        folder = folder.resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Importordner nicht gefunden."
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Kein Zugriff auf den Importordner."
+        ) from exc
+    if not folder.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Der Importpfad muss auf einen Ordner zeigen.",
+        )
+
+    registered: list[ImportedFile] = []
+    issues: list[FolderImportIssue] = []
+    candidates = 0
+
+    def walk_error(error: OSError) -> None:
+        issues.append(
+            FolderImportIssue(
+                file_name=Path(error.filename or folder.name).name,
+                reason="Ordner kann nicht gelesen werden.",
+            )
+        )
+
+    for current_root, dir_names, file_names in os.walk(
+        folder, topdown=True, followlinks=False, onerror=walk_error
+    ):
+        current = Path(current_root)
+        blocked_dirs = []
+        for name in dir_names:
+            path = current / name
+            if path.is_symlink():
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Symbolischer Ordnerlink übersprungen.")
+                )
+            else:
+                blocked_dirs.append(name)
+        dir_names[:] = blocked_dirs if payload.recursive else []
+
+        for name in sorted(file_names, key=str.casefold):
+            candidate = current / name
+            candidates += 1
+            if candidates > MAX_FOLDER_FILES:
+                issues.append(
+                    FolderImportIssue(
+                        file_name=name,
+                        reason=f"Limit von {MAX_FOLDER_FILES} Dateien erreicht; Rest übersprungen.",
+                    )
+                )
+                dir_names[:] = []
+                break
+            if candidate.is_symlink():
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Symbolischer Datei-Link übersprungen.")
+                )
+                continue
+            try:
+                resolved = candidate.resolve(strict=True)
+                if not resolved.is_file():
+                    issues.append(
+                        FolderImportIssue(file_name=name, reason="Keine reguläre Datei.")
+                    )
+                    continue
+                registered.append(register_imported_file(project_id, resolved))
+            except FileAlreadyRegisteredError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Bereits in diesem Projekt registriert.")
+                )
+            except PermissionError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Kein Zugriff auf die Datei.")
+                )
+            except FileNotFoundError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Datei wurde während des Imports entfernt.")
+                )
+            except OSError:
+                issues.append(
+                    FolderImportIssue(file_name=name, reason="Datei kann nicht registriert werden.")
+                )
+
+        if candidates > MAX_FOLDER_FILES:
+            break
+
+    return FolderImportResult(
+        registered_count=len(registered),
+        skipped_count=len(issues),
+        registered_files=registered,
+        issues=issues,
+        limit_reached=candidates > MAX_FOLDER_FILES,
+    )
+
+
+# All API routes except liveness and login require a valid local session.
+app.include_router(review_router)
+app.include_router(auth_router)
+app.add_middleware(AuthMiddleware)
+
+
+def _frontend_dist() -> Path | None:
+    candidates = (
+        Path(__file__).resolve().parents[3] / "frontend" / "dist",
+        Path(__file__).resolve().parents[1] / "frontend" / "dist",
+        Path(sys.executable).resolve().parent / "frontend" / "dist",
+    )
+    return next(
+        (candidate for candidate in candidates if (candidate / "index.html").is_file()),
+        None,
+    )
+
+
+_frontend_path = _frontend_dist()
+if _frontend_path is not None:
+    app.mount("/", StaticFiles(directory=str(_frontend_path), html=True), name="frontend")
