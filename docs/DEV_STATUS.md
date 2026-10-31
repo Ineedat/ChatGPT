@@ -128,3 +128,13 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Bedienelemente, Karten, Abstände und Arbeitsbereiche wurden verdichtet; Warn-, Fehler- und Erfolgsmeldungen behalten unterscheidbare kontrastreiche Zustände.
 - Visuelle Abnahme auf realen Windows-/Linux-Zielsystemen steht noch aus; nächster Implementierungsschritt ist die weitere Verdichtung des Projektarbeitsbereichs und der Dateiliste.
 - CI für diesen UI-Stand muss noch vollständig durchlaufen.
+
+
+## Projektarbeitsbereich — kompakte Dateikarten (2026-10-31)
+
+- Registrierte Dateien werden in einem responsiven Kartenraster dargestellt.
+- Status, Endungs-Hinweis, erkannter Typ und Dateigröße sind direkt sichtbar.
+- Formatauswahl, Erkennung, vollständige Validierung, Quellprofil, Ausgabepfad und Bereinigung sind pro Datei kompakt gruppiert und ohne zusätzliche Menüs erreichbar.
+- Die Bereinigungsaktion ist primär hervorgehoben und bleibt bei nicht unterstütztem Format oder fehlendem Ausgabepfad deaktiviert.
+- Ein Frontend-Regressionstest prüft die Gruppierung und Sichtbarkeit der Aktionen.
+- GitHub-CI für diesen Commit steht noch aus; die visuelle Prüfung auf Zielsystemen ist offen.
