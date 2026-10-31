@@ -71,7 +71,7 @@ describe("review workflow UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ausgabe durchsuchen" }));
     expect(await screen.findByText("token=REDACTED")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/reviews/runs/run-1/search?q=token%5Cs%3D.*&match_type=regex",
+      "/api/reviews/runs/run-1/search?q=token%5Cs*%3D.*&match_type=regex",
       expect.anything()
     );
     fireEvent.change(screen.getByRole("textbox", { name: /Name für eigenes Suchmuster/ }), { target: { value: "Token regex" } });
