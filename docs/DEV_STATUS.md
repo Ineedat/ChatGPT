@@ -4,8 +4,8 @@ Stand: 2026-10-31
 Repository: `Ineedat/ChatGPT`
 Arbeitsbranch: `feature/project-management-sqlite`
 Pull Request: [#2](https://github.com/Ineedat/ChatGPT/pull/2) — offen, nicht gemergt
-Letzter Code-Commit: `7c5f745aca34c4588f1a8bb1ac19569088fa7a4e`
-Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
+Letzter Code-Commit: `c98bf5f878849cb1ec978edbd9e98578c6940e66`
+Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Regex-Such-Erweiterung aktualisiert
 
 ## Projektleitplanken
 
@@ -40,7 +40,15 @@ Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
 - Der Linux-Backend-Job hat auch den vollständigen synthetischen 5-GiB-Benchmark erfolgreich ausgeführt. Der Windows-Backend-Job überspringt den 5-GiB-Lauf weiterhin; der dedizierte Zielhardwaretest bleibt offen.
 - In der Review-Oberfläche wurde eine Lücke behoben: Bei zurückgegebenen Läufen kann der Operator nun das Quellprofil erneut auswählen. Die Auswahl wird als `profile_id` an den neuen Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln.
 - Offline-Hilfe und Roadmap wurden um den Review-/Überarbeitungsablauf ergänzt.
-- Neue Frontend-Tests prüfen die Quellprofilwahl bei Überarbeitungen. Der erste CI-Lauf auf Zwischenstand `fd4bcbb` schlug wegen eines versehentlich als Text eingefügten `\\n`-Zeichens im neuen Hilfeeintrag fehl (Frontend-Test und portabler Linux-Build). Das Literal wurde in `7c5f745` korrigiert; CI für diesen aktuellen Stand ist erneut gestartet und muss noch vollständig geprüft werden.
+- Neue Frontend-Tests prüfen die Quellprofilwahl bei Überarbeitungen. Der erste CI-Lauf auf Zwischenstand `fd4bcbb` schlug wegen eines versehentlich als Text eingefügten `\\n`-Zeichens im neuen Hilfeeintrag fehl (Frontend-Test und portabler Linux-Build). Das Literal wurde in `7c5f745` korrigiert; CI für Commit `6c64e3c` (PR-Lauf `41228104875`) ist vollständig erfolgreich: alle fünf Jobs grün, einschließlich Linux-5-GiB-Benchmark und portabler Windows-/Linux-Smoke-Tests.
+
+## Aktuelle Fortsetzung: Prüfer-Stichprobensuche
+
+- Wörtliche Ad-hoc-Suche wurde um einen auswählbaren Regex-Modus ergänzt.
+- Regex-Suche verwendet das bereits eingesetzte `regex`-Paket mit 100-ms-Zeitlimit je Zeile; maximale Zeilenlänge bleibt 1 MiB und es werden höchstens 20 Treffer ausgegeben.
+- Gespeicherte Suchmuster speichern nun zusätzlich `match_type`; bestehende SQLite-Datenbanken erhalten beim Start eine additive Spalte mit Standardwert `literal`.
+- Frontend-Auswahl für wörtlich/Regex, Anzeige der Suchart und Wiederherstellung beim Laden gespeicherter Muster ergänzt.
+- Backend- und Frontend-Regressionstests hinzugefügt. Der neue Stand ist noch nicht CI-verifiziert.
 
 ## CI-/PR-Status
 
@@ -55,8 +63,8 @@ Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
 
 ## Nächste Schritte
 
-1. CI des aktuellen Branch-Heads vollständig abwarten und alle fehlgeschlagenen Jobs anhand ihrer Logs beheben, bis alle fünf Jobs grün sind.
-2. Besonders prüfen: Frontend-Import-/Export-Tests, URL-Mock-Isolation, den neuen Quellprofil-Test, TypeScript-Build und portable Windows-/Linux-Builds.
+1. CI des aktuellen Branch-Heads für die Regex-Such-Erweiterung vollständig abwarten und mögliche Fehler anhand der Logs beheben, bis alle fünf Jobs grün sind.
+2. Besonders prüfen: Backend-Regex-/Saved-Search-Tests, Frontend-Regex-Test, TypeScript-Build und portable Windows-/Linux-Builds.
 3. Priorität 1 fortsetzen: den vollständigen Projektablauf in der Oberfläche abschließen — Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe. Die Quellprofil-Auswahl und der direkte Review-Link sind jetzt ergänzt; der vollständige End-to-End-Ablauf ist noch nicht abgenommen.
 4. UI-Gestaltungsrichtlinien schrittweise auf die jeweils bearbeiteten Oberflächen anwenden; insbesondere manuelle Pfadeingaben später durch eine geeignete Dateiauswahl ersetzen, wenn dies für Standalone und Air-Gap-Betrieb sauber gelöst ist.
 5. Priorität 2 bleibt offen: E2E-Berechtigungstests der Regelverwaltung, Review-GUI, Zielsystem-Abnahme Windows/Linux, 5-GiB-Zielhardwaremessung, echte LDAP/SMTP-Integration und finales Offline-Handbuch/Paket-Testing.
