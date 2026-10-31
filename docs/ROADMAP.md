@@ -80,7 +80,7 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [x] Offline-Regelbibliothek mit 20 kategorisierten, einzeln übernehmbaren und editierbaren Startvorlagen für IPv4/IPv6, FQDN/Hostnamen, Benutzer, E-Mail, ausgewählte personenbezogene Daten, Passwort-/Token-/API-Key-Felder, Windows-/Unix-Pfade und Infrastrukturwerte; Vorlagen werden zunächst deaktiviert eingefügt. Regex-Tests, API und GUI sind abgedeckt.
 - [x] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Dateigrößenbegrenzung, Schema-/Regex-/Profil-/Konfliktprüfung, Importvorschau und expliziter Übernahme in einen ungespeicherten Entwurf; dauerhafte Aktivierung erst nach separatem Speichern. Exporte enthalten keine Projekt-Mappings.
 - [x] Quellprofil pro registrierter Datei in der Projektoberfläche auswählen und an den Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln. Nach erfolgreichem Lauf direkter Wechsel zu Prüfung & Verlauf.
-- [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
+- [x] Projektablauf in der Oberfläche verbinden: Projekt-/Dateiübersicht führt zur Regel- und Profilverwaltung; von Regelverwaltung und Prüfung/Verlauf führt eine Rücknavigation zurück zum Projekt; nach erfolgreicher Bereinigung bleibt der direkte Einstieg in die Prüfung erhalten. Formatwahl/-prüfung, Quellprofil, Bereinigung und Ergebnisvalidierung sind im Projektkontext gebündelt.
 
 ### Priorität 2 — Abnahme und Freigabe
 - [x] End-to-End-Berechtigungstests für Regelverwaltung: Administrator/Rule Owner dürfen Regeln ändern; Processor darf Regeln anwenden, aber nicht bearbeiten.
@@ -179,3 +179,12 @@ Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) wurde nach Absch
 - [ ] Neue CI-Aufteilung nach dem Commit durch Push-/PR-CI und einen manuellen Meilensteinlauf verifizieren.
 
 Details und Startanleitung: [CI.md](CI.md).
+
+
+## Projektworkflow — Navigation (2026-10-31)
+
+- [x] Aus dem geöffneten Projekt direkt zur Regel- und Quellprofilverwaltung wechseln.
+- [x] Aus der Regelverwaltung mit einer klaren Rücknavigation zum Projekt zurückkehren.
+- [x] Aus Prüfung & Verlauf zum Projekt zurückkehren; der bestehende direkte Sprung nach erfolgreicher Bereinigung bleibt bestehen.
+- [x] Frontend-Regressionstests für die Navigation ergänzt.
+- [ ] Neue Navigation durch schnelle Push-/PR-CI verifizieren.
