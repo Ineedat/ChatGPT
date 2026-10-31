@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 import sqlite3
+
+import regex as re
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -131,6 +133,7 @@ def initialize_review_database() -> None:
             owner_user_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             query TEXT NOT NULL,
+            match_type TEXT NOT NULL DEFAULT 'literal',
             created_at TEXT NOT NULL,
             UNIQUE(owner_user_id, name)
         );
@@ -138,6 +141,9 @@ def initialize_review_database() -> None:
         columns = {row["name"] for row in db.execute("PRAGMA table_info(review_runs)")}
         if "output_signature" not in columns:
             db.execute("ALTER TABLE review_runs ADD COLUMN output_signature TEXT NOT NULL DEFAULT ''")
+        saved_columns = {row["name"] for row in db.execute("PRAGMA table_info(saved_searches)")}
+        if "match_type" not in saved_columns:
+            db.execute("ALTER TABLE saved_searches ADD COLUMN match_type TEXT NOT NULL DEFAULT 'literal'")
     try:
         os.chmod(_path(), 0o600)
     except OSError:
@@ -311,6 +317,14 @@ def _actor(request: Request) -> tuple[int, str]:
 class SavedSearchCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     query: str = Field(min_length=1, max_length=200)
+    match_type: str = "literal"
+
+    @field_validator("match_type")
+    @classmethod
+    def validate_match_type(cls, value: str) -> str:
+        if value not in {"literal", "regex"}:
+            raise ValueError("Suchart muss literal oder regex sein.")
+        return value
 
     @field_validator("name", "query")
     @classmethod
@@ -368,6 +382,7 @@ def search_sanitized_output(
     request: Request,
     q: str | None = Query(default=None, min_length=1, max_length=200),
     saved_search_id: str | None = Query(default=None, min_length=1, max_length=80),
+    match_type: str = Query(default="literal"),
 ) -> dict:
     actor_id, _ = _actor(request)
     if bool(q) == bool(saved_search_id):
@@ -381,22 +396,28 @@ def search_sanitized_output(
             raise HTTPException(status_code=409, detail="Nur ausstehende Läufe können geprüft werden.")
         if saved_search_id:
             saved = db.execute(
-                "SELECT query FROM saved_searches WHERE id=? AND owner_user_id=?",
+                "SELECT query, match_type FROM saved_searches WHERE id=? AND owner_user_id=?",
                 (saved_search_id, actor_id),
             ).fetchone()
             if saved is None:
                 raise HTTPException(status_code=404, detail="Gespeichertes Suchmuster nicht gefunden.")
             query = str(saved["query"])
+            match_type = str(saved["match_type"])
         else:
             query = str(q).strip()
         if not query or len(query) > 200 or any(ord(char) < 32 for char in query):
             raise HTTPException(status_code=422, detail="Ungültiger Suchbegriff.")
+        if match_type not in {"literal", "regex"}:
+            raise HTTPException(status_code=422, detail="Suchart muss literal oder regex sein.")
+        try:
+            compiled_query = re.compile(re.escape(query) if match_type == "literal" else query, re.IGNORECASE)
+        except re.error as exc:
+            raise HTTPException(status_code=422, detail=f"Ungültiger regulärer Ausdruck: {exc}") from exc
         output_path = Path(row["output_path"])
         expected_signature = row["output_signature"]
     if not expected_signature:
         raise HTTPException(status_code=409, detail="Keine validierte Ausgabe für diesen Lauf gespeichert.")
     results = []
-    needle = query.casefold()
     try:
         with output_path.open("rb") as stream:
             info = os.fstat(stream.fileno())
@@ -415,8 +436,12 @@ def search_sanitized_output(
                     line = raw.decode("utf-8").rstrip("\r\n")
                 except UnicodeDecodeError as exc:
                     raise HTTPException(status_code=422, detail="Ausgabe ist nicht gültig UTF-8.") from exc
-                match_at = line.casefold().find(needle)
-                if match_at >= 0:
+                try:
+                    match = compiled_query.search(line, timeout=0.1)
+                except TimeoutError as exc:
+                    raise HTTPException(status_code=422, detail="Regex-Suche überschreitet das Zeitlimit.") from exc
+                if match is not None:
+                    match_at = match.start()
                     start_at = max(0, match_at - 100)
                     end_at = min(len(line), start_at + 300)
                     snippet = ("…" if start_at else "") + line[start_at:end_at] + ("…" if end_at < len(line) else "")
@@ -425,7 +450,7 @@ def search_sanitized_output(
         raise HTTPException(status_code=410, detail="Bereinigte Ausgabe konnte nicht gelesen werden.") from exc
     truncated = len(results) > MAX_SEARCH_RESULTS
     results = results[:MAX_SEARCH_RESULTS]
-    return {"run_id": run_id, "query": query, "match_count": len(results),
+    return {"run_id": run_id, "query": query, "match_type": match_type, "match_count": len(results),
             "limit": MAX_SEARCH_RESULTS, "truncated": truncated, "results": results}
 
 
@@ -435,7 +460,7 @@ def list_saved_searches(request: Request) -> list[dict]:
     initialize_review_database()
     with _db() as db:
         rows = db.execute(
-            "SELECT id, name, query, created_at FROM saved_searches WHERE owner_user_id=? ORDER BY name COLLATE NOCASE",
+            "SELECT id, name, query, match_type, created_at FROM saved_searches WHERE owner_user_id=? ORDER BY name COLLATE NOCASE",
             (actor_id,),
         ).fetchall()
     return [dict(row) for row in rows]
@@ -449,12 +474,12 @@ def create_saved_search(payload: SavedSearchCreate, request: Request) -> dict:
     try:
         with _db() as db:
             db.execute(
-                "INSERT INTO saved_searches(id, owner_user_id, name, query, created_at) VALUES(?,?,?,?,?)",
-                (search_id, actor_id, payload.name, payload.query, _now()),
+                "INSERT INTO saved_searches(id, owner_user_id, name, query, match_type, created_at) VALUES(?,?,?,?,?,?)",
+                (search_id, actor_id, payload.name, payload.query, payload.match_type, _now()),
             )
     except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="Ein Suchmuster mit diesem Namen existiert bereits.") from exc
-    return {"id": search_id, "name": payload.name, "query": payload.query, "owner": actor_name}
+    return {"id": search_id, "name": payload.name, "query": payload.query, "match_type": payload.match_type, "owner": actor_name}
 
 
 @router.delete("/saved-searches/{search_id}", status_code=204)
