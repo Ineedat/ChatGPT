@@ -131,6 +131,8 @@ def test_rule_management_permissions_allow_admin_and_rule_owner_but_deny_operato
             login = client.post("/api/auth/login", json={"username": username, "password": password})
             assert login.status_code == 200
             csrf = client.cookies.get("logsanitizer_csrf")
+            # The shared test client injects its bootstrap admin CSRF token by default.
+            client._test_csrf = csrf
             response = client.put(
                 "/api/rules/config",
                 json=sample_config(),
