@@ -32,7 +32,7 @@
 
 ## Meilenstein 2 — Prüfung und kontrollierte Freigabe
 - [x] Lokale Anmeldung, serverseitige Rollenprüfungen und Login-Oberfläche; Authentifizierungs- und Regressionstests in CI erfolgreich.
-- [x] Prüfer-Warteschlange und sichere wörtliche Stichprobensuche ausschließlich in bereinigten Ausgaben; eigene gespeicherte Suchmuster.
+- [x] Prüfer-Warteschlange und Stichprobensuche ausschließlich in bereinigten Ausgaben; wörtliche Suche und zeitbegrenzte Regex-Suche sowie eigene gespeicherte Suchmuster inklusive Suchart.
 - [x] Freigabe, Rückgabe, Stopp und Kommentare; Laufhistorie und unveränderliche Audit-Ereignisse.
 - [x] Eng begrenzte, ausdrücklich begründete Ausnahmen; fehlgeschlagene Pflichtvalidierungen bleiben nicht freigabefähig.
 - [x] Rollen- und Berechtigungstests: Operator-/Reviewer-/Approver-/Admin-Trennung, kombinierte Rollen, Review-Entscheidungen, Such-/Kommentar-/Audit-Zugriff und Fail-closed-Verhalten bei unbekannter Prüferzuordnung; CI erfolgreich.
@@ -148,3 +148,12 @@ Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils a
 - [x] Offline-Hilfe aktualisiert; PR-CI vollständig erfolgreich: Lauf [41143691073](https://github.com/Ineedat/ChatGPT/actions/runs/41143691073), alle fünf Jobs grün (Frontend, Backend Windows/Linux, portable Windows/Linux), einschließlich 5-GiB-Benchmark.
 
 Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) wurde nach Abschluss der Dateivorschau umgesetzt; die Umsetzung ist in der priorisierten Roadmap abgehakt.
+
+
+## Prüfer-Stichprobensuche — Erweiterung (2026-10-31)
+
+- [x] Ad-hoc-Suche wahlweise wörtlich oder als regulärer Ausdruck.
+- [x] Regex-Ausführung mit 100-ms-Zeitlimit je Zeile und maximal 1-MiB-Zeilenlänge; fehlerhafte und zeitüberschreitende Muster werden verständlich abgewiesen.
+- [x] Eigene Suchmuster speichern Suchtext und Suchart; beim Laden wird die gespeicherte Suchart wiederhergestellt.
+- [x] Suche bleibt auf validierte, unveränderte bereinigte Ausgaben beschränkt; Originaldateien sind nicht durchsuchbar.
+- [x] Backend- und Frontend-Regressionstests ergänzt; CI-Verifizierung folgt nach Abschluss der Änderung.
