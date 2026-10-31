@@ -75,3 +75,19 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Keine Migration alter Entwicklungs-Mappings einführen; produktive Nutzung startet mit frischen Daten.
 - Die JSON-Regelkonfiguration enthält keine Projekt-Mappings.
 - Die Dateivorschau darf nie die vollständige große Quelldatei in den Arbeitsspeicher laden.
+
+
+## Aktueller Stand der Fortsetzung (2026-10-31)
+
+- Prüfer-Stichprobensuche: wörtlich/Regex, eigene gespeicherte Muster mit Suchart und 100-ms-Regex-Zeitlimit je Zeile.
+- Prüferoberfläche erweitert: Laufhistorie nach Suchtext und Status filterbar; Vorgänger-/Folgeläufe navigierbar; Audit-Protokoll auf ausgewählten Lauf einschränkbar.
+- Backend-Berechtigungsregression ergänzt: Administrator und Rule Owner dürfen Regelkonfiguration speichern; Processor wird beim Speichern, Validieren und Vorschau-Endpunkt abgewiesen.
+- Frontend-Regression für Historienfilter und Laufketten ergänzt; Offline-Hilfe und Roadmap aktualisiert.
+- CI für Code-Commit `d089e66205198ba9980164efb919e99707f633aa` (PR-Lauf [41228725651](https://github.com/Ineedat/ChatGPT/actions/runs/41228725651)) vollständig erfolgreich: alle fünf Jobs grün; Linux-Backend-Suite, Ruff, Frontend-Tests/Build, portable Windows-/Linux-Builds und Smoke-Tests. Der Linux-5-GiB-Benchmark war Teil des Linux-Backend-Jobs.
+- PR #2 bleibt offen. Noch nicht abschließbare Abnahmepunkte erfordern Zugriff auf die tatsächliche Windows-/Linux-Zielhardware und die echte Air-Gap-Umgebung (LDAP/AD, TLS-Zertifikate, SMTP); diese dürfen nicht durch CI-Simulation als erledigt markiert werden.
+
+## Nächste Schritte
+
+1. Aktuelle CI des neuen Heads nach den Review-Historien- und Berechtigungsänderungen vollständig prüfen und Fehler beheben.
+2. Bei grüner CI ist der implementierbare Teil des Review-/Freigabe-Meilensteins abgeschlossen.
+3. Für den vollständigen Meilensteinabschluss anschließend die reale Zielsystem- und Air-Gap-Abnahme durchführen; Ergebnisse und Messwerte in `docs/PERFORMANCE.md` und `docs/DEV_STATUS.md` dokumentieren.
