@@ -25,7 +25,7 @@ Manueller Start in GitHub unter **Actions → Milestone validation → Run workf
 - Synthetischer 5-GiB-Streaming-Benchmark auf Linux (standardmäßig aktiviert).
 - Portable PyInstaller-Builds auf Windows und Linux.
 - Standalone- und HTTPS-Netzwerk-Smoke-Tests für beide Pakete.
-- Build-Artefakte und Benchmark-Eingaben/-Ausgaben werden als Actions-Artefakte für 30 Tage bereitgestellt.
+- Portable Build-Artefakte werden als Actions-Artefakte für 30 Tage bereitgestellt. Der Benchmark-Bericht ist im Job-Log sichtbar; die mehrere GiB großen synthetischen Eingabe-/Ausgabedateien werden ausdrücklich nicht hochgeladen.
 
 Der 5-GiB-Lauf kann beim manuellen Start über die Eingabe deaktiviert werden, wenn ausschließlich Paketierung und Smoke-Tests geprüft werden sollen.
 
