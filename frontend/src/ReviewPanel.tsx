@@ -65,9 +65,6 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyStatus, setHistoryStatus] = useState("all");
   const [auditRunOnly, setAuditRunOnly] = useState(false);
-  const [historyQuery, setHistoryQuery] = useState("");
-  const [historyStatus, setHistoryStatus] = useState("all");
-  const [auditRunOnly, setAuditRunOnly] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
   const [savedSearchId, setSavedSearchId] = useState("");
@@ -121,14 +118,6 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   });
   const relatedRuns = selectedRun ? history.filter(run => run.parent_run_id === selectedRun.id) : [];
   const visibleAudit = auditRunOnly && selectedRun ? audit.filter(event => event.run_id === selectedRun.id) : audit;
-  const filteredHistory = history.filter(run => {
-    const needle = historyQuery.trim().toLocaleLowerCase("de-DE");
-    const matchesText = !needle || `${run.display_name} ${run.output_name} ${run.id} ${run.last_comment}`.toLocaleLowerCase("de-DE").includes(needle);
-    return matchesText && (historyStatus === "all" || run.status === historyStatus);
-  });
-  const relatedRuns = selectedRun ? history.filter(run => run.parent_run_id === selectedRun.id) : [];
-  const visibleAudit = auditRunOnly && selectedRun ? audit.filter(event => event.run_id === selectedRun.id) : audit;
-
   useEffect(() => {
     if (selectedRun?.status !== "returned" || !roles.some(role => ["admin", "operator"].includes(role))) return;
     let cancelled = false;
