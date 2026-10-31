@@ -367,7 +367,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         </article>)}</div>}
       </section>
       {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
-        <p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3>
+        <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
         <div className="import-grid">
@@ -403,7 +403,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <article className="feature-card"><span className="feature-number">02</span><h3>Originale schützen</h3><p>Quelldateien bleiben unverändert. Verarbeitung erfolgt in getrennten Arbeitsbereichen.</p></article>
         <article className="feature-card"><span className="feature-number">03</span><h3>Freigabe kontrollieren</h3><p>Unvollständige Läufe dürfen später nicht exportiert oder freigegeben werden.</p></article>
       </section>
-    </> : tab === "rules" ? <RulesPanel /> : tab === "review" ? <ReviewPanel roles={user.roles} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
+    </> : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("overview")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("overview")} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
       <div className="help-list">{helpTopics.map(topic => <article className="help-topic" key={topic.id}><h3>{topic.title}</h3><p>{topic.summary}</p><ul>{topic.steps.map(step => <li key={step}>{step}</li>)}</ul></article>)}</div>
     </section>}
     <footer><span>LogSanitizer · 0.1.0-dev</span><span>Keine echten oder vertraulichen Logs in diesem Entwicklungsstand verarbeiten.</span></footer>
