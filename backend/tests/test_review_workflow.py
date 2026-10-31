@@ -251,6 +251,49 @@ def test_review_search_bounds_results_and_shows_match_context(tmp_path, monkeypa
 
 
 
+
+def test_review_search_supports_bounded_regex_and_saved_regex_patterns(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+
+    with TestClient(app) as client:
+        response, _, _, _ = _sanitized_run(
+            client, tmp_path, contents=b"token=REDACTED\\nuser=REDACTED\\nother=value\\n"
+        )
+        run_id = response.json()["review_run_id"]
+        regex_result = client.get(
+            f"/api/reviews/runs/{run_id}/search",
+            params={"q": r"token\\s*=\\s*REDACTED", "match_type": "regex"},
+        )
+        assert regex_result.status_code == 200
+        assert regex_result.json()["match_type"] == "regex"
+        assert regex_result.json()["match_count"] == 1
+        assert "token=REDACTED" in regex_result.json()["results"][0]["snippet"]
+
+        saved = client.post("/api/reviews/saved-searches", json={
+            "name": "Token assignments",
+            "query": r"token\\s*=\\s*REDACTED",
+            "match_type": "regex",
+        })
+        assert saved.status_code == 201
+        assert saved.json()["match_type"] == "regex"
+        saved_id = saved.json()["id"]
+        saved_result = client.get(
+            f"/api/reviews/runs/{run_id}/search",
+            params={"saved_search_id": saved_id},
+        )
+        assert saved_result.status_code == 200
+        assert saved_result.json()["match_type"] == "regex"
+        assert saved_result.json()["match_count"] == 1
+
+        invalid = client.get(
+            f"/api/reviews/runs/{run_id}/search",
+            params={"q": "(", "match_type": "regex"},
+        )
+        assert invalid.status_code == 422
+
+
 def test_unknown_reviewer_assignment_fails_closed_and_records_pending_review(tmp_path, monkeypatch):
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
