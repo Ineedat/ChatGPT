@@ -428,11 +428,11 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}{sanitizationJobs[file.id].status === "completed" && <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfung & Verlauf öffnen</button>}</div>}
         </li>)}</ul>}
       </section>}
-      <section className="feature-grid" aria-label="Projektprinzipien">
+      {!selectedProject && <section className="feature-grid" aria-label="Projektprinzipien">
         <article className="feature-card"><span className="feature-number">01</span><h3>Lokal bleiben</h3><p>Keine Cloud- oder externen API-Abhängigkeiten im vorgesehenen Betrieb.</p></article>
         <article className="feature-card"><span className="feature-number">02</span><h3>Originale schützen</h3><p>Quelldateien bleiben unverändert. Verarbeitung erfolgt in getrennten Arbeitsbereichen.</p></article>
         <article className="feature-card"><span className="feature-number">03</span><h3>Freigabe kontrollieren</h3><p>Unvollständige Läufe dürfen später nicht exportiert oder freigegeben werden.</p></article>
-      </section>
+      </section>}
     </> : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("overview")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("overview")} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
       <div className="help-list">{helpTopics.map(topic => <article className="help-topic" key={topic.id}><h3>{topic.title}</h3><p>{topic.summary}</p><ul>{topic.steps.map(step => <li key={step}>{step}</li>)}</ul></article>)}</div>
     </section>}
