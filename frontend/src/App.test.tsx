@@ -197,7 +197,8 @@ describe("JSON document sanitization UI", () => {
     expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled();
   });
 });
-\n
+
+
 describe("source profile selection for project sanitization", () => {
   it("loads available source profiles and sends the selected profile with the sanitization job", async () => {
     const project = {
