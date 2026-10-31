@@ -58,7 +58,7 @@ describe("review workflow UI", () => {
       const url = String(input);
       if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
-      if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+      if ((url === "/api/reviews/saved-searches" && init?.method !== "POST") || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       if (url.includes("/search?")) return { ok: true, json: async () => ({ query: "token\\s*=.*", match_type: "regex", match_count: 1, truncated: false, results: [{ line_number: 2, snippet: "token=REDACTED" }] }) } as Response;
       if (url === "/api/reviews/saved-searches" && init?.method === "POST") return { ok: true, json: async () => ({ id: "saved-1" }) } as Response;
       return { ok: true, json: async () => [] } as Response;
