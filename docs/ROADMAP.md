@@ -188,3 +188,13 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Aus Prüfung & Verlauf zum Projekt zurückkehren; der bestehende direkte Sprung nach erfolgreicher Bereinigung bleibt bestehen.
 - [x] Frontend-Regressionstests für die Navigation ergänzt.
 - [ ] Neue Navigation durch schnelle Push-/PR-CI verifizieren.
+
+
+## UI-Designbaseline — kompakt und kontrastreich (2026-10-31)
+
+- [x] Einheitliche helle, Windows-orientierte Darstellung mit Segoe-UI-Systemschrift, dunkler Schrift auf hellen Flächen und klaren neutralen Rahmen eingeführt.
+- [x] Einheitliche Schriftgröße von 10 px festgelegt; damit liegen alle UI-Texte innerhalb der Vorgabe von mindestens 8 px und maximal 12 px.
+- [x] Fokuszustände mit gut sichtbarem Windows-Blau; Warnungen, Fehler und Erfolgsmeldungen mit kontrastreichen, semantisch unterscheidbaren Flächen.
+- [x] Grundabstände, Eingabefelder, Schaltflächen und Karten kompakter gestaltet, um mehr Arbeitsinhalt auf einer Bildschirmseite unterzubringen.
+- [ ] Kontrast und Lesbarkeit bei realen Windows-/Linux-Bildschirmauflösungen visuell prüfen; besonders Regelvorschau, Review und Login.
+- [ ] Im nächsten UI-Schritt Projektarbeitsbereich und Dateiliste weiter verdichten, ohne Funktionen oder Statusinformationen zu verstecken.
