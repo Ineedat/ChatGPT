@@ -138,3 +138,6 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Die Bereinigungsaktion ist primär hervorgehoben und bleibt bei nicht unterstütztem Format oder fehlendem Ausgabepfad deaktiviert.
 - Ein Frontend-Regressionstest prüft die Gruppierung und Sichtbarkeit der Aktionen.
 - GitHub-CI für diesen Commit steht noch aus; die visuelle Prüfung auf Zielsystemen ist offen.
+
+
+- Im geöffneten Projekt werden die allgemeinen Prinzipien-Karten ausgeblendet; sie bleiben nur in der Übersicht ohne ausgewähltes Projekt sichtbar. Dadurch steht mehr Bildschirmfläche für Dateiverwaltung und Verarbeitung zur Verfügung.
