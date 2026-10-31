@@ -4,7 +4,7 @@ Stand: 2026-10-31
 Repository: `Ineedat/ChatGPT`
 Arbeitsbranch: `feature/project-management-sqlite`
 Pull Request: [#2](https://github.com/Ineedat/ChatGPT/pull/2) — offen, nicht gemergt
-Letzter Code-/Dokumentations-Commit vor aktueller Fortsetzung: `d307cc450d4a26d35b1fd701dc79d064ee76ecbb`
+Letzter Code-Commit: `7c5f745aca34c4588f1a8bb1ac19569088fa7a4e`
 Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
 
 ## Projektleitplanken
@@ -40,7 +40,7 @@ Letzter Übergabe-/Dokumentationsstand: nach diesem Commit aktualisiert
 - Der Linux-Backend-Job hat auch den vollständigen synthetischen 5-GiB-Benchmark erfolgreich ausgeführt. Der Windows-Backend-Job überspringt den 5-GiB-Lauf weiterhin; der dedizierte Zielhardwaretest bleibt offen.
 - In der Review-Oberfläche wurde eine Lücke behoben: Bei zurückgegebenen Läufen kann der Operator nun das Quellprofil erneut auswählen. Die Auswahl wird als `profile_id` an den neuen Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln.
 - Offline-Hilfe und Roadmap wurden um den Review-/Überarbeitungsablauf ergänzt.
-- Neue Frontend-Tests prüfen die Quellprofilwahl bei Überarbeitungen. Diese Änderungen sind noch nicht CI-verifiziert; den aktuellen Head und den neuesten Workflow prüfen.
+- Neue Frontend-Tests prüfen die Quellprofilwahl bei Überarbeitungen. Der erste CI-Lauf auf Zwischenstand `fd4bcbb` schlug wegen eines versehentlich als Text eingefügten `\\n`-Zeichens im neuen Hilfeeintrag fehl (Frontend-Test und portabler Linux-Build). Das Literal wurde in `7c5f745` korrigiert; CI für diesen aktuellen Stand ist erneut gestartet und muss noch vollständig geprüft werden.
 
 ## CI-/PR-Status
 
