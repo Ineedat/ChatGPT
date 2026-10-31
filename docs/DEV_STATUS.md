@@ -101,3 +101,13 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Backend: 105 passed, 1 skipped; Ruff erfolgreich. Frontend-Tests und Build erfolgreich.
 - Vollständiger synthetischer 5-GiB-Benchmark erfolgreich: 97,621 s, 52,45 MiB/s, CPU 94,436 s, maximaler Prozess-RSS 40.148.992 Byte; 10.485.760 Zeilen und Ersetzungen; `validated=true`.
 - Implementierbarer Teil des Review-/Freigabe-Meilensteins ist abgeschlossen. Die reale Zielsystem- und Air-Gap-Abnahme bleibt als externe Freigabevoraussetzung offen.
+
+
+## CI-Optimierung (2026-10-31)
+
+- Die reguläre Push-/PR-CI wurde auf schnelle Prüfungen reduziert: Backend-Tests (Linux), gezielte Backend-Regressionsprüfungen (Windows), Ruff auf beiden Plattformen sowie Frontend-Tests und Build.
+- Der kleine und vollständige synthetische Benchmark sowie die portablen Windows-/Linux-Builds wurden aus der regulären CI entfernt.
+- Neuer manueller Workflow `.github/workflows/milestone-validation.yml`: 5-GiB-Benchmark (standardmäßig aktiv, optional deaktivierbar), portable Builds beider Betriebssysteme und Standalone-/HTTPS-Netzwerk-Smoke-Tests.
+- Der bestehende tag-basierte Release-Workflow bleibt unverändert.
+- Die neue Workflow-Aufteilung muss nach dem Commit noch durch die normale CI und einen manuell gestarteten Meilensteinlauf bestätigt werden.
+- Anleitung: [docs/CI.md](CI.md).

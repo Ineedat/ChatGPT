@@ -168,3 +168,14 @@ Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) wurde nach Absch
 - [x] Backend-End-to-End-Berechtigungstest: Administrator und Rule Owner dürfen Regelkonfiguration speichern; Processor wird beim Speichern, Validieren und Vorschau-Endpunkt abgewiesen.
 - [x] Offline-Hilfe um Sucharten, Historienfilter, Laufketten und Audit-Filter ergänzt.
 - [ ] Externe Abnahme bleibt erforderlich: reale Windows-/Linux-Zielhardware (5 GiB, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit), LDAP/AD/TLS/SMTP in der Air-Gap-Umgebung sowie finale Offline-Paketprüfung.
+
+
+## CI-Strategie (2026-10-31)
+
+- [x] Schnelle CI bei jedem Push/Pull Request: Backend-Tests, Windows-Regressionslauf, Ruff sowie Frontend-Tests und Build.
+- [x] Aufwendige 5-GiB-Benchmarks und portable Windows-/Linux-Builds aus der regulären CI entfernt und in einen manuell startbaren Meilenstein-Workflow verschoben.
+- [x] Meilenstein-Workflow prüft 5-GiB-Streaming (optional abschaltbar), portable Pakete und Standalone-/HTTPS-Netzwerk-Smoke-Tests.
+- [x] Release-Workflow bleibt als zusätzliche Prüfung beim Erstellen eines Versions-Tags bestehen.
+- [ ] Neue CI-Aufteilung nach dem Commit durch Push-/PR-CI und einen manuellen Meilensteinlauf verifizieren.
+
+Details und Startanleitung: [CI.md](CI.md).
