@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { RulesPanel } from "./RulesPanel";
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const initialConfig = {
   schema_version: 1 as const,
@@ -56,9 +56,12 @@ describe("rule editor", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => config } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ valid: true, conflicts: [] }) } as Response);
     vi.stubGlobal("fetch", fetchMock);
+    const NativeURL = globalThis.URL;
     const createUrl = vi.fn(() => "blob:rules-export");
     const revokeUrl = vi.fn();
-    vi.stubGlobal("URL", { ...URL, createObjectURL: createUrl, revokeObjectURL: revokeUrl });
+    class MockURL extends NativeURL {}
+    Object.assign(MockURL, { createObjectURL: createUrl, revokeObjectURL: revokeUrl });
+    vi.stubGlobal("URL", MockURL);
     render(<RulesPanel />);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
@@ -101,5 +104,4 @@ describe("rule editor", () => {
     expect(screen.getByLabelText("Platzhalter-Präfix")).toHaveValue("IP");
     expect(screen.getByRole("button", { name: "Konfiguration speichern" })).toBeEnabled();
   });
-
 });
