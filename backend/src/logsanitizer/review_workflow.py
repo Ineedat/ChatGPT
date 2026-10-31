@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import os
 import sqlite3
-
-import regex as re
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import regex as re
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
