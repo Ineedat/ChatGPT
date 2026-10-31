@@ -197,3 +197,49 @@ describe("JSON document sanitization UI", () => {
     expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled();
   });
 });
+\n
+describe("source profile selection for project sanitization", () => {
+  it("loads available source profiles and sends the selected profile with the sanitization job", async () => {
+    const project = {
+      id: "project-profile", name: "Profilprojekt", description: "", status: "draft",
+      created_at: "2026-10-31T10:00:00+00:00", updated_at: "2026-10-31T10:00:00+00:00"
+    };
+    const file = {
+      id: "file-profile", project_id: project.id, display_name: "events.log", size_bytes: 128,
+      modified_at: "2026-10-31T10:00:00+00:00", imported_at: "2026-10-31T10:00:00+00:00",
+      state: "registered", detected_format: "text"
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ profiles: [{ id: "nginx", name: "Nginx" }] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "job-profile", status: "queued" }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        id: "job-profile", status: "completed", phase: "complete", processed_bytes: 128,
+        total_bytes: 128, lines_processed: 1,
+        result: { output_name: "events.cleaned.log", output_bytes: 128, replacements: 1, validated: true }
+      }) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
+    fireEvent.focus(profileSelect);
+    expect(await screen.findByRole("option", { name: "Nginx" })).toBeInTheDocument();
+    fireEvent.change(profileSelect, { target: { value: "nginx" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Ausgabepfad für events.log" }), {
+      target: { value: "/tmp/events.cleaned.log" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Bereinigung starten" }));
+
+    expect(await screen.findByText(/Bereinigung für events.log abgeschlossen und validiert/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/${file.id}/sanitize-jobs`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ output_path: "/tmp/events.cleaned.log", profile_id: "nginx" })
+      })
+    );
+  });
+});
