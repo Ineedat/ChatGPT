@@ -83,8 +83,8 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 - [ ] Vollständigen Projektablauf in der Oberfläche verbinden: Projekt, Dateien, Format, Quellprofil/Regeln, Bereinigung, Validierung und Freigabe.
 
 ### Priorität 2 — Abnahme und Freigabe
-- [ ] End-to-End-Berechtigungstests für Regelverwaltung: Administrator/Rule Owner dürfen Regeln ändern; Processor darf Regeln anwenden, aber nicht bearbeiten.
-- [x] Review-Überarbeitung in der GUI übernimmt die erneute Quellprofilwahl und übergibt sie an den neuen Bereinigungslauf; erneute Pflichtvalidierung und Prüfung bleiben erforderlich.\n- [ ] Review-/Freigabeablauf in der GUI vervollständigen und mit dem vollständigen Bereinigungsablauf verbinden.
+- [x] End-to-End-Berechtigungstests für Regelverwaltung: Administrator/Rule Owner dürfen Regeln ändern; Processor darf Regeln anwenden, aber nicht bearbeiten.
+- [x] Review-Überarbeitung in der GUI übernimmt die erneute Quellprofilwahl und übergibt sie an den neuen Bereinigungslauf; erneute Pflichtvalidierung und Prüfung bleiben erforderlich.\n- [x] Review-/Freigabe-GUI vervollständigt: Stichprobensuche (wörtlich/Regex), gespeicherte Suchmuster, Freigabe/Rückgabe/Stopp, begründete Ausnahme, Kommentare, Laufdetails, gefilterte Historie, Vorgänger-/Folgelauf-Navigation und Audit-Filter. Die App führt nach erfolgreicher Bereinigung direkt zur Prüfung & Verlauf; zurückgegebene Läufe können mit neu gewähltem Quellprofil überarbeitet werden.
 - [ ] Zielsystem-Abnahme unter unterstützten Windows-/Linux-Versionen, inklusive 5-GiB-Datei, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit.
 - [ ] LDAP/AD-Gruppenzuordnung, TLS-Zertifikate und SMTP-Versand in der tatsächlichen Air-Gap-Umgebung testen.
 - [ ] Offline-Handbuch und portable Pakete final auf Zielsystemen prüfen.
@@ -157,3 +157,14 @@ Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) wurde nach Absch
 - [x] Eigene Suchmuster speichern Suchtext und Suchart; beim Laden wird die gespeicherte Suchart wiederhergestellt.
 - [x] Suche bleibt auf validierte, unveränderte bereinigte Ausgaben beschränkt; Originaldateien sind nicht durchsuchbar.
 - [x] Backend- und Frontend-Regressionstests ergänzt; CI-Verifizierung folgt nach Abschluss der Änderung.
+
+
+## Review-/Freigabe-Meilenstein — Implementierung (2026-10-31)
+
+- [x] Ad-hoc-Stichprobensuche und eigene Suchmuster wahlweise wörtlich oder Regex; Regex-Zeitlimit und Ausgabe-/Zeilenlimits aktiv.
+- [x] Laufhistorie nach Suchtext und Status filterbar; Laufdetails verknüpfen Vorgänger und Folge-Überarbeitungen.
+- [x] Audit-Protokoll optional auf den ausgewählten Lauf einschränkbar.
+- [x] Regressionstests für History-Filter und Laufverknüpfung ergänzt.
+- [x] Backend-End-to-End-Berechtigungstest: Administrator und Rule Owner dürfen Regelkonfiguration speichern; Processor wird beim Speichern, Validieren und Vorschau-Endpunkt abgewiesen.
+- [x] Offline-Hilfe um Sucharten, Historienfilter, Laufketten und Audit-Filter ergänzt.
+- [ ] Externe Abnahme bleibt erforderlich: reale Windows-/Linux-Zielhardware (5 GiB, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit), LDAP/AD/TLS/SMTP in der Air-Gap-Umgebung sowie finale Offline-Paketprüfung.
