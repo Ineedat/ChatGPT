@@ -21,6 +21,7 @@ type ReviewRun = {
   exception_reason: string;
 };
 type SavedSearch = { id: string; name: string; query: string; created_at: string };
+type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SearchResult = { line_number: number; snippet: string };
 type AuditEvent = {
   id: number;
@@ -72,6 +73,9 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   const [exception, setException] = useState(false);
   const [exceptionReason, setExceptionReason] = useState("");
   const [retryOutput, setRetryOutput] = useState("");
+  const [retryProfileId, setRetryProfileId] = useState("");
+  const [retryProfiles, setRetryProfiles] = useState<RuleProfile[]>([]);
+  const [retryProfilesLoading, setRetryProfilesLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -103,6 +107,22 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const selectedRun = [...queue, ...history].find(run => run.id === selectedId);
+
+  useEffect(() => {
+    if (selectedRun?.status !== "returned" || !roles.some(role => ["admin", "operator"].includes(role))) return;
+    let cancelled = false;
+    setRetryProfilesLoading(true);
+    void reviewFetch("/api/rules/config").then(async response => {
+      if (!response.ok) throw new Error("Quellprofile konnten nicht geladen werden.");
+      const config = await response.json() as { profiles?: RuleProfile[] };
+      if (!cancelled) setRetryProfiles(config.profiles || []);
+    }).catch(cause => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "Quellprofile konnten nicht geladen werden.");
+    }).finally(() => {
+      if (!cancelled) setRetryProfilesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedRun?.status, selectedRun?.id, roles]);
 
   async function searchOutput(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -234,12 +254,13 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ output_path: retryOutput, retry_of_run_id: selectedRun.id })
+          body: JSON.stringify({ output_path: retryOutput, retry_of_run_id: selectedRun.id, profile_id: retryProfileId || null })
         }
       );
       const body = await response.json() as { detail?: string; id?: string };
       if (!response.ok) throw new Error(body.detail || "Überarbeitete Bereinigung konnte nicht gestartet werden.");
       setRetryOutput("");
+      setRetryProfileId("");
       setMessage("Überarbeitete Bereinigung wurde gestartet. Nach erfolgreicher Pflichtvalidierung wird sie erneut zur Prüfung vorgelegt.");
       await refresh();
     } catch (cause) {
@@ -315,8 +336,10 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
       </dl>
       {selectedRun.status === "returned" && roles.some(role => ["admin", "operator"].includes(role)) && <form className="review-rework-form" onSubmit={event => void startRework(event)}>
         <h4>Überarbeitung starten</h4>
+        <label>Quellprofil für die Überarbeitung<select aria-label="Quellprofil für die Überarbeitung" value={retryProfileId} onChange={event => setRetryProfileId(event.target.value)} disabled={retryProfilesLoading}><option value="">Globale Regeln (kein Quellprofil)</option>{retryProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>
+        {retryProfilesLoading && <p className="field-help">Quellprofile werden geladen …</p>}
         <label>Neuer absoluter Ausgabepfad<input value={retryOutput} maxLength={4096} onChange={event => setRetryOutput(event.target.value)} required placeholder="Neuer Pfad; vorhandene Dateien werden nicht überschrieben" /></label>
-        <button className="secondary-button" type="submit" disabled={busy || !retryOutput.trim()}>Erneut bereinigen</button>
+        <button className="secondary-button" type="submit" disabled={busy || retryProfilesLoading || !retryOutput.trim()}>Erneut bereinigen</button>
       </form>}
     </section>}
     <section className="review-section" aria-label="Laufhistorie">
