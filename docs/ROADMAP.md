@@ -84,7 +84,7 @@ Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverh
 
 ### Priorität 2 — Abnahme und Freigabe
 - [ ] End-to-End-Berechtigungstests für Regelverwaltung: Administrator/Rule Owner dürfen Regeln ändern; Processor darf Regeln anwenden, aber nicht bearbeiten.
-- [ ] Review-/Freigabeablauf in der GUI vervollständigen und mit dem vollständigen Bereinigungsablauf verbinden.
+- [x] Review-Überarbeitung in der GUI übernimmt die erneute Quellprofilwahl und übergibt sie an den neuen Bereinigungslauf; erneute Pflichtvalidierung und Prüfung bleiben erforderlich.\n- [ ] Review-/Freigabeablauf in der GUI vervollständigen und mit dem vollständigen Bereinigungsablauf verbinden.
 - [ ] Zielsystem-Abnahme unter unterstützten Windows-/Linux-Versionen, inklusive 5-GiB-Datei, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit.
 - [ ] LDAP/AD-Gruppenzuordnung, TLS-Zertifikate und SMTP-Versand in der tatsächlichen Air-Gap-Umgebung testen.
 - [ ] Offline-Handbuch und portable Pakete final auf Zielsystemen prüfen.
