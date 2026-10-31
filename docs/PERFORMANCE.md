@@ -82,3 +82,22 @@ Der 5-GiB-Test wurde erneut im PR-CI-Lauf [41141244600](https://github.com/Ineed
 | Ausgabevalidierung | erfolgreich |
 
 Auch dieser Lauf verwendet ausschließlich synthetische 512-Byte-Logeinträge und eine einfache Ersetzungsregel. Er ist ein CI-Referenzwert und ersetzt nicht die Messung auf der tatsächlichen Zielhardware.
+
+
+## Dritter gemessener CI-Referenzlauf (2026-10-31)
+
+Der vollständige synthetische 5-GiB-Lauf wurde im PR-CI-Lauf [41229528527](https://github.com/Ineedat/ChatGPT/actions/runs/41229528527) erfolgreich ausgeführt (Python 3.11.17, Linux 7.0.0-1017-azure-x86_64).
+
+| Messwert | Ergebnis |
+|---|---:|
+| Eingabe | 5,00 GiB (5.368.709.120 Byte) |
+| Ausgabe | 5.379.194.880 Byte |
+| Wandzeit | 97,621 s |
+| CPU-Zeit | 94,436 s |
+| Durchsatz | 52,45 MiB/s |
+| Maximaler Prozess-RSS | 40.148.992 Byte (ca. 38,3 MiB) |
+| Verarbeitete Zeilen | 10.485.760 |
+| Ersetzungen | 10.485.760 |
+| Ausgabevalidierung | erfolgreich (`validated=true`) |
+
+Wie bei den vorherigen Läufen handelt es sich um synthetische 512-Byte-Logeinträge mit einer einfachen Ersetzungsregel. Der Wert ist ein CI-Referenzpunkt und ersetzt nicht die Messung auf der tatsächlichen Zielhardware.

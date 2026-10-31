@@ -91,3 +91,13 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 1. Aktuelle CI des neuen Heads nach den Review-Historien- und Berechtigungsänderungen vollständig prüfen und Fehler beheben.
 2. Bei grüner CI ist der implementierbare Teil des Review-/Freigabe-Meilensteins abgeschlossen.
 3. Für den vollständigen Meilensteinabschluss anschließend die reale Zielsystem- und Air-Gap-Abnahme durchführen; Ergebnisse und Messwerte in `docs/PERFORMANCE.md` und `docs/DEV_STATUS.md` dokumentieren.
+
+
+## CI-Abschluss Review-/Freigabe-Meilenstein (2026-10-31)
+
+- Aktueller Code-Stand vor dieser Dokumentationsaktualisierung: `781a9af7a83af8dfb09c57b96a3501aa475cf4b1`.
+- Der erste Lauf `41229407081` deckte einen Fehler im Berechtigungs-Test-Setup auf: Der gemeinsame Testclient verwendete nach dem Rollenwechsel weiterhin sein initiales CSRF-Token. Der Test setzt jetzt das CSRF-Token des jeweils angemeldeten Testbenutzers.
+- Korrigierter PR-CI-Lauf [41229528527](https://github.com/Ineedat/ChatGPT/actions/runs/41229528527) vollständig erfolgreich: alle fünf Jobs grün (Linux-/Windows-Backend, Frontend, portable Linux-/Windows-Pakete einschließlich Netzwerk-Smoke-Tests).
+- Backend: 105 passed, 1 skipped; Ruff erfolgreich. Frontend-Tests und Build erfolgreich.
+- Vollständiger synthetischer 5-GiB-Benchmark erfolgreich: 97,621 s, 52,45 MiB/s, CPU 94,436 s, maximaler Prozess-RSS 40.148.992 Byte; 10.485.760 Zeilen und Ersetzungen; `validated=true`.
+- Implementierbarer Teil des Review-/Freigabe-Meilensteins ist abgeschlossen. Die reale Zielsystem- und Air-Gap-Abnahme bleibt als externe Freigabevoraussetzung offen.
