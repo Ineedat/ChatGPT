@@ -65,6 +65,9 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyStatus, setHistoryStatus] = useState("all");
   const [auditRunOnly, setAuditRunOnly] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("all");
+  const [auditRunOnly, setAuditRunOnly] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
   const [savedSearchId, setSavedSearchId] = useState("");
@@ -111,6 +114,13 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const selectedRun = [...queue, ...history].find(run => run.id === selectedId);
+  const filteredHistory = history.filter(run => {
+    const needle = historyQuery.trim().toLocaleLowerCase("de-DE");
+    const haystack = (run.display_name + " " + run.output_name + " " + run.id + " " + run.last_comment).toLocaleLowerCase("de-DE");
+    return (!needle || haystack.includes(needle)) && (historyStatus === "all" || run.status === historyStatus);
+  });
+  const relatedRuns = selectedRun ? history.filter(run => run.parent_run_id === selectedRun.id) : [];
+  const visibleAudit = auditRunOnly && selectedRun ? audit.filter(event => event.run_id === selectedRun.id) : audit;
   const filteredHistory = history.filter(run => {
     const needle = historyQuery.trim().toLocaleLowerCase("de-DE");
     const matchesText = !needle || `${run.display_name} ${run.output_name} ${run.id} ${run.last_comment}`.toLocaleLowerCase("de-DE").includes(needle);
@@ -344,8 +354,9 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
         <div><dt>Ersetzungen</dt><dd>{selectedRun.replacements}</dd></div>
         {selectedRun.last_comment && <div><dt>Letzter Kommentar</dt><dd>{selectedRun.last_comment}</dd></div>}
         {selectedRun.exception_reason && <div><dt>Ausnahmebegründung</dt><dd>{selectedRun.exception_reason}</dd></div>}
-        {selectedRun.parent_run_id && <div><dt>Überarbeitet aus</dt><dd>{selectedRun.parent_run_id}</dd></div>}
+        {selectedRun.parent_run_id && <div><dt>Überarbeitet aus</dt><dd><button className="text-button" type="button" onClick={() => { setSelectedId(selectedRun.parent_run_id!); setMatches([]); setMessage(""); }}>Vorherigen Lauf öffnen · {selectedRun.parent_run_id}</button></dd></div>}
       </dl>
+      {relatedRuns.length > 0 && <div className="review-lineage"><strong>Überarbeitete Folge-Läufe</strong><ul>{relatedRuns.map(run => <li key={run.id}><button className="text-button" type="button" onClick={() => { setSelectedId(run.id); setMatches([]); setMessage(""); }}>{run.display_name} · {statusLabel(run.status)} · {run.id}</button></li>)}</ul></div>}
       {selectedRun.status === "returned" && roles.some(role => ["admin", "operator"].includes(role)) && <form className="review-rework-form" onSubmit={event => void startRework(event)}>
         <h4>Überarbeitung starten</h4>
         <label>Quellprofil für die Überarbeitung<select aria-label="Quellprofil für die Überarbeitung" value={retryProfileId} onChange={event => setRetryProfileId(event.target.value)} disabled={retryProfilesLoading}><option value="">Globale Regeln (kein Quellprofil)</option>{retryProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>
@@ -355,16 +366,20 @@ export function ReviewPanel({ roles }: { roles: string[] }) {
       </form>}
     </section>}
     <section className="review-section" aria-label="Laufhistorie">
-      <h3>Laufhistorie ({history.length})</h3>
-      {history.length === 0 ? <p className="muted-message">Noch keine Bereinigungsläufe gespeichert.</p> : <ul className="review-run-list">{history.map(run =>
+      <div className="section-heading"><h3>Laufhistorie ({filteredHistory.length} von {history.length})</h3></div>
+      <div className="review-history-filters">
+        <label>Suche in Läufen<input value={historyQuery} onChange={event => setHistoryQuery(event.target.value)} placeholder="Datei, Ausgabe, Lauf-ID oder Kommentar" /></label>
+        <label>Status<select value={historyStatus} onChange={event => setHistoryStatus(event.target.value)}><option value="all">Alle Status</option><option value="pending_review">Prüfung ausstehend</option><option value="returned">Zur Überarbeitung zurückgegeben</option><option value="approved">Freigegeben</option><option value="approved_with_exception">Mit Ausnahme freigegeben</option><option value="failed">Fehlgeschlagen</option><option value="stopped">Gestoppt</option><option value="cancelled">Abgebrochen</option></select></label>
+      </div>
+      {history.length === 0 ? <p className="muted-message">Noch keine Bereinigungsläufe gespeichert.</p> : filteredHistory.length === 0 ? <p className="muted-message">Keine Läufe passen zu den gewählten Filtern.</p> : <ul className="review-run-list">{filteredHistory.map(run =>
         <li key={run.id} className={selectedId === run.id ? "selected" : ""}>
           <div><strong>{run.display_name}</strong><span>{run.output_name} · {statusLabel(run.status)}</span><span>{new Date(run.created_at).toLocaleString("de-DE")}</span>{run.last_comment && <span>Kommentar: {run.last_comment}</span>}</div>
           <button className="secondary-button" type="button" onClick={() => { setSelectedId(run.id); setMatches([]); setMessage(""); }}>Details</button>
         </li>)}</ul>}
     </section>
     {canReview && <section className="review-section" aria-label="Audit-Protokoll">
-      <h3>Audit-Protokoll (letzte {audit.length} Ereignisse)</h3>
-      {audit.length === 0 ? <p className="muted-message">Noch keine Audit-Ereignisse.</p> : <ul className="audit-list">{audit.map(event =>
+      <div className="section-heading"><h3>Audit-Protokoll ({visibleAudit.length} Ereignisse)</h3>{selectedRun && <label className="review-audit-filter"><input type="checkbox" checked={auditRunOnly} onChange={event => setAuditRunOnly(event.target.checked)} /> Nur ausgewählten Lauf anzeigen</label>}</div>
+      {visibleAudit.length === 0 ? <p className="muted-message">{audit.length === 0 ? "Noch keine Audit-Ereignisse." : "Für diesen Lauf liegen in den letzten Audit-Ereignissen keine Einträge vor."}</p> : <ul className="audit-list">{visibleAudit.map(event =>
         <li key={event.id}><div><strong>{statusLabel(event.action)}</strong><span>{event.actor_username} · Lauf {event.run_id}</span><span>{new Date(event.created_at).toLocaleString("de-DE")}</span>{event.comment && <p>{event.comment}</p>}{event.exception_reason && <p>Ausnahme: {event.exception_reason}</p>}</div></li>)}</ul>}
     </section>}
   </section>;
