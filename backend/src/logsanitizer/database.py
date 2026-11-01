@@ -16,7 +16,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 APP_DIR_NAME = ".logsanitizer"
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def database_path() -> Path:
@@ -135,6 +135,12 @@ def initialize_database() -> None:
                 "ALTER TABLE projects ADD COLUMN output_directory TEXT NOT NULL DEFAULT ''"
             )
             connection.execute("UPDATE schema_metadata SET version = 4")
+
+        if current_version < 5:
+            connection.execute(
+                "ALTER TABLE imported_files ADD COLUMN relative_path TEXT NOT NULL DEFAULT ''"
+            )
+            connection.execute("UPDATE schema_metadata SET version = 5")
 
 
 class ProjectCreate(BaseModel):
@@ -323,18 +329,16 @@ def create_project(payload: ProjectCreate) -> Project:
 def _imported_file_from_row(row: sqlite3.Row) -> ImportedFile:
     values = dict(row)
     source_path = values.pop("source_path", None)
-    relative_path = values["display_name"]
-    if source_path:
+    relative_path = values.get("relative_path") or ""
+    if not relative_path and source_path:
         sources_root = (
             database_path().parent / "projects" / values["project_id"] / "sources"
         ).resolve()
         try:
             relative_path = Path(source_path).resolve(strict=False).relative_to(sources_root).as_posix()
         except ValueError:
-            # Files registered through the backend-path fallback have no project-relative
-            # directory structure; retain their basename in the output workspace.
-            pass
-    values["relative_path"] = relative_path
+            relative_path = Path(source_path).name
+    values["relative_path"] = relative_path or values["display_name"]
     values["format_hint"] = format_hint_for_name(values["display_name"])
     return ImportedFile(**values)
 
