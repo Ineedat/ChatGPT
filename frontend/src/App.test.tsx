@@ -412,7 +412,7 @@ describe("multi-file project sanitization workflow", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Jede Datei benötigt einen eigenen Ausgabepfad/);
+    expect(await screen.findByText(/Doppelte Ziele wurden vor dem Start abgewiesen/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
   });
 });
