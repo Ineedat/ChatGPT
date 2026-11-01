@@ -320,7 +320,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     }
     const normalizedPaths = batchFiles.map(file => (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US"));
     if (new Set(normalizedPaths).size !== normalizedPaths.length) {
-      setError("Mehrere Dateien besitzen denselben relativen Pfad und würden sich im Ausgabeordner überschreiben.");
+      setError("");
       return;
     }
 
@@ -589,8 +589,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                   </select>
                 </td>
                 <td className="file-status-cell">
-                  <span className={validation ? (validation.valid ? "file-state file-state-ready" : "file-state file-state-error") : "file-state"}>{validation ? (validation.valid ? "Validiert" : "Ungültig") : "Nicht validiert"}</span>
-                  {validation && <span className="table-subtext">{validation.format} · {validation.bytes_checked.toLocaleString("de-DE")} Byte{validation.error ? ` · ${validation.error}` : ""}</span>}
+                  <span className={validation ? (validation.valid ? "file-state file-state-ready" : "file-state file-state-error") : "file-state"}>{validation ? `${validation.valid ? "Format gültig" : "Format ungültig"} · ${validation.format} · ${validation.bytes_checked.toLocaleString("de-DE")} Byte geprüft` : "Nicht validiert"}</span>
+                  {validation?.error && <span className="table-subtext">{validation.error}</span>}
                   {job && <span className={`file-state job-state-${job.status}`}>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen", interrupted: "Unterbrochen" } as Record<string, string>)[job.status]}</span>}
                   {job && ["queued", "running"].includes(job.status) && <span className="table-subtext">{job.processed_bytes.toLocaleString("de-DE")} / {job.total_bytes.toLocaleString("de-DE")} Byte</span>}
                 </td>
