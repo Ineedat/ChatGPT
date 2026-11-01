@@ -1,4 +1,5 @@
 import sqlite3
+from pathlib import Path
 
 from fastapi.testclient import TestClient as BaseTestClient
 from test_client import TestClient
@@ -28,7 +29,6 @@ def _stored_output_path(tmp_path, run_id):
     with sqlite3.connect(tmp_path / "data" / "review.sqlite3") as db:
         row = db.execute("SELECT output_path FROM review_runs WHERE id=?", (run_id,)).fetchone()
     assert row is not None
-    from pathlib import Path
     return Path(row[0])
 
 
@@ -67,7 +67,9 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         assert response.status_code == 200
         result = response.json()
         assert result["review_status"] == "pending_review"
-        assert output.read_bytes() == b"REDACTED\n"
+        work_output = _stored_output_path(tmp_path, result["review_run_id"])
+        assert work_output.read_bytes() == b"REDACTED\n"
+        assert not output.exists()
 
         queue = client.get("/api/reviews/queue")
         assert queue.status_code == 200
@@ -112,8 +114,8 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         )
         assert foreign_search.status_code == 404
 
-        # Replacing the output after validation must block both further sampling and approval.
-        output.write_text("secret=alpha\n", encoding="utf-8")
+        # Tampering with the private work file blocks further sampling and approval.
+        work_output.write_text("secret=alpha\n", encoding="utf-8")
         changed_search = client.get(
             f"/api/reviews/runs/{run['id']}/search", params={"q": "secret"}
         )
@@ -123,15 +125,15 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         )
         assert changed_approval.status_code == 409
 
-        # The API omits paths; the private local database keeps the output path internally for verification.
         audit_db = sqlite3.connect(tmp_path / "data" / "review.sqlite3")
         stored = audit_db.execute(
-            "SELECT status, output_path FROM review_runs WHERE id=?",
+            "SELECT status, output_path, publish_path FROM review_runs WHERE id=?",
             (run["id"],),
         ).fetchone()
         audit_db.close()
         assert stored[0] == "pending_review"
         assert stored[1] == str(work_output)
+        assert stored[2] == str(output)
         assert client.get("/api/reviews/audit").status_code == 200
 
 
@@ -180,8 +182,10 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
             json={"output_path": str(retry_output), "retry_of_run_id": run_id},
         )
         assert retried.status_code == 202
-        assert retry_output.read_bytes() == b"REDACTED\n"
         latest = client.get("/api/reviews/runs").json()[0]
+        retry_work_output = _stored_output_path(tmp_path, latest["id"])
+        assert retry_work_output.read_bytes() == b"REDACTED\n"
+        assert not retry_output.exists()
         assert latest["parent_run_id"] == run_id
         assert latest["status"] == "pending_review"
 
@@ -223,11 +227,11 @@ def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(t
         })
         assert login.status_code == 200
         client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
-        response, _, _, _ = _sanitized_run(client, tmp_path)
+        response, _, _, output = _sanitized_run(client, tmp_path)
         assert response.status_code == 200
         assert response.json()["review_status"] == "approved"
         assert client.get("/api/reviews/runs").json()[0]["status"] == "approved"
-        assert output.exists() and output.read_bytes() == b"REDACTED\\n"
+        assert output.exists() and output.read_bytes() == b"REDACTED\n"
         assert client.get("/api/reviews/queue").status_code == 403
 
 
