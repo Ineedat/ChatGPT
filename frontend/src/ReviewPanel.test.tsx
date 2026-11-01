@@ -31,7 +31,7 @@ const run = {
 function stubReviewFetch() {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+    if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [run] } as Response;
     if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
     if (url === "/api/reviews/saved-searches") return { ok: true, json: async () => [] } as Response;
     if (url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
@@ -56,7 +56,7 @@ describe("review workflow UI", () => {
   it("supports regex searches and persists the selected search mode", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
       if ((url === "/api/reviews/saved-searches" && init?.method !== "POST") || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       if (url.includes("/search?")) return { ok: true, json: async () => ({ query: "token\\s*=.*", match_type: "regex", match_count: 1, truncated: false, results: [{ line_number: 2, snippet: "token=REDACTED" }] }) } as Response;
@@ -85,7 +85,7 @@ describe("review workflow UI", () => {
   it("submits an explicit approval decision", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       if (url.endsWith("/approve")) return { ok: true, json: async () => ({ status: "approved" }) } as Response;
@@ -105,7 +105,7 @@ describe("review workflow UI", () => {
 
   it("does not show reviewer controls to an operator", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      if (String(input) === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [run] } as Response;
       return { ok: false, json: async () => ({ detail: "Forbidden" }) } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -119,7 +119,7 @@ describe("review workflow UI", () => {
     const returnedRun = { ...run, status: "returned" };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [returnedRun] } as Response;
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [returnedRun] } as Response;
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [] } as Response;
       if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       if (url === "/api/rules/config") return { ok: true, json: async () => ({ profiles: [{ id: "nginx", name: "Nginx" }] }) } as Response;
@@ -154,7 +154,7 @@ describe("review workflow UI", () => {
     const child = { ...run, id: "run-2", display_name: "app-reworked.log", output_name: "clean-app-reworked.log", status: "returned", parent_run_id: "run-1" };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [child, run] } as Response;
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [child, run] } as Response;
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       return { ok: true, json: async () => [] } as Response;
@@ -177,7 +177,7 @@ describe("project file comparison view", () => {
   it("shows the active project's file list and opens bounded original/output panes", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/projects/project-1/files") return { ok: true, json: async () => [{
         id: "file-1", display_name: "app.log", relative_path: "logs/app.log", size_bytes: 100, state: "registered"
       }] } as Response;
