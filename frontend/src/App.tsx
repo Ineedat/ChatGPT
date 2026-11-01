@@ -573,13 +573,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <span className="status-pill"><span className="status-dot" /> Lokaler Arbeitsbereich</span>
         <h2>Logs sicher vorbereiten.</h2>
         <p>Die lokale Arbeitsumgebung für die regelbasierte Bereinigung von Anwendungslogs.</p>
-        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt UTF-8-Text, JSON Lines und vollständige JSON-Dokumente. Vor dem produktiven Einsatz müssen die Erkennungsregeln fachlich geprüft und die Verarbeitung großer Dateien auf Zielhardware gemessen werden. Prüf- und Freigabeworkflow sind bereits integriert.</span></div>
-      </section>
-      <section className="projects-section home-projects">
-        <div className="section-heading"><div><p className="eyebrow">ARBEITSBEREICH</p><h3>Projekte</h3></div>
-          <div className="rule-actions"><button className="secondary-button" type="button" onClick={() => void loadProjects()} disabled={loading}>{loading ? "Lädt …" : "Aktualisieren"}</button><button className="primary-button" type="button" onClick={() => setShowProjectDialog(true)}>Neues Projekt</button></div>
-        </div>
-        {loading ? <p className="muted-message">Projektliste wird geladen …</p> : projects.length === 0 ? <p className="muted-message">Noch keine Projekte vorhanden. Über „Neues Projekt“ kannst du ein Projekt anlegen.</p> : <div className="project-list">{projects.map(project => <article className="project-card" key={project.id}>
+       {loading ? <p className="muted-message">Projektliste wird geladen …</p> : projects.length === 0 ? <p className="muted-message">Noch keine Projekte vorhanden. Über „Neues Projekt“ kannst du ein Projekt anlegen.</p> : <div className="project-list">{projects.map(project => <article className="project-card" key={project.id}>
           <div><h4>{project.name}</h4><p>{project.description || "Keine Beschreibung"}</p><span className="project-meta">Erstellt: {new Date(project.created_at).toLocaleString("de-DE")} · Status: {project.status === "draft" ? "Entwurf" : project.status}</span></div>
           <button className="secondary-button" onClick={() => void openProject(project.id)}>Öffnen</button>
         </article>)}</div>}
@@ -592,11 +586,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           <button className="secondary-button" onClick={() => void openProject(project.id)}>Öffnen</button>
         </article>)}</div>}
       </section>
-      {!selectedProject && <section className="feature-grid" aria-label="Projektprinzipien">
-        <article className="feature-card"><span className="feature-number">01</span><h3>Lokal bleiben</h3><p>Keine Cloud- oder externen API-Abhängigkeiten im vorgesehenen Betrieb.</p></article>
-        <article className="feature-card"><span className="feature-number">02</span><h3>Originale schützen</h3><p>Quelldateien bleiben unverändert. Verarbeitung erfolgt in getrennten Arbeitsbereichen.</p></article>
-        <article className="feature-card"><span className="feature-number">03</span><h3>Freigabe kontrollieren</h3><p>Unvollständige Läufe dürfen später nicht exportiert oder freigegeben werden.</p></article>
-      </section>}
     </> : tab === "project" ? projectWorkspace : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("project")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("project")} /> : tab === "users" ? <UserManagementPanel currentUser={user} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
       <div className="help-list">{helpTopics.map(topic => <article className="help-topic" key={topic.id}><h3>{topic.title}</h3><p>{topic.summary}</p><ul>{topic.steps.map(step => <li key={step}>{step}</li>)}</ul></article>)}</div>
     </section>}
