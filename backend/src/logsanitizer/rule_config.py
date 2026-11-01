@@ -124,7 +124,18 @@ def load_rule_config() -> RuleConfig:
         # Make the curated starter rules visible immediately in a fresh installation.
         # They remain disabled until an operator reviews and explicitly enables them.
         templates = list_rule_templates()
-        return RuleConfig.model_validate({"schema_version": CONFIG_VERSION, "profiles": [], "rules": templates})
+        rule_fields = (
+            "id", "name", "category", "match_type", "pattern", "replacement",
+            "replacement_mode", "mapping_prefix", "case_sensitive", "priority",
+            "profile_id", "enabled",
+        )
+        starter_rules = [
+            {field: template[field] for field in rule_fields}
+            for template in templates
+        ]
+        return RuleConfig.model_validate({
+            "schema_version": CONFIG_VERSION, "profiles": [], "rules": starter_rules
+        })
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
