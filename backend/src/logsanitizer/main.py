@@ -3,6 +3,7 @@
 Local project management and sanitization are development features. Release
 controls and production security hardening remain incomplete.
 """
+import asyncio
 import csv
 import io
 import json
@@ -13,6 +14,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath
+from typing import BinaryIO
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -829,6 +831,18 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
+def _copy_upload_to_temporary(source: BinaryIO, destination: Path) -> int:
+    """Copy a spooled upload to disk without buffering the full file in memory."""
+    total_bytes = 0
+    with destination.open("xb") as output:
+        while chunk := source.read(UPLOAD_CHUNK_BYTES):
+            total_bytes += len(chunk)
+            if total_bytes > MAX_UPLOAD_BYTES:
+                raise ValueError("Datei überschreitet das Limit von 5 GiB.")
+            output.write(chunk)
+    return total_bytes
+
+
 @app.post(
     "/api/projects/{project_id}/files/upload",
     response_model=FolderImportResult,
@@ -893,16 +907,17 @@ async def project_files_upload(
             await upload.close()
             continue
 
+        if upload.size is not None and upload.size > MAX_UPLOAD_BYTES:
+            issues.append(
+                FolderImportIssue(file_name=relative.name, reason="Datei überschreitet das Limit von 5 GiB.")
+            )
+            await upload.close()
+            continue
+
         temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.part")
-        total_bytes = 0
         try:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            with temporary.open("xb") as output:
-                while chunk := await upload.read(UPLOAD_CHUNK_BYTES):
-                    total_bytes += len(chunk)
-                    if total_bytes > MAX_UPLOAD_BYTES:
-                        raise ValueError("Datei überschreitet das Limit von 5 GiB.")
-                    output.write(chunk)
+            await asyncio.to_thread(_copy_upload_to_temporary, upload.file, temporary)
             os.replace(temporary, destination)
             try:
                 registered.append(register_imported_file(project_id, destination))
