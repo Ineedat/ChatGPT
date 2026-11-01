@@ -386,6 +386,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const body = await response.json() as ImportedFile & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format-Auswahl konnte nicht gespeichert werden.");
       setImportedFiles(current => current.map(item => item.id === file.id ? body : item));
+      setImportMessage(formatOverride ? `Manuelles Format für ${file.display_name} gespeichert: ${formatOverride}.` : `Manuelle Format-Auswahl für ${file.display_name} entfernt.`);
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Format-Auswahl konnte nicht gespeichert werden.");
@@ -580,7 +581,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                   <select aria-label={`Format für ${relativePath}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)} disabled={batchRunning || activeJob || applyingBulkSettings}>
                     <option value="">Automatisch ({effectiveFormat.toUpperCase()})</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option>
                   </select>
-                  <span className="table-subtext">Erkannt: {file.detected_format || "noch nicht geprüft"} · Endung: {file.format_hint || "unbekannt"}</span>
+                  <span className="table-subtext">Erkannt: {(file.detected_format || "noch nicht geprüft").toUpperCase()} · Endung: {(file.format_hint || "unbekannt").toUpperCase()}</span>
                 </td>
                 <td>
                   <select aria-label={`Quellprofil für ${relativePath}`} value={profileSelections[file.id] || ""} onFocus={() => void loadSourceProfiles()} onChange={event => setProfileSelections(current => ({ ...current, [file.id]: event.target.value }))} disabled={batchRunning || activeJob}>
