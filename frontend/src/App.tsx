@@ -249,7 +249,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   }
 
   async function startSanitization(file: ImportedFile, waitForCompletion = false): Promise<SanitizationJob | null> {
-    if (!selectedProject || !projectOutputDirectory.trim() || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
+    if (!selectedProject || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
     const separator = projectOutputDirectory.includes("\\") ? "\\" : "/";
     const outputPath = projectOutputDirectory.replace(/[\\/]+$/, "") + separator + file.display_name;
     setError("");
@@ -311,7 +311,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
     );
     if (invalidFile) {
-      setError(`Bitte prüfe Format, Ausgabepfad und Laufstatus für „${invalidFile.display_name}“.`);
+      setError(`Bitte prüfe Format, gespeicherten Ausgabeordner und Laufstatus für „${invalidFile.display_name}“.`);
       return;
     }
     const normalizedPaths = batchFiles.map(file => file.display_name.toLocaleLowerCase("en-US"));
@@ -457,13 +457,14 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     file.display_name.toLocaleLowerCase("en-US")
   )).size !== selectedBatchFiles.length;
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
-    projectOutputDirectory.trim() && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
 
   const projectWorkspace = selectedProject ? <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
         <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
+        {error && <p className="error-message" role="alert">{error}</p>}
         <div className="project-output-setting"><label htmlFor="project-output-directory">Ausgabeordner<input id="project-output-directory" value={projectOutputDirectory} onChange={event => setProjectOutputDirectory(event.target.value)} placeholder="Absoluter Ordnerpfad" maxLength={4096} /></label><button className="secondary-button" type="button" disabled={savingOutputDirectory || projectOutputDirectory.trim() === (selectedProject.output_directory || "")} onClick={() => void saveProjectOutputDirectory()}>{savingOutputDirectory ? "Speichert …" : "Ausgabeordner speichern"}</button><p className="field-help">Alle Ergebnisse werden hier unter ihrem Originaldateinamen abgelegt. Der Ordner muss bereits existieren.</p></div>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
         <form className="import-source-form" onSubmit={event => void registerSources(event)} aria-label="Dateien hinzufügen">
@@ -603,6 +604,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       <section className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title">
         <div className="section-heading"><div><p className="eyebrow">PROJEKT ANLEGEN</p><h3 id="project-dialog-title">Neues Projekt</h3></div><button className="secondary-button" type="button" onClick={() => setShowProjectDialog(false)}>Schließen</button></div>
         <form onSubmit={event => void createProject(event)}>
+          {error && <p className="error-message" role="alert">{error}</p>}
           <label htmlFor="project-name">Projektname</label>
           <input id="project-name" value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="z. B. Analyse Anwendungsfehler" maxLength={80} required autoFocus />
           <label htmlFor="project-description">Beschreibung <span className="optional-label">(optional)</span></label>
