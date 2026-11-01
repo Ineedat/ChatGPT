@@ -486,13 +486,15 @@ def _changed_line_spans(
     """Return line and character spans changed by sanitization for precise highlighting."""
     original_lines = original.splitlines(keepends=True)
     sanitized_lines = sanitized.splitlines(keepends=True)
-    original_text = [line.rstrip("\\r\\n") for line in original_lines]
-    sanitized_text = [line.rstrip("\\r\\n") for line in sanitized_lines]
+    original_text = [line.rstrip("\r\n") for line in original_lines]
+    sanitized_text = [line.rstrip("\r\n") for line in sanitized_lines]
     matcher = difflib.SequenceMatcher(a=original_text, b=sanitized_text)
     original_spans: list[dict[str, int]] = []
     sanitized_spans: list[dict[str, int]] = []
 
-    def add_whole_line(target: list[dict[str, int]], line_number: int, value: str) -> None:
+    def add_whole_line(
+        target: list[dict[str, int]], line_number: int, value: str
+    ) -> None:
         target.append({"line_number": line_number, "start": 0, "end": max(1, len(value))})
 
     for tag, original_start, original_end, sanitized_start, sanitized_end in matcher.get_opcodes():
