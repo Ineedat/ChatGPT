@@ -1,10 +1,10 @@
 # Entwicklungsstand — Übergabe für den nächsten Chat
 
-Stand: 2026-10-31
+Stand: 2026-11-01
 Repository: `Ineedat/ChatGPT`
 Arbeitsbranch: `feature/project-management-sqlite`
 Pull Request: [#2](https://github.com/Ineedat/ChatGPT/pull/2) — offen, nicht gemergt
-Letzter Code-Commit: `c98bf5f878849cb1ec978edbd9e98578c6940e66`
+Letzter Code-Commit: `3090d30aa304095dbe6f1666a258a7704b545325`
 Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Regex-Such-Erweiterung aktualisiert
 
 ## Projektleitplanken
@@ -160,3 +160,15 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Backend liest Uploads in 1-MiB-Blöcken, begrenzt jede Datei auf 5 GiB und eine Auswahl auf 5.000 Dateien; unvollständige temporäre Dateien werden bei Fehlern entfernt.
 - Relative Uploadpfade werden auf absolute Pfade, Laufwerkspräfixe und Traversal geprüft; Originaldateien auf dem Client werden nicht verändert.
 - Regressionstests decken Upload, Ordnerstruktur, Traversal-Schutz und Größenlimit ab. CI-Verifizierung steht noch aus.
+
+
+## Datei-/Ordnerauswahl — CI-Abschluss (2026-11-01)
+
+- Implementiert: Browser-Dateiauswahl für Mehrfachdateien und Ordner, Übernahme der relativen Ordnerstruktur, blockweiser Upload in den Projektarbeitsbereich.
+- Backend: Upload-Limit 5 GiB je Datei, 5.000 Dateien je Auswahl, 1-MiB-Kopierblöcke in einem Worker-Thread, temporäre Dateien mit atomarer Übernahme und Bereinigung bei Fehlern.
+- Sicherheit/Integrität: relative Pfade werden gegen Traversal und Laufwerkspräfixe geprüft; Originaldateien im Browser bleiben unverändert. Uploads werden erst nach vollständiger Übernahme registriert.
+- Offline-Hilfe und Fallback für bereits auf dem Backend vorhandene Pfade ergänzt.
+- Regressionen: erfolgreicher Mehrdatei-Upload, verschachtelte Ordnerstruktur, Pfad-Traversal und Dateigrößenlimit.
+- CI für Commit `3090d30aa304095dbe6f1666a258a7704b545325`, PR-Lauf [41291446536](https://github.com/Ineedat/ChatGPT/actions/runs/41291446536), vollständig erfolgreich: Frontend-Tests und Build, vollständige Backend-Suite unter Linux, gezielte Projekt-/Upload- und Mappingtests unter Windows sowie Ruff auf beiden Plattformen.
+- PR #2 bleibt offen und ungemergt.
+- Noch offen und nicht durch CI ersetzbar: visuelle Abnahme auf realen Windows-/Linux-Zielbildschirmen. Der separate manuelle Meilensteinlauf für portable Pakete und den 5-GiB-Benchmark wurde in diesem Schritt nicht gestartet.
