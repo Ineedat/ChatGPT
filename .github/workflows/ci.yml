@@ -27,7 +27,7 @@ jobs:
       - if: runner.os != 'Windows'
         run: pytest
       - if: runner.os == 'Windows'
-        run: pytest tests/test_mapping_encryption.py tests/test_projects.py
+        run: pytest tests/test_mapping_store.py tests/test_projects.py
       - run: ruff check src tests
 
   frontend:
