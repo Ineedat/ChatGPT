@@ -37,6 +37,7 @@ type Project = {
   status: "draft" | "active" | "archived";
   created_at: string;
   updated_at: string;
+  output_directory: string;
 };
 
 function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) {
