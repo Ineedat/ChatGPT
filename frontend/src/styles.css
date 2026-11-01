@@ -476,3 +476,9 @@ footer { margin-top: 14px; padding-top: 8px; border-color: #bdbdbd; }
   .import-source-fields .import-recursive-option { padding-bottom: 0; }
   .import-source-footer { align-items: stretch; flex-direction: column; }
 }
+
+.path-import-fallback { border-top: 1px solid #d6d6d6; padding-top: 7px; color: #303030; }
+.path-import-fallback summary { cursor: pointer; font-weight: 600; }
+.path-import-fallback .import-source-fields { margin-top: 7px; grid-template-columns: minmax(0, 1fr) auto; }
+.selected-upload-list { margin: 0; padding: 5px 7px; border: 1px solid #d0d0d0; background: #f5f5f5; overflow-wrap: anywhere; }
+.import-source-fields input[type=file] { width: 100%; min-width: 0; padding: 4px; border: 1px solid #858585; background: #fff; color: #1f1f1f; }
