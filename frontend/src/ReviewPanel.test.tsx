@@ -184,8 +184,8 @@ describe("project file comparison view", () => {
       if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
       if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       if (url.includes("/compare-preview")) return { ok: true, json: async () => ({
-        original: { content: "secret=alpha\\n", byte_offset: 0, next_offset: null, total_bytes: 13 },
-        sanitized: { content: "REDACTED\\n", byte_offset: 0, next_offset: null, total_bytes: 9 }
+        original: { content: "secret=alpha\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 13 },
+        sanitized: { content: "REDACTED\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 9 }
       }) } as Response;
       return { ok: true, json: async () => ({}) } as Response;
     });
