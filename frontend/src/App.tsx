@@ -117,7 +117,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   useEffect(() => {
     if (selectedProject) void loadImportedFiles(selectedProject.id);
     else setImportedFiles([]);
-  }, [selectedProject, loadImportedFiles]);
+  }, [selectedProject?.id, loadImportedFiles]);
 
   async function registerSources(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
