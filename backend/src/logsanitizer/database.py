@@ -275,7 +275,7 @@ def get_project(project_id: str) -> Project | None:
     with connect_database() as connection:
         row = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at
+            SELECT id, name, description, status, created_at, updated_at, output_directory
             FROM projects WHERE id = ?
             """,
             (project_id,),
@@ -310,7 +310,7 @@ def create_project(payload: ProjectCreate) -> Project:
         )
         row = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at
+            SELECT id, name, description, status, created_at, updated_at, output_directory
             FROM projects WHERE id = ?
             """,
             (project_id,),
