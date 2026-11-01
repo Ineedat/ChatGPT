@@ -147,10 +147,15 @@ def test_folder_import_registers_files_and_reports_duplicates(tmp_path, monkeypa
     nested.mkdir(parents=True)
     first = folder / "one.log"
     second = nested / "two.log"
+    other_nested = folder / "other"
+    other_nested.mkdir()
+    third = other_nested / "two.log"
     first.write_text("token=secret-one", encoding="utf-8")
     second.write_text("token=secret-two", encoding="utf-8")
+    third.write_text("token=secret-three", encoding="utf-8")
     first_before = first.read_bytes()
     second_before = second.read_bytes()
+    third_before = third.read_bytes()
 
     with TestClient(app) as client:
         project_id = client.post("/api/projects", json={"name": "Folder import"}).json()["id"]
@@ -160,14 +165,15 @@ def test_folder_import_registers_files_and_reports_duplicates(tmp_path, monkeypa
         )
         assert response.status_code == 200
         result = response.json()
-        assert result["registered_count"] == 2
+        assert result["registered_count"] == 3
         assert result["skipped_count"] == 0
         assert {item["display_name"] for item in result["registered_files"]} == {
             "one.log",
             "two.log",
         }
-        relative_paths = {item["display_name"]: item["relative_path"] for item in result["registered_files"]}
-        assert relative_paths == {"one.log": "one.log", "two.log": "nested/two.log"}
+        assert {item["relative_path"] for item in result["registered_files"]} == {
+            "one.log", "nested/two.log", "other/two.log"
+        }
         assert all("source_path" not in item for item in result["registered_files"])
 
         repeated = client.post(
@@ -176,11 +182,12 @@ def test_folder_import_registers_files_and_reports_duplicates(tmp_path, monkeypa
         )
         assert repeated.status_code == 200
         assert repeated.json()["registered_count"] == 0
-        assert repeated.json()["skipped_count"] == 2
+        assert repeated.json()["skipped_count"] == 3
         assert all("bereits" in issue["reason"].casefold() for issue in repeated.json()["issues"])
 
     assert first.read_bytes() == first_before
     assert second.read_bytes() == second_before
+    assert third.read_bytes() == third_before
 
 
 def test_folder_import_nonrecursive_and_invalid_paths(tmp_path, monkeypatch) -> None:
