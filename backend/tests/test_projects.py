@@ -428,3 +428,32 @@ def test_browser_upload_checks_disk_space_again_before_each_file(tmp_path, monke
     assert "Nicht genügend freier Speicherplatz" in response.json()["issues"][0]["reason"]
     workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
     assert not (workspace / "one.log").exists()
+
+
+
+def test_zero_byte_log_is_registered_and_detected_as_text(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    source = tmp_path / "empty.log"
+    source.write_bytes(b"")
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Empty log"}).json()["id"]
+        registered = client.post(
+            f"/api/projects/{project_id}/files", json={"path": str(source)}
+        )
+        assert registered.status_code == 201
+        assert registered.json()["size_bytes"] == 0
+
+        file_id = registered.json()["id"]
+        detected = client.post(
+            f"/api/projects/{project_id}/files/{file_id}/detect-format"
+        )
+        assert detected.status_code == 200
+        assert detected.json()["detected_format"] == "text"
+
+        validated = client.post(
+            f"/api/projects/{project_id}/files/{file_id}/validate-format"
+        )
+        assert validated.status_code == 200
+        assert validated.json()["valid"] is True
+        assert validated.json()["bytes_checked"] == 0
