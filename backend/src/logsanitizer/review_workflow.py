@@ -371,7 +371,11 @@ def _read_compare_window(path: Path, byte_offset: int) -> dict[str, object]:
     with path.open("rb") as stream:
         stream.seek(requested)
         if requested:
-            stream.readline(MAX_LINE_BYTES + 1)
+            stream.seek(requested - 1)
+            previous_byte = stream.read(1)
+            stream.seek(requested)
+            if previous_byte != b"\\n":
+                stream.readline(MAX_LINE_BYTES + 1)
         actual_offset = stream.tell()
         raw = stream.read(MAX_COMPARE_PREVIEW_BYTES + 1)
     if len(raw) > MAX_COMPARE_PREVIEW_BYTES:
