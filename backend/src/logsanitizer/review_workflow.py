@@ -499,9 +499,15 @@ def _changed_line_spans(
     def add_whole_line(
         target: list[dict[str, int]], line_number: int, value: str
     ) -> None:
-        target.append({"line_number": line_number, "start": 0, "end": max(1, _utf16_length(value))})
+        target.append({
+            "line_number": line_number,
+            "start": 0,
+            "end": max(1, _utf16_length(value)),
+        })
 
-    for tag, original_start, original_end, sanitized_start, sanitized_end in matcher.get_opcodes():
+    for tag, original_start, original_end, sanitized_start, sanitized_end in (
+        matcher.get_opcodes()
+    ):
         if tag == "equal":
             continue
         paired = min(original_end - original_start, sanitized_end - sanitized_start)
@@ -522,13 +528,13 @@ def _changed_line_spans(
                     original_spans.append({
                         "line_number": original_line_number,
                         "start": _utf16_length(original_line[:a_start]),
-                        "end": _utf16_length(original_line[:a_end])
+                        "end": _utf16_length(original_line[:a_end]),
                     })
                 if b_end > b_start:
                     sanitized_spans.append({
                         "line_number": sanitized_line_number,
                         "start": _utf16_length(sanitized_line[:b_start]),
-                        "end": _utf16_length(sanitized_line[:b_end])
+                        "end": _utf16_length(sanitized_line[:b_end]),
                     })
         for index in range(original_start + paired, original_end):
             add_whole_line(original_spans, index + 1, original_text[index])
