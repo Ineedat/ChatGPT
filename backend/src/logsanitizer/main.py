@@ -460,6 +460,21 @@ class SanitizationRequest(BaseModel):
 
 
 
+def _relative_project_source_path(project_id: str, source: Path, stored_relative_path: str = "") -> Path:
+    """Return a validated project-relative path without exposing absolute source paths."""
+    relative = PurePosixPath(stored_relative_path.replace("\\", "/")) if stored_relative_path else None
+    if relative is not None and not relative.is_absolute() and relative.parts and all(
+        part not in {"", ".", ".."} and ":" not in part for part in relative.parts
+    ):
+        return Path(*relative.parts)
+    sources_root = (database_path().parent / "projects" / project_id / "sources").resolve()
+    try:
+        return source.resolve(strict=False).relative_to(sources_root)
+    except ValueError:
+        # Backend-path imports outside the project workspace keep only their basename.
+        return Path(source.name)
+
+
 @app.post(
     "/api/projects/{project_id}/files/{file_id}/sanitize-jobs",
     status_code=status.HTTP_202_ACCEPTED,
@@ -513,12 +528,6 @@ def project_file_sanitize_start(
         raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
     if selected_format not in {"text", "jsonl", "json"}:
         raise HTTPException(status_code=422, detail="Unterstützt werden derzeit Text, JSON und JSON Lines.")
-    if not output.is_absolute():
-        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
-    if output.is_symlink() or output.exists():
-        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
-    if not output.parent.is_dir():
-        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
     try:
         config = load_rule_config()
     except RuntimeError as exc:
