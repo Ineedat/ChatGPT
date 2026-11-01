@@ -17,7 +17,7 @@ describe("LogSanitizer app shell", () => {
 
   it("shows the development-only warning", async () => {
     render(<App />);
-    expect(screen.getByText(/Noch nicht für echte Logdaten freigegeben/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Projekte verwalten." })).toBeInTheDocument();
     await screen.findByText(/Noch keine Projekte vorhanden/);
   });
 
@@ -66,9 +66,10 @@ describe("LogSanitizer app shell", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response);
 
     render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Neues Projekt" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Projektname" }), { target: { value: "Testprojekt" } });
     fireEvent.change(screen.getByRole("textbox", { name: /Beschreibung/ }), { target: { value: "Testbeschreibung" } });
-    fireEvent.click(screen.getByRole("button", { name: "Projekt anlegen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Projekt erstellen" }));
 
     const openedProject = await screen.findByRole("region", { name: "Geöffnetes Projekt" });
     expect(within(openedProject).getByRole("heading", { name: "Testprojekt" })).toBeInTheDocument();
@@ -254,8 +255,9 @@ describe("JSON document sanitization UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für events.json" }), { target: { value: "/tmp/events.cleaned.json" } });
-    expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled();
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled());
   });
 });
 
@@ -290,9 +292,9 @@ describe("source profile selection for project sanitization", () => {
     fireEvent.focus(profileSelect);
     expect(await screen.findByRole("option", { name: "Nginx" })).toBeInTheDocument();
     fireEvent.change(profileSelect, { target: { value: "nginx" } });
-    fireEvent.change(screen.getByRole("textbox", { name: "Ausgabepfad für events.log" }), {
-      target: { value: "/tmp/events.cleaned.log" }
-    });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Bereinigung starten" }));
 
     expect(await screen.findByText(/Bereinigung für events.log abgeschlossen und validiert/)).toBeInTheDocument();
@@ -301,7 +303,7 @@ describe("source profile selection for project sanitization", () => {
       `/api/projects/${project.id}/files/${file.id}/sanitize-jobs`,
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ output_path: "/tmp/events.cleaned.log", profile_id: "nginx" })
+        body: JSON.stringify({ output_path: "/tmp/events.log", profile_id: "nginx" })
       })
     );
   });
@@ -341,7 +343,7 @@ describe("multi-file project sanitization workflow", () => {
     };
     const files = [
       { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
-      { id: "file-two", project_id: project.id, display_name: "second.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+      { id: "file-two", project_id: project.id, display_name: "first.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
     ];
     const calls: string[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -380,11 +382,11 @@ describe("multi-file project sanitization workflow", () => {
     expect(secondStart).toBeGreaterThan(firstStatus);
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/projects/${project.id}/files/file-one/sanitize-jobs`,
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/first.clean.log", profile_id: null }) })
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/first.log", profile_id: null }) })
     );
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/projects/${project.id}/files/file-two/sanitize-jobs`,
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/second.clean.log", profile_id: null }) })
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/second.log", profile_id: null }) })
     );
   });
 
@@ -412,7 +414,7 @@ describe("multi-file project sanitization workflow", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
-    expect(await screen.findByText(/Doppelte Ziele wurden vor dem Start abgewiesen/)).toBeInTheDocument();
+    expect(await screen.findByText(/gleichem Originalnamen/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
   });
 });
