@@ -1,6 +1,19 @@
 from test_client import TestClient
 
-from logsanitizer.main import app
+from logsanitizer.main import _relative_project_source_path, app
+
+
+def test_sanitization_output_path_uses_stored_relative_source_path(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    source = tmp_path / "private-data" / "projects" / "incident" / "sources" / "nested" / "events.log"
+    source.parent.mkdir(parents=True)
+    source.write_text("line", encoding="utf-8")
+
+    relative = _relative_project_source_path("incident", source, "nested/events.log")
+    external = _relative_project_source_path("incident", tmp_path / "external" / "events.log", "")
+
+    assert relative == Path("nested/events.log")
+    assert external == Path("events.log")
 
 
 def test_project_create_list_and_open_use_sqlite(tmp_path, monkeypatch) -> None:
