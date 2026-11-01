@@ -164,17 +164,50 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
     setError("");
   }
 
-  function addProfile() {
+  async function persistProfileConfig(nextConfig: RuleConfig, successMessage: string) {
+    if (draftDirty) {
+      setError("Bitte übernehmen oder verwerfen Sie zuerst den offenen Regelentwurf, bevor Sie ein Quellprofil speichern.");
+      return;
+    }
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const validation = await request("/api/rules/config/validate", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextConfig)
+      });
+      const checked = await validation.json() as { valid?: boolean; conflicts?: Conflict[]; detail?: unknown };
+      if (!validation.ok) throw new Error(typeof checked.detail === "string" ? checked.detail : "Regelkonfiguration ist ungültig.");
+      if (!checked.valid) { setConflicts(checked.conflicts || []); throw new Error("Regelkonflikte müssen vor dem Speichern behoben werden."); }
+      const response = await request("/api/rules/config", {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextConfig)
+      });
+      const body = await response.json() as RuleConfig & { detail?: unknown };
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Quellprofil konnte nicht gespeichert werden.");
+      setConfig(body); setDirty(false); setMessage(successMessage); setConflicts([]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Quellprofil konnte nicht gespeichert werden.");
+    } finally { setSaving(false); }
+  }
+
+  async function addProfile() {
     if (!profileDraft.name.trim()) { setError("Bitte einen Profilnamen eingeben."); return; }
     const id = profileDraft.id || makeId(profileDraft.name, config.profiles.map(profile => profile.id));
-    const next = { ...profileDraft, id, source_hint: profileDraft.source_hint?.trim() || null };
-    setConfig(current => ({ ...current, profiles: current.profiles.some(profile => profile.id === id) ? current.profiles.map(profile => profile.id === id ? next : profile) : [...current.profiles, next] }));
-    setProfileDraft({ id: "", name: "", source_hint: "" }); setDirty(true); setMessage("Quellprofil vorgemerkt. Änderungen anschließend speichern.");
+    const next = { ...profileDraft, id, name: profileDraft.name.trim(), source_hint: profileDraft.source_hint?.trim() || null };
+    const nextConfig = {
+      ...config,
+      profiles: config.profiles.some(profile => profile.id === id)
+        ? config.profiles.map(profile => profile.id === id ? next : profile)
+        : [...config.profiles, next]
+    };
+    await persistProfileConfig(nextConfig, `Quellprofil „${next.name}“ wurde gespeichert.`);
+    setProfileDraft({ id: "", name: "", source_hint: "" });
   }
-  function removeProfile(id: string) {
+
+  async function removeProfile(id: string) {
+    const profile = config.profiles.find(item => item.id === id);
     if (config.rules.some(rule => rule.profile_id === id)) { setError("Das Profil wird noch von Regeln verwendet. Weise diese Regeln zuerst einem anderen Profil zu."); return; }
-    setConfig(current => ({ ...current, profiles: current.profiles.filter(profile => profile.id !== id) }));
-    setDirty(true);
+    if (!window.confirm(`Quellprofil „${profile?.name || id}“ wirklich löschen?`)) return;
+    await persistProfileConfig({ ...config, profiles: config.profiles.filter(profile => profile.id !== id) }, "Quellprofil wurde gelöscht.");
+    if (profileDraft.id === id) setProfileDraft({ id: "", name: "", source_hint: "" });
   }
 
   if (loading) return <section className="rules-page"><p role="status">Regelkonfiguration wird geladen …</p></section>;
@@ -207,9 +240,9 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
         </div>
         <div className="rule-editor-footer"><span className="field-help">ID: {selectedId || "wird beim Übernehmen automatisch erzeugt"}</span><button className="secondary-button" onClick={saveDraft}>Regel übernehmen</button></div>
       </div>
-    </div> : section === "profiles" ? <div className="profile-workspace">
-      <div className="profile-form"><h3>{profileDraft.id ? "Quellprofil bearbeiten" : "Quellprofil anlegen"}</h3><label>Profilname<input value={profileDraft.name} onChange={event => setProfileDraft(current => ({ ...current, name: event.target.value }))} placeholder="z. B. Webserver" maxLength={100} /></label><label>Quellhinweis (optional)<input value={profileDraft.source_hint || ""} onChange={event => setProfileDraft(current => ({ ...current, source_hint: event.target.value }))} placeholder="z. B. nginx" maxLength={200} /></label><div className="rule-actions"><button className="secondary-button" onClick={addProfile}>Profil übernehmen</button>{profileDraft.id && <button className="text-button" onClick={() => setProfileDraft({ id: "", name: "", source_hint: "" })}>Abbrechen</button>}</div></div>
-      <div className="profile-list"><h3>Vorhandene Quellprofile</h3>{config.profiles.map(profile => <div className="profile-item" key={profile.id}><div><strong>{profile.name}</strong><small>{profile.source_hint || "Kein Quellhinweis"} · ID: {profile.id}</small></div><div className="rule-actions"><button className="text-button" onClick={() => { setProfileDraft({ ...profile, source_hint: profile.source_hint || "" }); setError(""); }}>Bearbeiten</button><button className="text-button danger-text" onClick={() => removeProfile(profile.id)}>Löschen</button></div></div>)}{config.profiles.length === 0 && <p className="muted-message">Noch keine Quellprofile angelegt.</p>}</div>
+    </div> : section === "profiles" ? <div className="profile-workspace"><p className="field-help profile-save-note">Quellprofile werden beim Speichern sofort dauerhaft in der lokalen Regelkonfiguration übernommen. Ein separates Speichern der gesamten Regelkonfiguration ist dafür nicht erforderlich.</p>
+      <div className="profile-form"><h3>{profileDraft.id ? "Quellprofil bearbeiten" : "Quellprofil anlegen"}</h3><label>Profilname<input value={profileDraft.name} onChange={event => setProfileDraft(current => ({ ...current, name: event.target.value }))} placeholder="z. B. Webserver" maxLength={100} /></label><label>Quellhinweis (optional)<input value={profileDraft.source_hint || ""} onChange={event => setProfileDraft(current => ({ ...current, source_hint: event.target.value }))} placeholder="z. B. nginx" maxLength={200} /></label><div className="rule-actions"><button className="secondary-button" onClick={() => void addProfile()} disabled={saving || !profileDraft.name.trim()}>Profil speichern</button>{profileDraft.id && <button className="text-button" onClick={() => setProfileDraft({ id: "", name: "", source_hint: "" })}>Abbrechen</button>}</div></div>
+      <div className="profile-list"><h3>Vorhandene Quellprofile</h3>{config.profiles.map(profile => <div className="profile-item" key={profile.id}><div><strong>{profile.name}</strong><small>{profile.source_hint || "Kein Quellhinweis"} · ID: {profile.id}</small></div><div className="rule-actions"><button className="text-button" onClick={() => { setProfileDraft({ ...profile, source_hint: profile.source_hint || "" }); setError(""); }}>Bearbeiten</button><button className="text-button danger-text" onClick={() => void removeProfile(profile.id)} disabled={saving}>Löschen</button></div></div>)}{config.profiles.length === 0 && <p className="muted-message">Noch keine Quellprofile angelegt.</p>}</div>
     </div> : section === "library" ? <RuleLibraryPanel onAddTemplate={addTemplate} /> : <RuleTestPanel config={config} draft={draft} selectedId={selectedId} draftDirty={draftDirty} />}
   </section>;
 }
