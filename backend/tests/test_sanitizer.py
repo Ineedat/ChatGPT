@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,13 @@ from test_client import TestClient
 from logsanitizer.main import app
 from logsanitizer.rule_config import RuleConfig, save_rule_config
 from logsanitizer.sanitizer import SanitizationCancelled, SanitizationError, sanitize_file
+
+
+def _stored_output_path(tmp_path: Path, run_id: str) -> Path:
+    with sqlite3.connect(tmp_path / "data" / "review.sqlite3") as db:
+        row = db.execute("SELECT output_path FROM review_runs WHERE id=?", (run_id,)).fetchone()
+    assert row is not None
+    return Path(row[0])
 
 
 def config() -> RuleConfig:
@@ -142,7 +150,9 @@ def test_sanitization_api_requires_selected_supported_format_and_writes_separate
         assert response.json()["replacements"] == 2
         assert "secret" not in response.text
 
-    assert (tmp_path / "clean.log").read_bytes() == b"hidden=REDACTED\n"
+    work_output = _stored_output_path(tmp_path, response.json()["review_run_id"])
+    assert work_output.read_bytes() == b"hidden=REDACTED\n"
+    assert not (tmp_path / "clean.log").exists()
     assert source.read_bytes() == original
 
 
@@ -331,7 +341,9 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs/{outside_job_id}"
         ).json()
         assert outside_state["status"] == "completed"
-        assert outside_output.read_bytes() == b"hidden=REDACTED\\n"
+        outside_work_output = _stored_output_path(tmp_path, outside_job_id)
+        assert outside_work_output.read_bytes() == b"hidden=REDACTED\\n"
+        assert not outside_output.exists()
 
         client.put(
             f"/api/projects/{project_id}/output-directory",
@@ -351,13 +363,15 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
         state = status_response.json()
         assert state["status"] == "completed"
         assert state["phase"] == "completed"
-        assert state["processed_bytes"] == output.stat().st_size
-        assert state["total_bytes"] == output.stat().st_size
+        work_output = _stored_output_path(tmp_path, job_id)
+        assert state["processed_bytes"] == work_output.stat().st_size
+        assert state["total_bytes"] == work_output.stat().st_size
         assert state["result"]["validated"] is True
         assert "source_path" not in status_response.text
         assert "secret=alpha" not in status_response.text
 
-    assert output.read_bytes() == b"hidden=REDACTED\\n"
+    assert work_output.read_bytes() == b"hidden=REDACTED\\n"
+    assert not output.exists()
     assert source.read_bytes() == original
     assert list(second_output_dir.glob(".service.log.logsanitizer-*.tmp")) == []
 
@@ -414,7 +428,9 @@ def test_sanitization_api_allows_user_selected_output_directory(tmp_path: Path, 
         assert response.status_code == 200
         assert response.json()["status"] == "completed"
 
-    assert outside.read_bytes() == b"hidden=REDACTED\\n"
+    work_output = _stored_output_path(tmp_path, response.json()["review_run_id"])
+    assert work_output.read_bytes() == b"hidden=REDACTED\\n"
+    assert not outside.exists()
     assert source.read_bytes() == original
 
 
