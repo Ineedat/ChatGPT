@@ -258,7 +258,7 @@ describe("JSON document sanitization UI", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
     fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
   });
 });
 
@@ -292,12 +292,12 @@ describe("source profile selection for project sanitization", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
     fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
     const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
     fireEvent.focus(profileSelect);
     expect(await screen.findByRole("option", { name: "Nginx" })).toBeInTheDocument();
     fireEvent.change(profileSelect, { target: { value: "nginx" } });
-    fireEvent.click(screen.getByRole("button", { name: "Bereinigung starten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bereinigen" }));
 
     expect(await screen.findByText(/Bereinigung für events.log abgeschlossen und validiert/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Prüfung & Verlauf öffnen" })).toBeInTheDocument();
@@ -323,14 +323,14 @@ describe("compact registered file workspace", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     const fileName = await screen.findByText("events.json");
-    const card = fileName.closest("li");
-    expect(card).toHaveClass("registered-file-card");
-    expect(within(card as HTMLElement).getByText("4.096 Byte")).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText(/Erkannt: JSON/)).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("combobox", { name: "Format für events.json" })).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("button", { name: "Format lokal prüfen" })).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("button", { name: "Bereinigung starten" })).toBeDisabled();
+    const row = fileName.closest("tr");
+    expect(row).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText("4.096 Byte")).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText(/Erkannt: JSON/)).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("combobox", { name: "Format für events.json" })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Erkennen" })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Bereinigen" })).toBeDisabled();
     expect(screen.queryByRole("region", { name: "Projektprinzipien" })).not.toBeInTheDocument();
   });
 });
