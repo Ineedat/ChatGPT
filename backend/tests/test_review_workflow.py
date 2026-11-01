@@ -436,6 +436,8 @@ def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, m
         assert "REDACTED" in body["sanitized"]["content"]
         assert body["original"]["total_bytes"] == len(b"secret=alpha\\nsecond line\\n")
         assert body["sanitized"]["total_bytes"] == output.stat().st_size
+        assert body["original_changed_lines"] == [1]
+        assert body["sanitized_changed_lines"] == [1]
         assert "source_path" not in body and "output_path" not in body
 
         create_user("compare-operator", "compare-operator-password-123", ["operator"])
