@@ -224,3 +224,15 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
   - Backend Linux: 118 passed, 1 skipped; Ruff erfolgreich.
   - Backend Windows: 23 gezielte Projekt-/Mappingtests; Ruff erfolgreich.
 - PR #2 bleibt offen und nicht gemergt. Das portable Linux-Paket wurde für diesen Stand noch nicht neu gebaut; die visuelle Abnahme auf dem Zielsystem steht weiterhin aus.
+
+
+## Prüfarbeitsbereich, Quellprofile und Benutzeranlage (2026-11-01)
+
+- Quellprofile werden nun einzeln und unmittelbar gespeichert: Anlegen, Bearbeiten und Löschen validieren die vollständige Regelkonfiguration serverseitig und schreiben sie erst nach erfolgreicher Prüfung. Nicht gespeicherte Regeländerungen blockieren das separate Profilspeichern, damit sie nicht unbeabsichtigt mit aktiviert werden.
+- Die Prüfansicht lädt die registrierten Dateien des aktuell geöffneten Projekts und zeigt pro Datei den letzten Bereinigungslauf und dessen Status.
+- Für prüfbare Läufe kann der Prüfer einen Dateivergleich öffnen. Original und sanitisierte Ausgabe werden nebeneinander in getrennten, scrollbar begrenzten Fenstern mit jeweils maximal 65.536 Byte angezeigt. Vor-/Zurücknavigation erfolgt fensterweise; die gesamte Datei wird nicht in den Arbeitsspeicher geladen.
+- Der neue Vergleichsendpunkt ist auf Administratoren, Prüfer und Freigeber beschränkt. Er prüft vor der Anzeige die gespeicherte Identität der sanitisierte Ausgabe und gibt keine absoluten Dateipfade zurück.
+- Warteschlange, Dateiprüfung und Prüfverlauf sind jetzt getrennte Ansichten innerhalb der Prüfoberfläche. Das Audit-Protokoll befindet sich im Prüfverlauf.
+- Die Benutzerverwaltung zeigt die Anlage nicht mehr inline in der Benutzerliste. „Neuen Benutzer anlegen“ öffnet eine separate Ansicht; nach erfolgreicher Anlage kehrt die Oberfläche zur Liste zurück.
+- Regressionstests ergänzt: Quellprofil anlegen/bearbeiten, separate Benutzeranlage, Projektdateiliste und Dateivergleich, rollenbeschränkter Vergleichsendpunkt sowie Navigation über große Dateien.
+- **CI-Verifizierung dieses Stands steht noch aus.** Die bisherigen grünen CI-Läufe gelten nicht für diese Änderungen. PR #2 bleibt offen und ungemergt.
