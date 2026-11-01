@@ -588,7 +588,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                   <span className="table-subtext">Erkannt: {(file.detected_format || "noch nicht geprüft").toUpperCase()} · Endung: {(file.format_hint || "unbekannt").toUpperCase()}</span>
                 </td>
                 <td>
-                  <select aria-label={`Quellprofil für ${relativePath}`} value={profileSelections[file.id] || ""} onFocus={() => void loadSourceProfiles()} onChange={event => setProfileSelections(current => ({ ...current, [file.id]: event.target.value }))} disabled={batchRunning || activeJob}>
+                  <select aria-label={`Quellprofil für ${relativePath}`} value={profileSelections[file.id] || ""} onFocus={() => void loadSourceProfiles()} onChange={event => setProfileSelections(current => ({ ...current, [file.id]: event.target.value }))} disabled={batchRunning || activeJob || approved}>
                     <option value="">Globale Regeln</option>{sourceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
                   </select>
                 </td>
