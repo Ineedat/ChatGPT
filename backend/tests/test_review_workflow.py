@@ -231,6 +231,40 @@ def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(t
         assert client.get("/api/reviews/queue").status_code == 403
 
 
+def test_approved_file_is_visible_and_locked_against_further_sanitization(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+    create_user("operator-locked", "operator-password-789", ["operator"])
+
+    with BaseTestClient(app) as client:
+        login = client.post("/api/auth/login", json={
+            "username": "operator-locked", "password": "operator-password-789"
+        })
+        assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        response, project, file, output = _sanitized_run(client, tmp_path)
+        assert response.status_code == 200
+        assert response.json()["review_status"] == "approved"
+        assert output.exists()
+
+        files = client.get(f"/api/projects/{project['id']}/files")
+        assert files.status_code == 200
+        assert next(item for item in files.json() if item["id"] == file["id"])["state"] == "approved"
+
+        retry = client.post(
+            f"/api/projects/{project['id']}/files/{file['id']}/sanitize",
+            json={"output_path": str(tmp_path / "second-output.log")},
+        )
+        assert retry.status_code == 409
+        queued_retry = client.post(
+            f"/api/projects/{project['id']}/files/{file['id']}/sanitize-jobs",
+            json={"output_path": str(tmp_path / "second-output.log")},
+        )
+        assert queued_retry.status_code == 409
+        assert not (tmp_path / "second-output.log").exists()
+
+
 def test_failed_sanitization_is_persisted_but_never_queued_for_approval(tmp_path, monkeypatch):
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
