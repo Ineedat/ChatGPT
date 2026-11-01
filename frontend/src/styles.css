@@ -699,3 +699,51 @@ input:not([type=checkbox]):not([type=file]), select, textarea { min-width: 0; }
 .user-admin-actions{display:flex;gap:8px;flex-wrap:wrap}
 .user-actions{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:760px){.review-compare-grid{grid-template-columns:minmax(0,1fr)}.review-compare-pane pre{height:38vh;min-height:150px}.review-project-files table{min-width:620px}}
+
+
+/* Review comparison: Windows-like high-contrast surface, synchronized panes and visible changes. */
+.review-compare-pane {
+  min-width: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border-color: #9a9a9a;
+}
+.review-compare-pane h4 {
+  color: #1f1f1f;
+  background: #f0f0f0;
+  border-bottom: 1px solid #b8b8b8;
+  padding: 7px 9px;
+}
+.review-compare-pane pre {
+  display: block;
+  height: min(52vh, 520px);
+  min-height: 180px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #b8b8b8;
+  border-radius: 0 0 5px 5px;
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+  font: 11px/1.45 Consolas, "Courier New", monospace;
+  white-space: pre;
+  tab-size: 4;
+}
+.review-compare-changed {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  color: #1f1f1f;
+}
+.review-compare-changed-original {
+  background: #ffe49a;
+  box-shadow: inset 3px 0 #9a6500;
+}
+.review-compare-changed-sanitized {
+  background: #ccebd1;
+  box-shadow: inset 3px 0 #17652a;
+}
+@media (max-width: 760px) {
+  .review-compare-pane pre { height: 38vh; min-height: 150px; }
+}
