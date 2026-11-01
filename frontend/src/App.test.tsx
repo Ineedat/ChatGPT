@@ -423,7 +423,7 @@ describe("multi-file project sanitization workflow", () => {
     fireEvent.click(duplicateFileChecks[1]);
     await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
-    expect(await screen.findByText(/gleichem Originalnamen/)).toBeInTheDocument();
+    expect(await screen.findByText(/gleichen relativen Pfad/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
   });
 });
