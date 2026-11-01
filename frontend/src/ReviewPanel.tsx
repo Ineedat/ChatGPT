@@ -148,7 +148,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
   }, [selectedRun?.status, selectedRun?.id, roles]);
 
   async function loadComparePreview(runId: string, originalOffset = 0, outputOffset = 0) {
-    setCompareLoading(true); setCompareError("");
+    setCompareLoading(true); setCompareError(""); setComparePreview(null);
     try {
       const params = new URLSearchParams({ original_offset: String(originalOffset), output_offset: String(outputOffset) });
       const response = await reviewFetch(`/api/reviews/runs/${encodeURIComponent(runId)}/compare-preview?${params}`);
@@ -411,7 +411,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
           <div><strong>{run.display_name}</strong><span>{run.output_name} · {statusLabel(run.status)}</span><span>{new Date(run.created_at).toLocaleString("de-DE")}</span>{run.last_comment && <span>Kommentar: {run.last_comment}</span>}</div>
           <button className="secondary-button" type="button" onClick={() => openRunForInspection(run)}>Details</button>
         </li>)}</ul>}
-    </section>
+    </section>}
     {activeView === "history" && canReview && <section className="review-section" aria-label="Audit-Protokoll">
       <div className="section-heading"><h3>Audit-Protokoll ({visibleAudit.length} Ereignisse)</h3>{selectedRun && <label className="review-audit-filter"><input type="checkbox" checked={auditRunOnly} onChange={event => setAuditRunOnly(event.target.checked)} /> Nur ausgewählten Lauf anzeigen</label>}</div>
       {visibleAudit.length === 0 ? <p className="muted-message">{audit.length === 0 ? "Noch keine Audit-Ereignisse." : "Für diesen Lauf liegen in den letzten Audit-Ereignissen keine Einträge vor."}</p> : <ul className="audit-list">{visibleAudit.map(event =>
