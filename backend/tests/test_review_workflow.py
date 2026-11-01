@@ -491,7 +491,9 @@ def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, m
         assert "secret=alpha" in body["original"]["content"]
         assert "REDACTED" in body["sanitized"]["content"]
         assert body["original"]["total_bytes"] == len(b"secret=alpha\\nsecond line\\n")
-        assert body["sanitized"]["total_bytes"] == output.stat().st_size
+        work_output = _stored_output_path(tmp_path, run_id)
+        assert body["sanitized"]["total_bytes"] == work_output.stat().st_size
+        assert not output.exists()
         assert body["original_changed_lines"] == [1]
         assert body["sanitized_changed_lines"] == [1]
         assert "source_path" not in body and "output_path" not in body
