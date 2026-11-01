@@ -532,6 +532,20 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         {importMessage && <p className="success-message" role="status">{importMessage}</p>}
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
         <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
+        <div className="bulk-file-settings" aria-label="Einstellungen für alle Dateien">
+          <strong>Gemeinsame Einstellungen</strong>
+          <label>Format für alle Dateien
+            <select aria-label="Format für alle Dateien" value={bulkFormatOverride} onChange={event => setBulkFormatOverride(event.target.value)} disabled={batchRunning || applyingBulkSettings}>
+              <option value="">Automatische Erkennung verwenden</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option>
+            </select>
+          </label>
+          <label>Quellprofil für alle Dateien
+            <select aria-label="Quellprofil für alle Dateien" value={bulkProfileId} onFocus={() => void loadSourceProfiles()} onChange={event => setBulkProfileId(event.target.value)} disabled={batchRunning || applyingBulkSettings}>
+              <option value="">Globale Regeln (kein Quellprofil)</option>{sourceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+            </select>
+          </label>
+          <button className="secondary-button" type="button" onClick={() => void applySettingsToAllFiles()} disabled={batchRunning || applyingBulkSettings || importedFiles.length === 0}>{applyingBulkSettings ? "Wird angewendet …" : "Auf alle Dateien anwenden"}</button>
+        </div>
         {importedFiles.length > 0 && <div className="batch-toolbar" aria-label="Mehrdatei-Bereinigung">
           <div className="batch-selection-actions">
             <button className="secondary-button" type="button" onClick={() => setSelectedFileIds(selectableFiles.map(file => file.id))} disabled={batchRunning || selectableFiles.length === 0}>Geeignete auswählen ({selectableFiles.length})</button>
@@ -547,39 +561,47 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           <span>Aktuell: {batchProgress.fileName}</span>
           <button className="secondary-button" type="button" onClick={stopBatchSanitization}>Stapel abbrechen</button>
         </div>}
-        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li className="registered-file-card" key={file.id}>
-          <div className="file-card-heading">
-            <div className="file-title"><label className="batch-file-select"><input type="checkbox" aria-label={`Für Stapel auswählen: ${file.display_name}`} checked={selectedFileIds.includes(file.id)} disabled={batchRunning || !selectableFiles.some(item => item.id === file.id)} onChange={event => setSelectedFileIds(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><strong>{file.display_name}</strong></label><span className={file.state === "registered" ? "file-state file-state-ready" : "file-state"}>{file.state === "registered" ? "Registriert" : file.state}</span></div>
-            <span className="file-size">{file.size_bytes.toLocaleString("de-DE")} Byte</span>
-          </div>
-          <div className="file-format-summary">
-            <span>Endung: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.format_hint || "unknown"] || "unbekannt"}</span>
-            <span>Erkannt: {({ json: "JSON", jsonl: "JSON Lines", text: "Text", xml: "XML", csv: "CSV", unknown: "unbekannt" } as Record<string, string>)[file.detected_format || "unknown"] || "unbekannt"}</span>
-            {file.format_override && <span>Manuell: <strong>{file.format_override.toUpperCase()}</strong></span>}
-          </div>
-          <div className="file-card-controls">
-            <label>Format festlegen
-              <select aria-label={`Format für ${file.display_name}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)}>
-                <option value="">Automatisch (Erkennung verwenden)</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option>
-              </select>
-            </label>
-            <div className="file-format-actions">
-              <button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)}>Format lokal prüfen</button>
-              <button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Validiert …" : "Vollständig validieren"}</button>
-            </div>
-          </div>
-          {validationResults[file.id] && <p className={validationResults[file.id].valid ? "success-message" : "error-message"} role="status">{validationResults[file.id].valid ? "Format gültig" : "Format ungültig"} · {validationResults[file.id].format} · {validationResults[file.id].bytes_checked.toLocaleString("de-DE")} Byte geprüft{validationResults[file.id].error ? ` · ${validationResults[file.id].error}` : ""}</p>}
-          <div className="file-run-controls">
-            <label>Quellprofil
-              <select aria-label={`Quellprofil für ${file.display_name}`} value={profileSelections[file.id] || ""} onFocus={() => void loadSourceProfiles()} onChange={event => setProfileSelections(current => ({ ...current, [file.id]: event.target.value }))}>
-                <option value="">Globale Regeln (kein Quellprofil)</option>{sourceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-              </select>
-            </label>
-            <button className="primary-button file-sanitize-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || !["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") || Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))}>Bereinigung starten</button>
-          </div>
-          {loadingProfiles && <p className="field-help">Quellprofile werden geladen …</p>}
-          {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen", interrupted: "Unterbrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}{sanitizationJobs[file.id].status === "completed" && <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfung & Verlauf öffnen</button>}</div>}
-        </li>)}</ul>}
+        {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <div className="registered-files-table-wrap">
+          <table className="registered-files-table">
+            <thead><tr><th scope="col">Datei</th><th scope="col">Größe</th><th scope="col">Format</th><th scope="col">Quellprofil</th><th scope="col">Status</th><th scope="col">Aktionen</th></tr></thead>
+            <tbody>{importedFiles.map(file => {
+              const relativePath = file.relative_path || file.display_name;
+              const validation = validationResults[file.id];
+              const job = sanitizationJobs[file.id];
+              const effectiveFormat = file.format_override || file.detected_format || "unknown";
+              const activeJob = Boolean(job && ["queued", "running", "cancelling"].includes(job.status));
+              return <tr key={file.id}>
+                <td className="registered-file-name">
+                  <label className="batch-file-select"><input type="checkbox" aria-label={`Für Stapel auswählen: ${relativePath}`} checked={selectedFileIds.includes(file.id)} disabled={batchRunning || activeJob || !selectableFiles.some(item => item.id === file.id)} onChange={event => setSelectedFileIds(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><span title={relativePath}>{relativePath}</span></label>
+                  <span className="table-file-state">{file.state === "registered" ? "Registriert" : file.state}</span>
+                </td>
+                <td className="file-size">{file.size_bytes.toLocaleString("de-DE")} Byte</td>
+                <td>
+                  <select aria-label={`Format für ${relativePath}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)} disabled={batchRunning || activeJob || applyingBulkSettings}>
+                    <option value="">Automatisch ({effectiveFormat.toUpperCase()})</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option>
+                  </select>
+                  <span className="table-subtext">Erkannt: {file.detected_format || "noch nicht geprüft"} · Endung: {file.format_hint || "unbekannt"}</span>
+                </td>
+                <td>
+                  <select aria-label={`Quellprofil für ${relativePath}`} value={profileSelections[file.id] || ""} onFocus={() => void loadSourceProfiles()} onChange={event => setProfileSelections(current => ({ ...current, [file.id]: event.target.value }))} disabled={batchRunning || activeJob}>
+                    <option value="">Globale Regeln</option>{sourceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+                  </select>
+                </td>
+                <td className="file-status-cell">
+                  <span className={validation ? (validation.valid ? "file-state file-state-ready" : "file-state file-state-error") : "file-state"}>{validation ? (validation.valid ? "Validiert" : "Ungültig") : "Nicht validiert"}</span>
+                  {validation && <span className="table-subtext">{validation.format} · {validation.bytes_checked.toLocaleString("de-DE")} Byte{validation.error ? ` · ${validation.error}` : ""}</span>}
+                  {job && <span className={`file-state job-state-${job.status}`}>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen", interrupted: "Unterbrochen" } as Record<string, string>)[job.status]}</span>}
+                  {job && ["queued", "running"].includes(job.status) && <span className="table-subtext">{job.processed_bytes.toLocaleString("de-DE")} / {job.total_bytes.toLocaleString("de-DE")} Byte</span>}
+                </td>
+                <td className="file-row-actions">
+                  <button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)} disabled={batchRunning || activeJob}>Erkennen</button>
+                  <button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={batchRunning || activeJob || validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Prüft …" : "Validieren"}</button>
+                  {job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
+                </td>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
       </section> : <p className="muted-message">Bitte zuerst ein Projekt auf der Startseite öffnen.</p>;
 
   return <main className="app-shell">
