@@ -364,7 +364,7 @@ def update_format_override(project_id: str, file_id: str, format_override: str |
         )
         row = connection.execute(
             """
-            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE project_id = ? AND id = ?
             """,
@@ -377,7 +377,7 @@ def list_imported_files(project_id: str) -> list[ImportedFile]:
     with connect_database() as connection:
         rows = connection.execute(
             """
-            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE project_id = ?
             ORDER BY imported_at ASC, display_name COLLATE NOCASE ASC
@@ -419,7 +419,7 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
         )
         row = connection.execute(
             """
-            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE id = ?
             """,
