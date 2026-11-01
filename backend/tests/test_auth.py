@@ -184,3 +184,76 @@ def test_rule_owner_can_manage_rules_but_cannot_process_or_manage_projects(tmp_p
         assert owner.post("/api/projects", json={"name": "Denied project"}).status_code == 403
         assert processor.put("/api/rules/config", json=payload).status_code == 403
         assert processor.post("/api/projects", json={"name": "Allowed project"}).status_code == 201
+
+
+def _admin_client(username, password):
+    client = TestClient(app)
+    response = client.post(
+        "/api/auth/login", json={"username": username, "password": password}
+    )
+    assert response.status_code == 200
+    client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+    return client
+
+
+def test_admin_can_update_roles_and_disable_user_and_sessions_are_revoked(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("root-admin", "root-admin-password-123", ["admin"])
+    target_id = create_user("temporary-user", "temporary-password-123", ["operator"])
+    with _admin_client("root-admin", "root-admin-password-123") as admin, \
+         _admin_client("temporary-user", "temporary-password-123") as target:
+        changed = admin.put(
+            f"/api/auth/users/{target_id}",
+            json={"roles": ["reviewer", "approver"]},
+        )
+        assert changed.status_code == 200
+        assert set(changed.json()["roles"]) == {"reviewer", "approver"}
+        disabled = admin.put(
+            f"/api/auth/users/{target_id}", json={"enabled": False}
+        )
+        assert disabled.status_code == 200
+        assert disabled.json()["enabled"] is False
+        assert target.get("/api/auth/me").status_code == 401
+        assert admin.put(
+            f"/api/auth/users/{target_id}", json={"enabled": True}
+        ).json()["enabled"] is True
+
+
+def test_admin_cannot_remove_last_admin_or_self_lockout(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("only-admin", "only-admin-password-123", ["admin"])
+    with _admin_client("only-admin", "only-admin-password-123") as admin:
+        users = admin.get("/api/auth/users").json()
+        admin_id = users[0]["id"]
+        assert admin.delete(f"/api/auth/users/{admin_id}").status_code == 409
+        assert admin.put(
+            f"/api/auth/users/{admin_id}", json={"roles": ["operator"]}
+        ).status_code == 409
+        assert admin.put(
+            f"/api/auth/users/{admin_id}", json={"enabled": False}
+        ).status_code == 409
+        assert admin.get("/api/auth/me").status_code == 200
+
+
+def test_admin_can_delete_another_admin_when_a_second_active_admin_exists(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("primary-admin", "primary-admin-password-123", ["admin"])
+    secondary_id = create_user("secondary-admin", "secondary-admin-password-123", ["admin"])
+    with _admin_client("primary-admin", "primary-admin-password-123") as admin:
+        deleted = admin.delete(f"/api/auth/users/{secondary_id}")
+        assert deleted.status_code == 200
+        assert deleted.json() == {"deleted": True, "id": secondary_id}
+        assert all(row["username"] != "secondary-admin" for row in admin.get("/api/auth/users").json())
+
+
+def test_user_administration_rejects_invalid_roles_and_non_admins(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    create_user("regular-user", "regular-user-password-123", ["operator"])
+    create_user("administrator", "administrator-password-123", ["admin"])
+    target_id = 1
+    with _admin_client("administrator", "administrator-password-123") as admin, \
+         _admin_client("regular-user", "regular-user-password-123") as regular:
+        assert admin.put(
+            f"/api/auth/users/{target_id}", json={"roles": ["not-a-role"]}
+        ).status_code == 422
+        assert regular.delete(f"/api/auth/users/{target_id}").status_code == 403
