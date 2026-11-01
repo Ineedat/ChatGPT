@@ -870,7 +870,7 @@ def project_file_sanitize_start(
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
+            "SELECT source_path, detected_format, format_override, display_name, relative_path FROM imported_files "
             "WHERE project_id = ? AND id = ?",
             (project_id, file_id),
         ).fetchone()
@@ -885,7 +885,7 @@ def project_file_sanitize_start(
         raise HTTPException(status_code=422, detail="Der Projekt-Ausgabeordner muss festgelegt werden und existieren.")
     try:
         resolved_root = output_root.resolve(strict=True)
-        relative_source = _relative_project_source_path(project_id, source)
+        relative_source = _relative_project_source_path(project_id, source, row["relative_path"])
         expected_output = (resolved_root / relative_source).resolve(strict=False)
         if output.resolve(strict=False) != expected_output:
             raise HTTPException(status_code=422, detail="Die Ausgabedatei muss die relative Quellpfadstruktur im Projekt-Ausgabeordner beibehalten.")
