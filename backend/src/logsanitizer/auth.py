@@ -346,7 +346,7 @@ def update_user(user_id: int, payload: UserUpdate, request: Request):
             raise HTTPException(409, "Das eigene Konto kann nicht deaktiviert werden.")
         if user_id == actor_id and "admin" not in next_roles:
             raise HTTPException(409, "Die eigene Administratorrolle kann nicht entzogen werden.")
-        if "admin" in current_roles and ("admin" not in next_roles or not next_enabled):
+        if bool(target["enabled"]) and "admin" in current_roles and ("admin" not in next_roles or not next_enabled):
             if _active_admin_count(db) <= 1:
                 raise HTTPException(409, "Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.")
 
