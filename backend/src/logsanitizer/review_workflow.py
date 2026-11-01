@@ -16,8 +16,8 @@ import regex as re
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
-from logsanitizer.notifications import notify_returned_run
 from logsanitizer.database import connect_database
+from logsanitizer.notifications import notify_returned_run
 
 router = APIRouter(prefix="/api/reviews", tags=["review"])
 VALID_STATUSES = {
