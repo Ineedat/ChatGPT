@@ -100,6 +100,7 @@ describe("project file registration UI", () => {
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Dateipfad" }), { target: { value: "/var/log/service.log" } });
     fireEvent.click(screen.getByRole("button", { name: "Datei hinzufügen" }));
 
@@ -132,6 +133,7 @@ describe("project file registration UI", () => {
     await screen.findByRole("region", { name: "Geöffnetes Projekt" });
     fireEvent.change(screen.getByRole("combobox", { name: "Quelle" }), { target: { value: "folder" } });
     expect(screen.getByRole("checkbox", { name: "Unterordner einbeziehen" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Ordnerpfad" }), { target: { value: "/var/log/my-service" } });
     fireEvent.click(screen.getByRole("button", { name: "Ordnerinhalt hinzufügen" }));
 
@@ -142,6 +144,37 @@ describe("project file registration UI", () => {
       body: JSON.stringify({ path: "/var/log/my-service", recursive: true })
     }));
   });
+  it("uploads browser-selected files without exposing client filesystem paths", async () => {
+    const project = {
+      id: "project-upload", name: "Uploadprojekt", description: "", status: "draft",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
+    };
+    const uploaded = {
+      id: "file-upload", project_id: project.id, display_name: "service.log", size_bytes: 7,
+      modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered"
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        registered_count: 1, skipped_count: 0, registered_files: [uploaded], issues: [], limit_reached: false
+      }) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    const fileInput = await screen.findByLabelText("Lokale Dateien");
+    const file = new File(["logdata"], "service.log", { type: "text/plain" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl übernehmen" }));
+    expect(await screen.findByText(/Übernommen: 1; übersprungen: 0/)).toBeInTheDocument();
+    expect(await screen.findByText("service.log")).toBeInTheDocument();
+    const uploadCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/files/upload"));
+    expect(uploadCall).toBeDefined();
+    expect((uploadCall?.[1] as RequestInit).body).toBeInstanceOf(FormData);
+    expect((uploadCall?.[1] as RequestInit).headers).toBeUndefined();
+  });
+
 });
 
 
