@@ -480,6 +480,10 @@ def _read_compare_window(path: Path, byte_offset: int) -> dict[str, object]:
     }
 
 
+def _utf16_length(value: str) -> int:
+    return len(value.encode("utf-16-le")) // 2
+
+
 def _changed_line_spans(
     original: str, sanitized: str
 ) -> tuple[list[int], list[int], list[dict[str, int]], list[dict[str, int]]]:
@@ -495,7 +499,7 @@ def _changed_line_spans(
     def add_whole_line(
         target: list[dict[str, int]], line_number: int, value: str
     ) -> None:
-        target.append({"line_number": line_number, "start": 0, "end": max(1, len(value))})
+        target.append({"line_number": line_number, "start": 0, "end": max(1, _utf16_length(value))})
 
     for tag, original_start, original_end, sanitized_start, sanitized_end in matcher.get_opcodes():
         if tag == "equal":
@@ -516,11 +520,15 @@ def _changed_line_spans(
                     continue
                 if a_end > a_start:
                     original_spans.append({
-                        "line_number": original_line_number, "start": a_start, "end": a_end
+                        "line_number": original_line_number,
+                        "start": _utf16_length(original_line[:a_start]),
+                        "end": _utf16_length(original_line[:a_end])
                     })
                 if b_end > b_start:
                     sanitized_spans.append({
-                        "line_number": sanitized_line_number, "start": b_start, "end": b_end
+                        "line_number": sanitized_line_number,
+                        "start": _utf16_length(sanitized_line[:b_start]),
+                        "end": _utf16_length(sanitized_line[:b_end])
                     })
         for index in range(original_start + paired, original_end):
             add_whole_line(original_spans, index + 1, original_text[index])
