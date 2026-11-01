@@ -292,6 +292,8 @@ def project_file_detect_format(project_id: str, file_id: str) -> dict[str, str |
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    if is_file_approved(project_id, file_id):
+        raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist gesperrt.")
     source = Path(row["source_path"])
     try:
         if source.is_symlink() or not source.is_file():
@@ -323,6 +325,8 @@ def project_file_set_format(
     """Persist a manual format override, or clear it with null."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
+    if is_file_approved(project_id, file_id):
+        raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist gesperrt.")
     updated = update_format_override(project_id, file_id, payload.format_override)
     if updated is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
