@@ -347,6 +347,8 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    if is_file_approved(project_id, file_id):
+        raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist gesperrt.")
     source = Path(row["source_path"])
     if source.is_symlink() or not source.is_file():
         raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
