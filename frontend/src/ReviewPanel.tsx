@@ -175,10 +175,10 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
       current.push(span);
       spansByLine.set(span.line_number, current);
     });
-    const lines = content.match(/[^\\n]*\\n|[^\\n]+$/g) || [];
+    const lines = content.match(/[^\n]*\n|[^\n]+$/g) || [];
     return lines.map((line, index) => {
       const lineNumber = index + 1;
-      const lineContent = line.replace(/\\r?\\n$/, "");
+      const lineContent = line.replace(/\r?\n$/, "");
       const lineEnding = line.slice(lineContent.length);
       const spans = spansByLine.get(lineNumber) || [];
       if (!spans.length) {
