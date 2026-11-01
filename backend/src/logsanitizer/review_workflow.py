@@ -484,6 +484,19 @@ def _utf16_length(value: str) -> int:
     return len(value.encode("utf-16-le")) // 2
 
 
+def _merge_changed_ranges(
+    line: str, ranges: list[tuple[int, int]]
+) -> list[tuple[int, int]]:
+    """Merge adjacent diff fragments inside a token, but keep whitespace-separated hits apart."""
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(ranges):
+        if merged and not line[merged[-1][1]:start].isspace():
+            merged[-1] = (merged[-1][0], end)
+        else:
+            merged.append((start, end))
+    return merged
+
+
 def _changed_line_spans(
     original: str, sanitized: str
 ) -> tuple[list[int], list[int], list[dict[str, int]], list[dict[str, int]]]:
@@ -521,21 +534,27 @@ def _changed_line_spans(
                 add_whole_line(sanitized_spans, sanitized_line_number, sanitized_line)
                 continue
             line_matcher = difflib.SequenceMatcher(a=original_line, b=sanitized_line)
+            original_ranges = []
+            sanitized_ranges = []
             for line_tag, a_start, a_end, b_start, b_end in line_matcher.get_opcodes():
                 if line_tag == "equal":
                     continue
                 if a_end > a_start:
-                    original_spans.append({
-                        "line_number": original_line_number,
-                        "start": _utf16_length(original_line[:a_start]),
-                        "end": _utf16_length(original_line[:a_end]),
-                    })
+                    original_ranges.append((a_start, a_end))
                 if b_end > b_start:
-                    sanitized_spans.append({
-                        "line_number": sanitized_line_number,
-                        "start": _utf16_length(sanitized_line[:b_start]),
-                        "end": _utf16_length(sanitized_line[:b_end]),
-                    })
+                    sanitized_ranges.append((b_start, b_end))
+            for start, end in _merge_changed_ranges(original_line, original_ranges):
+                original_spans.append({
+                    "line_number": original_line_number,
+                    "start": _utf16_length(original_line[:start]),
+                    "end": _utf16_length(original_line[:end]),
+                })
+            for start, end in _merge_changed_ranges(sanitized_line, sanitized_ranges):
+                sanitized_spans.append({
+                    "line_number": sanitized_line_number,
+                    "start": _utf16_length(sanitized_line[:start]),
+                    "end": _utf16_length(sanitized_line[:end]),
+                })
         for index in range(original_start + paired, original_end):
             add_whole_line(original_spans, index + 1, original_text[index])
         for index in range(sanitized_start + paired, sanitized_end):
