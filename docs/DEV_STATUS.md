@@ -172,3 +172,14 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - CI für Commit `3090d30aa304095dbe6f1666a258a7704b545325`, PR-Lauf [41291446536](https://github.com/Ineedat/ChatGPT/actions/runs/41291446536), vollständig erfolgreich: Frontend-Tests und Build, vollständige Backend-Suite unter Linux, gezielte Projekt-/Upload- und Mappingtests unter Windows sowie Ruff auf beiden Plattformen.
 - PR #2 bleibt offen und ungemergt.
 - Noch offen und nicht durch CI ersetzbar: visuelle Abnahme auf realen Windows-/Linux-Zielbildschirmen. Der separate manuelle Meilensteinlauf für portable Pakete und den 5-GiB-Benchmark wurde in diesem Schritt nicht gestartet.
+
+
+
+## Speicherplatzprüfung beim Datei-/Ordnerupload (2026-11-01)
+
+- Der Upload prüft vor dem ersten Kopiervorgang den freien Speicherplatz auf dem Zielvolume gegen die Gesamtgröße der ausgewählten Dateien.
+- Zusätzlich wird eine Sicherheitsreserve von mindestens 16 MiB bzw. 5 % der Uploadgröße verlangt.
+- Bei zu wenig Speicherplatz wird die gesamte Auswahl mit HTTP 507 abgelehnt; es werden keine Dateien teilweise übernommen.
+- Unmittelbar vor jeder einzelnen Datei erfolgt eine erneute Prüfung, damit zwischenzeitlich belegter Speicher erkannt wird.
+- Die Prüfung läuft serverseitig auf dem tatsächlichen Zielvolume und funktioniert damit für Windows- und Linux-Zielsysteme.
+- Regressionstests decken die Gesamtprüfung und einen zwischenzeitlichen Rückgang des freien Speicherplatzes ab; CI-Verifizierung steht noch aus.
