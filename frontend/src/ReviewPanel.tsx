@@ -158,7 +158,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
     syncingCompareScroll.current = true;
     to.scrollTop = from.scrollTop;
     to.scrollLeft = from.scrollLeft;
-    requestAnimationFrame(() => { syncingCompareScroll.current = false; });
+    syncingCompareScroll.current = false;
   }
 
   function renderCompareLines(content: string, changedLines: number[], kind: "original" | "sanitized") {
