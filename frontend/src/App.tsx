@@ -17,6 +17,7 @@ type Tab = "overview" | "rules" | "review" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type ImportMode = "file" | "folder";
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type FormatValidationResult = { file_id: string; format: string; valid: boolean; bytes_checked: number; error?: string };
 type SanitizationJob = {
@@ -403,8 +404,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                 id="source-files"
                 type="file"
                 multiple
-                onChange={event => setSelectedUploadFiles(Array.from(event.target.files || []))}
-                {...(importMode === "folder" ? { webkitdirectory: "", directory: "" } as Record<string, string> : {})}
+                onChange={event => { const files = Array.from(event.target.files || []); setSelectedUploadFiles(files); setError(files.some(file => file.size > MAX_UPLOAD_BYTES) ? "Mindestens eine Datei überschreitet das Limit von 5 GiB." : ""); }}
+                ref={element => { if (element && importMode === "folder") element.setAttribute("webkitdirectory", ""); else element?.removeAttribute("webkitdirectory"); }}
               />
             </label>
             <span className="field-help">{selectedUploadFiles.length ? `${selectedUploadFiles.length} Dateien · ${selectedUploadFiles.reduce((sum, file) => sum + file.size, 0).toLocaleString("de-DE")} Byte` : "Mehrfachauswahl möglich"}</span>
@@ -412,7 +413,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           {selectedUploadFiles.length > 0 && <p className="selected-upload-list" aria-live="polite">{selectedUploadFiles.slice(0, 5).map(file => file.webkitRelativePath || file.name).join(" · ")}{selectedUploadFiles.length > 5 ? ` · +${selectedUploadFiles.length - 5} weitere` : ""}</p>}
           <div className="import-source-footer">
             <p className="field-help">Dateien werden in den Projektarbeitsbereich kopiert, blockweise übertragen und dort verarbeitet. Maximal 5 GiB je Datei und 5.000 Dateien je Auswahl. Originaldateien bleiben unverändert.</p>
-            <button className="primary-button" type="submit" disabled={(!selectedUploadFiles.length && !sourcePath.trim()) || importing}>{importing ? "Übernimmt …" : "Auswahl übernehmen"}</button>
+            <button className="primary-button" type="submit" disabled={(!selectedUploadFiles.length && !sourcePath.trim()) || selectedUploadFiles.some(file => file.size > MAX_UPLOAD_BYTES) || importing}>{importing ? "Übernimmt …" : "Auswahl übernehmen"}</button>
           </div>
           <details className="path-import-fallback">
             <summary>Alternativ: Backend-Pfad manuell registrieren</summary>
