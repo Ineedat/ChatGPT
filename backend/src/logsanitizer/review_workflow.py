@@ -5,6 +5,7 @@ are never returned by review metadata endpoints.
 """
 from __future__ import annotations
 
+import difflib
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -397,6 +398,21 @@ def _read_compare_window(path: Path, byte_offset: int) -> dict[str, object]:
     }
 
 
+def _changed_line_numbers(original: str, sanitized: str) -> tuple[list[int], list[int]]:
+    """Return 1-based line numbers changed by sanitization for bounded visual highlighting."""
+    original_lines = original.splitlines()
+    sanitized_lines = sanitized.splitlines()
+    matcher = difflib.SequenceMatcher(a=original_lines, b=sanitized_lines)
+    original_changed: set[int] = set()
+    sanitized_changed: set[int] = set()
+    for tag, original_start, original_end, sanitized_start, sanitized_end in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        original_changed.update(range(original_start + 1, original_end + 1))
+        sanitized_changed.update(range(sanitized_start + 1, sanitized_end + 1))
+    return sorted(original_changed), sorted(sanitized_changed)
+
+
 @router.get("/runs/{run_id}/compare-preview")
 def compare_run_preview(
     run_id: str,
@@ -428,10 +444,17 @@ def compare_run_preview(
     source_path = Path(source_row["source_path"])
     if not expected_signature or _file_signature(output_path) != expected_signature:
         raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
+    original = _read_compare_window(source_path, original_offset)
+    sanitized = _read_compare_window(output_path, output_offset)
+    original_changed, sanitized_changed = _changed_line_numbers(
+        str(original["content"]), str(sanitized["content"])
+    )
     return {
         "run_id": run_id,
-        "original": _read_compare_window(source_path, original_offset),
-        "sanitized": _read_compare_window(output_path, output_offset),
+        "original": original,
+        "sanitized": sanitized,
+        "original_changed_lines": original_changed,
+        "sanitized_changed_lines": sanitized_changed,
     }
 
 
