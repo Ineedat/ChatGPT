@@ -163,7 +163,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
 
   function renderCompareLines(content: string, changedLines: number[], kind: "original" | "sanitized") {
     const changed = new Set(changedLines);
-    const lines = content.match(/[^\\n]*\\n|[^\\n]+$/g) || [];
+    const lines = content.match(/[^\n]*\n|[^\n]+$/g) || [];
     return lines.map((line, index) => (
       <span className={changed.has(index + 1) ? `review-compare-changed review-compare-changed-${kind}` : undefined} key={index}>{line}</span>
     ));
