@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type ReviewRun = {
   id: string;
@@ -25,7 +25,7 @@ type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SearchResult = { line_number: number; snippet: string };
 type ProjectFile = { id: string; display_name: string; relative_path?: string; size_bytes: number; state: string; detected_format?: string; format_override?: string | null };
 type CompareWindow = { content: string; byte_offset: number; previous_offset: number | null; next_offset: number | null; total_bytes: number };
-type ComparePreview = { original: CompareWindow; sanitized: CompareWindow };
+type ComparePreview = { original: CompareWindow; sanitized: CompareWindow; original_changed_lines: number[]; sanitized_changed_lines: number[] };
 type AuditEvent = {
   id: number;
   run_id: string;
@@ -66,6 +66,9 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
   const [comparePreview, setComparePreview] = useState<ComparePreview | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState("");
+  const originalComparePane = useRef<HTMLPreElement>(null);
+  const sanitizedComparePane = useRef<HTMLPreElement>(null);
+  const syncingCompareScroll = useRef(false);
   const [queue, setQueue] = useState<ReviewRun[]>([]);
   const [history, setHistory] = useState<ReviewRun[]>([]);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -146,6 +149,25 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
     });
     return () => { cancelled = true; };
   }, [selectedRun?.status, selectedRun?.id, roles]);
+
+  function syncCompareScroll(source: "original" | "sanitized") {
+    if (syncingCompareScroll.current) return;
+    const from = source === "original" ? originalComparePane.current : sanitizedComparePane.current;
+    const to = source === "original" ? sanitizedComparePane.current : originalComparePane.current;
+    if (!from || !to) return;
+    syncingCompareScroll.current = true;
+    to.scrollTop = from.scrollTop;
+    to.scrollLeft = from.scrollLeft;
+    requestAnimationFrame(() => { syncingCompareScroll.current = false; });
+  }
+
+  function renderCompareLines(content: string, changedLines: number[], kind: "original" | "sanitized") {
+    const changed = new Set(changedLines);
+    const lines = content.match(/[^\\n]*\\n|[^\\n]+$/g) || [];
+    return lines.map((line, index) => (
+      <span className={changed.has(index + 1) ? `review-compare-changed review-compare-changed-${kind}` : undefined} key={index}>{line}</span>
+    ));
+  }
 
   async function loadComparePreview(runId: string, originalOffset = 0, outputOffset = 0) {
     setCompareLoading(true); setCompareError(""); setComparePreview(null);
@@ -375,7 +397,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
     {activeView === "inspect" && selectedRun && <section className="review-section" aria-label="Original und bereinigte Datei vergleichen">
       <div className="section-heading"><h3>Dateivergleich: {selectedRun.display_name}</h3><button className="secondary-button" type="button" onClick={() => void loadComparePreview(selectedRun.id)} disabled={compareLoading}>Neu laden</button></div>
       {compareError && <p className="error-message" role="alert">{compareError}</p>}{compareLoading && <p className="muted-message">Dateifenster werden geladen …</p>}
-      {comparePreview?.original && comparePreview?.sanitized && <><div className="review-compare-grid"><div className="review-compare-pane"><h4>Original</h4><pre>{comparePreview.original.content || "(Leere Datei)"}</pre><span className="field-help">{comparePreview.original.byte_offset.toLocaleString("de-DE")} / {comparePreview.original.total_bytes.toLocaleString("de-DE")} Byte</span></div><div className="review-compare-pane"><h4>Sanitisiert</h4><pre>{comparePreview.sanitized.content || "(Leere Datei)"}</pre><span className="field-help">{comparePreview.sanitized.byte_offset.toLocaleString("de-DE")} / {comparePreview.sanitized.total_bytes.toLocaleString("de-DE")} Byte</span></div></div>
+      {comparePreview?.original && comparePreview?.sanitized && <><div className="review-compare-grid"><div className="review-compare-pane"><h4>Original</h4><pre ref={originalComparePane} onScroll={() => syncCompareScroll("original")}>{renderCompareLines(comparePreview.original.content || "(Leere Datei)", comparePreview.original_changed_lines || [], "original")}</pre><span className="field-help">{comparePreview.original.byte_offset.toLocaleString("de-DE")} / {comparePreview.original.total_bytes.toLocaleString("de-DE")} Byte</span></div><div className="review-compare-pane"><h4>Sanitisiert</h4><pre ref={sanitizedComparePane} onScroll={() => syncCompareScroll("sanitized")}>{renderCompareLines(comparePreview.sanitized.content || "(Leere Datei)", comparePreview.sanitized_changed_lines || [], "sanitized")}</pre><span className="field-help">{comparePreview.sanitized.byte_offset.toLocaleString("de-DE")} / {comparePreview.sanitized.total_bytes.toLocaleString("de-DE")} Byte</span></div></div>
       <div className="review-compare-navigation"><button className="secondary-button" type="button" disabled={compareLoading || (comparePreview.original.previous_offset === null && comparePreview.sanitized.previous_offset === null)} onClick={() => void loadComparePreview(selectedRun.id, comparePreview.original.previous_offset ?? 0, comparePreview.sanitized.previous_offset ?? 0)}>Vorheriges Fenster</button><button className="secondary-button" type="button" disabled={compareLoading || (comparePreview.original.byte_offset === 0 && comparePreview.sanitized.byte_offset === 0)} onClick={() => void loadComparePreview(selectedRun.id, 0, 0)}>Zum Anfang</button><button className="secondary-button" type="button" disabled={compareLoading || (comparePreview.original.next_offset === null && comparePreview.sanitized.next_offset === null)} onClick={() => void loadComparePreview(selectedRun.id, comparePreview.original.next_offset ?? comparePreview.original.total_bytes, comparePreview.sanitized.next_offset ?? comparePreview.sanitized.total_bytes)}>Nächstes Fenster</button></div></>}
       <p className="field-help">Es wird nur ein begrenztes Dateifenster geladen. Die Quelldatei bleibt unverändert; die Ausgabe wird vor dem Anzeigen auf unveränderte Identität geprüft.</p>
     </section>}
