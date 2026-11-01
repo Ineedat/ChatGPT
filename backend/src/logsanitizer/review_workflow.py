@@ -347,6 +347,20 @@ def _public_run(row: sqlite3.Row | None) -> dict:
     )} | {"published": row["status"] in {"approved", "approved_with_exception"}}
 
 
+def is_file_approved(project_id: str, file_id: str) -> bool:
+    """Return whether a file has an approved run and is therefore locked from reprocessing."""
+    initialize_review_database()
+    with _db() as db:
+        row = db.execute(
+            """SELECT 1 FROM review_runs
+               WHERE project_id=? AND file_id=?
+                 AND status IN ('approved', 'approved_with_exception')
+               LIMIT 1""",
+            (project_id, file_id),
+        ).fetchone()
+    return row is not None
+
+
 def get_run(run_id: str) -> dict | None:
     initialize_review_database()
     with _db() as db:
