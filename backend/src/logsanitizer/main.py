@@ -211,7 +211,8 @@ def detect_format_from_sample(path: Path) -> str:
     with path.open("rb") as source:
         sample = source.read(MAX_FORMAT_SAMPLE_BYTES)
     if not sample:
-        return "unknown"
+        # An empty log is a valid empty text file, not an unknown/binary format.
+        return "text"
     try:
         text = sample.decode("utf-8-sig")
     except UnicodeDecodeError:
