@@ -14,7 +14,7 @@
 - [x] SQLite-Metadatenschema mit Schema-Versionierung.
 - [x] Einzeldatei registrieren: nur Metadaten speichern, Original unverändert lassen.
 - [x] Backend-Ordnerregistrierung mit Fehlerliste, Duplikatbehandlung und Begrenzung auf 5.000 Dateien.
-- [x] UI für Einzeldatei-/Ordnerregistrierung mit expliziter Aktion, rekursiver Option und Fehlerliste (absolute Pfade; nativer Dateiauswahldialog bleibt offen).
+- [x] Einheitlicher UI-Ablauf für Einzeldatei- und Ordnerregistrierung mit gemeinsamer Pfadeingabe, Quelltyp-Auswahl, rekursiver Option und gemeinsamer Ergebnis-/Fehleranzeige (absolute Pfade; nativer Dateiauswahldialog bleibt offen).
 - [x] Konservativer Dateiendungs-Hinweis (`format_hint`) inklusive `unknown`; keine Inhaltsprüfung bei Registrierung.
 - [x] Explizite heuristische Formaterkennung anhand einer lokalen Stichprobe von höchstens 64 KiB; Ergebnis lokal speichern.
 - [x] Manuelle Format-Auswahl pro Datei speichern und wieder entfernen.
@@ -211,3 +211,12 @@ Details und Startanleitung: [CI.md](CI.md).
 
 
 - [x] Allgemeine Projektprinzipien-Karten ausblenden, sobald ein Projekt geöffnet ist; sie bleiben in der Projektübersicht ohne Auswahl sichtbar und beanspruchen nicht länger Platz im aktiven Arbeitsbereich.
+
+
+## Dateiimport — vereinheitlichte Bedienung (2026-11-01)
+
+- [x] Einzeldatei und Ordner verwenden im Projektarbeitsbereich denselben Formular- und Registrierungsablauf; der Quelltyp wird über eine kompakte Auswahlliste gewählt.
+- [x] Gemeinsame Lade-, Fehler- und Erfolgsbehandlung; registrierte Dateien werden anhand ihrer IDs zusammengeführt, Ordner-Duplikate und übersprungene Einträge bleiben sichtbar.
+- [x] Rekursive Suche wird nur bei Ordnerauswahl eingeblendet; das bestehende Limit von 5.000 Kandidaten bleibt bestehen.
+- [ ] Lokalen Dateibrowser für Standalone- und Air-Gap-Betrieb integrieren; die bisherige Pfadeingabe bleibt bis dahin als technischer Fallback bestehen.
+- [ ] Frontend-Tests, CI und visuelle Abnahme auf Windows/Linux durchführen.
