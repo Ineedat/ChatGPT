@@ -60,7 +60,7 @@ from logsanitizer.notifications import notify_pending_review
 from logsanitizer.review_workflow import create_run as create_review_run
 from logsanitizer.review_workflow import fail_run as fail_review_run
 from logsanitizer.review_workflow import finish_run as finish_review_run
-from logsanitizer.review_workflow import initialize_review_database
+from logsanitizer.review_workflow import initialize_review_database, is_file_approved
 from logsanitizer.review_workflow import router as review_router
 from logsanitizer.review_workflow import set_run_running as set_review_run_running
 from logsanitizer.rule_config import (
@@ -510,6 +510,8 @@ def project_file_sanitize_start(
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    if is_file_approved(project_id, file_id):
+        raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist für weitere Bereinigungen gesperrt.")
     source = Path(row["source_path"])
     output = Path(payload.output_path).expanduser()
     if not output.is_absolute():
@@ -627,6 +629,8 @@ def project_file_sanitize(
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Registrierte Datei nicht gefunden.")
+    if is_file_approved(project_id, file_id):
+        raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist für weitere Bereinigungen gesperrt.")
 
     source = Path(row["source_path"])
     output = Path(payload.output_path).expanduser()
