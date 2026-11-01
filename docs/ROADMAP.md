@@ -243,4 +243,4 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Projektweite Mapping-Konsistenz über mehrere Dateien ist durch die SQLite-Implementierung und den bestehenden Backend-Regressionstest abgesichert.
 - [x] Erfolgreiche Dateien erzeugen weiterhin eigene validierte Review-Läufe; Freigabe bleibt pro Datei getrennt.
 - [x] Offline-Hilfe und Frontend-Regressionen für Reihenfolge und doppelte Ausgabeziele ergänzt.
-- [ ] Push-/PR-CI für den neuen Mehrdateiablauf vollständig erfolgreich abschließen.
+- [x] Push-/PR-CI für den Mehrdateiablauf vollständig erfolgreich: Push-Lauf [41324254157](https://github.com/Ineedat/ChatGPT/actions/runs/41324254157) und PR-Lauf [41324257605](https://github.com/Ineedat/ChatGPT/actions/runs/41324257605), alle drei Jobs jeweils grün.

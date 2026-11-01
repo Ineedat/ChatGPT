@@ -195,3 +195,16 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Die projektbezogene SQLite-Mapping-Tabelle wird von jedem Job mit derselben Projekt-ID verwendet; derselbe Originalwert erhält daher dateiübergreifend denselben Platzhalter. Der Backend-Regressionstest `test_indexed_mapping_is_stable_across_files_and_isolated_by_project` deckt dies ab.
 - Frontend-Tests prüfen die sequentielle Reihenfolge (Datei 2 startet erst nach dem terminalen Status von Datei 1) sowie die Abweisung doppelter Ausgabepfade.
 - CI-Verifizierung des neuen Frontend- und Dokumentationsstands steht noch aus.
+
+
+
+## Mehrdatei-Projektworkflow — CI-Abschluss (2026-11-01)
+
+- Code-Commit: `cf5e14896b6b7310b9be0d6a0cd61d2d08772ff1`.
+- Push-CI [41324254157](https://github.com/Ineedat/ChatGPT/actions/runs/41324254157) und PR-CI [41324257605](https://github.com/Ineedat/ChatGPT/actions/runs/41324257605) vollständig erfolgreich; jeweils Frontend, Backend Linux und Backend Windows grün.
+- Frontend: 31 Tests erfolgreich; TypeScript-/Vite-Produktionsbuild erfolgreich.
+- Backend Linux: 110 passed, 1 skipped; Ruff ohne Befund.
+- Backend Windows: 20 gezielte Projekt-/Mappingtests erfolgreich; Ruff ohne Befund.
+- Projektweite Mapping-Konsistenz wird durch `test_indexed_mapping_is_stable_across_files_and_isolated_by_project` abgesichert.
+- Mehrdatei-Frontendtests bestätigen, dass die zweite Datei erst nach dem terminalen Status der ersten gestartet wird und doppelte Ausgabepfade vor dem Start erkannt werden.
+- PR #2 bleibt offen und ungemergt.
