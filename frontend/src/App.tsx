@@ -254,7 +254,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   async function startSanitization(file: ImportedFile, waitForCompletion = false): Promise<SanitizationJob | null> {
     if (!selectedProject || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
     const separator = projectOutputDirectory.includes("\\") ? "\\" : "/";
-    const outputPath = projectOutputDirectory.replace(/[\\/]+$/, "") + separator + file.display_name;
+    const relativePath = (file.relative_path || file.display_name).replace(/[\\/]+/g, separator);
+    const outputPath = projectOutputDirectory.replace(/[\\/]+$/, "") + separator + relativePath;
     setError("");
     try {
       const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
@@ -317,9 +318,9 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       setError(`Bitte prüfe Format, gespeicherten Ausgabeordner und Laufstatus für „${invalidFile.display_name}“.`);
       return;
     }
-    const normalizedPaths = batchFiles.map(file => file.display_name.toLocaleLowerCase("en-US"));
+    const normalizedPaths = batchFiles.map(file => (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US"));
     if (new Set(normalizedPaths).size !== normalizedPaths.length) {
-      setError("Dateien mit gleichem Originalnamen würden denselben Ausgabe-Pfad verwenden. Bitte die Dateinamen eindeutig halten.");
+      setError("Mehrere Dateien besitzen denselben relativen Pfad und würden sich im Ausgabeordner überschreiben.");
       return;
     }
 
@@ -480,7 +481,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   );
   const selectedBatchFiles = importedFiles.filter(file => selectedFileIds.includes(file.id));
   const batchHasDuplicateOutputs = new Set(selectedBatchFiles.map(file =>
-    file.display_name.toLocaleLowerCase("en-US")
+    (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US")
   )).size !== selectedBatchFiles.length;
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
     Boolean(projectOutputDirectory.trim()) && projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
