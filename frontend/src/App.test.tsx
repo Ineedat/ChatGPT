@@ -102,7 +102,7 @@ describe("project file registration UI", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Dateipfad" }), { target: { value: "/var/log/service.log" } });
-    fireEvent.click(screen.getByRole("button", { name: "Datei hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl übernehmen" }));
 
     expect(await screen.findByText("Datei registriert. Der Inhalt wurde nicht verarbeitet.")).toBeInTheDocument();
     expect(await screen.findByText("service.log")).toBeInTheDocument();
@@ -135,7 +135,7 @@ describe("project file registration UI", () => {
     expect(screen.getByRole("checkbox", { name: "Unterordner einbeziehen" })).toBeInTheDocument();
     fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Ordnerpfad" }), { target: { value: "/var/log/my-service" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ordnerinhalt hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl übernehmen" }));
 
     expect(await screen.findByText(/Registriert: 1; übersprungen: 1/)).toBeInTheDocument();
     expect(await screen.findByText(/old.log/)).toBeInTheDocument();
