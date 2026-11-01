@@ -48,6 +48,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [sourcePath, setSourcePath] = useState("");
+  const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const [importMode, setImportMode] = useState<ImportMode>("file");
   const [recursive, setRecursive] = useState(true);
   const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([]);
@@ -108,7 +109,38 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   async function registerSources(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const path = sourcePath.trim();
-    if (!selectedProject || !path || importing) return;
+    if (!selectedProject || importing || (!selectedUploadFiles.length && !path)) return;
+
+    if (selectedUploadFiles.length) {
+      setImporting(true);
+      setError("");
+      setImportMessage("");
+      setImportIssues([]);
+      try {
+        const formData = new FormData();
+        selectedUploadFiles.forEach(file => formData.append("files", file, file.name));
+        formData.append("relative_paths", JSON.stringify(selectedUploadFiles.map(file => file.webkitRelativePath || file.name)));
+        const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/upload`, { method: "POST", body: formData });
+        const body = await response.json() as FolderImportResult & { detail?: string };
+        if (!response.ok) throw new Error(body.detail || "Dateien konnten nicht übernommen werden.");
+        setImportedFiles(current => {
+          const byId = new Map(current.map(file => [file.id, file]));
+          body.registered_files.forEach(file => byId.set(file.id, file));
+          return [...byId.values()];
+        });
+        setImportIssues(body.issues);
+        const bytes = selectedUploadFiles.reduce((sum, file) => sum + file.size, 0);
+        setImportMessage(`Übernommen: ${body.registered_count}; übersprungen: ${body.skipped_count}; ausgewählt: ${selectedUploadFiles.length} Dateien (${bytes.toLocaleString("de-DE")} Byte).${body.limit_reached ? " Das Limit von 5.000 Dateien wurde erreicht." : ""} Quelldateien bleiben unverändert.`);
+        setSelectedUploadFiles([]);
+        setSourcePath("");
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Dateien konnten nicht übernommen werden.");
+      } finally {
+        setImporting(false);
+      }
+      return;
+    }
+    if (!path) return;
 
     const isFolder = importMode === "folder";
     const endpoint = isFolder
@@ -361,20 +393,37 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <form className="import-source-form" onSubmit={event => void registerSources(event)} aria-label="Dateien hinzufügen">
           <div className="import-source-fields">
             <label htmlFor="import-mode">Quelle
-              <select id="import-mode" value={importMode} onChange={event => setImportMode(event.target.value as ImportMode)}>
-                <option value="file">Einzelne Datei</option>
-                <option value="folder">Ordner mit Dateien</option>
+              <select id="import-mode" value={importMode} onChange={event => { setImportMode(event.target.value as ImportMode); setSelectedUploadFiles([]); }}>
+                <option value="file">Dateien auswählen</option>
+                <option value="folder">Ordner auswählen</option>
               </select>
             </label>
-            <label htmlFor="source-path">{importMode === "folder" ? "Absoluter Ordnerpfad" : "Absoluter Dateipfad"}
-              <input id="source-path" value={sourcePath} onChange={event => setSourcePath(event.target.value)} placeholder={importMode === "folder" ? "z. B. /var/log/my-service" : "z. B. /var/log/service.log"} maxLength={4096} required />
+            <label htmlFor="source-files">{importMode === "folder" ? "Lokaler Ordner" : "Lokale Dateien"}
+              <input
+                id="source-files"
+                type="file"
+                multiple
+                onChange={event => setSelectedUploadFiles(Array.from(event.target.files || []))}
+                {...(importMode === "folder" ? { webkitdirectory: "", directory: "" } as Record<string, string> : {})}
+              />
             </label>
-            {importMode === "folder" && <label className="import-recursive-option" htmlFor="recursive"><input id="recursive" type="checkbox" checked={recursive} onChange={event => setRecursive(event.target.checked)} /> Unterordner einbeziehen</label>}
+            <span className="field-help">{selectedUploadFiles.length ? `${selectedUploadFiles.length} Dateien · ${selectedUploadFiles.reduce((sum, file) => sum + file.size, 0).toLocaleString("de-DE")} Byte` : "Mehrfachauswahl möglich"}</span>
           </div>
+          {selectedUploadFiles.length > 0 && <p className="selected-upload-list" aria-live="polite">{selectedUploadFiles.slice(0, 5).map(file => file.webkitRelativePath || file.name).join(" · ")}{selectedUploadFiles.length > 5 ? ` · +${selectedUploadFiles.length - 5} weitere` : ""}</p>}
           <div className="import-source-footer">
-            <p className="field-help">{importMode === "folder" ? "Bis zu 5.000 Dateikandidaten pro Aufruf. Bereits registrierte Dateien und übersprungene Einträge werden ausgewiesen." : "Die Datei wird nur registriert. Ihr Inhalt bleibt unangetastet."} Der Pfad bezieht sich auf das Dateisystem des lokalen Backends.</p>
-            <button className="primary-button" type="submit" disabled={!sourcePath.trim() || importing}>{importing ? "Registriert …" : importMode === "folder" ? "Ordnerinhalt hinzufügen" : "Datei hinzufügen"}</button>
+            <p className="field-help">Dateien werden in den Projektarbeitsbereich kopiert, blockweise übertragen und dort verarbeitet. Maximal 5 GiB je Datei und 5.000 Dateien je Auswahl. Originaldateien bleiben unverändert.</p>
+            <button className="primary-button" type="submit" disabled={(!selectedUploadFiles.length && !sourcePath.trim()) || importing}>{importing ? "Übernimmt …" : "Auswahl übernehmen"}</button>
           </div>
+          <details className="path-import-fallback">
+            <summary>Alternativ: Backend-Pfad manuell registrieren</summary>
+            <div className="import-source-fields">
+              <label htmlFor="source-path">{importMode === "folder" ? "Absoluter Ordnerpfad" : "Absoluter Dateipfad"}
+                <input id="source-path" value={sourcePath} onChange={event => setSourcePath(event.target.value)} placeholder={importMode === "folder" ? "z. B. /var/log/my-service" : "z. B. /var/log/service.log"} maxLength={4096} />
+              </label>
+              {importMode === "folder" && <label className="import-recursive-option" htmlFor="recursive"><input id="recursive" type="checkbox" checked={recursive} onChange={event => setRecursive(event.target.checked)} /> Unterordner einbeziehen</label>}
+            </div>
+            <p className="field-help">Dieser Fallback bezieht sich auf das Dateisystem des Backend-Rechners. Die Registrierung liest keine Log-Inhalte.</p>
+          </details>
         </form>
         {importMessage && <p className="success-message" role="status">{importMessage}</p>}
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
