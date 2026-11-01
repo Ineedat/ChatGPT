@@ -8,6 +8,7 @@ import csv
 import io
 import json
 import os
+import shutil
 import sys
 import threading
 import uuid
@@ -829,6 +830,18 @@ def project_folder_import(
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
+UPLOAD_DISK_RESERVE_BYTES = 16 * 1024 * 1024
+
+
+def _upload_size(upload: UploadFile) -> int:
+    """Return the size of a spooled upload without changing its read position."""
+    if upload.size is not None:
+        return upload.size
+    position = upload.file.tell()
+    upload.file.seek(0, os.SEEK_END)
+    size = upload.file.tell()
+    upload.file.seek(position)
+    return size
 
 
 def _copy_upload_to_temporary(source: BinaryIO, destination: Path) -> int:
@@ -875,11 +888,27 @@ async def project_files_upload(
 
     root = (database_path().parent / "projects" / project_id / "sources").resolve()
     root.mkdir(parents=True, exist_ok=True)
+    candidate_uploads = files[:MAX_FOLDER_FILES]
+    upload_sizes = [_upload_size(upload) for upload in candidate_uploads]
+    required_bytes = sum(size for size in upload_sizes if size <= MAX_UPLOAD_BYTES)
+    reserve_bytes = max(UPLOAD_DISK_RESERVE_BYTES, int(required_bytes * 0.05))
+    available_bytes = shutil.disk_usage(root).free
+    if available_bytes < required_bytes + reserve_bytes:
+        for upload in files:
+            await upload.close()
+        raise HTTPException(
+            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+            detail=(
+                "Nicht genügend freier Speicherplatz auf dem Zielsystem. "
+                f"Benötigt: {required_bytes + reserve_bytes} Byte "
+                f"(einschließlich Reserve), verfügbar: {available_bytes} Byte."
+            ),
+        )
     registered: list[ImportedFile] = []
     issues: list[FolderImportIssue] = []
     limit_reached = len(files) > MAX_FOLDER_FILES
 
-    for index, upload in enumerate(files[:MAX_FOLDER_FILES]):
+    for index, upload in enumerate(candidate_uploads):
         raw_relative = requested_paths[index].replace("\\", "/")
         relative = PurePosixPath(raw_relative)
         if (
@@ -907,9 +936,20 @@ async def project_files_upload(
             await upload.close()
             continue
 
-        if upload.size is not None and upload.size > MAX_UPLOAD_BYTES:
+        upload_size = upload_sizes[index]
+        if upload_size > MAX_UPLOAD_BYTES:
             issues.append(
                 FolderImportIssue(file_name=relative.name, reason="Datei überschreitet das Limit von 5 GiB.")
+            )
+            await upload.close()
+            continue
+
+        if shutil.disk_usage(root).free < upload_size + reserve_bytes:
+            issues.append(
+                FolderImportIssue(
+                    file_name=relative.name,
+                    reason="Nicht genügend freier Speicherplatz auf dem Zielsystem für diese Datei.",
+                )
             )
             await upload.close()
             continue
