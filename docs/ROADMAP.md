@@ -218,5 +218,5 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Einzeldatei und Ordner verwenden im Projektarbeitsbereich denselben Formular- und Registrierungsablauf; der Quelltyp wird über eine kompakte Auswahlliste gewählt.
 - [x] Gemeinsame Lade-, Fehler- und Erfolgsbehandlung; registrierte Dateien werden anhand ihrer IDs zusammengeführt, Ordner-Duplikate und übersprungene Einträge bleiben sichtbar.
 - [x] Rekursive Suche wird nur bei Ordnerauswahl eingeblendet; das bestehende Limit von 5.000 Kandidaten bleibt bestehen.
-- [ ] Lokalen Dateibrowser für Standalone- und Air-Gap-Betrieb integrieren; die bisherige Pfadeingabe bleibt bis dahin als technischer Fallback bestehen.
-- [ ] Frontend-Tests, CI und visuelle Abnahme auf Windows/Linux durchführen.
+- [x] Browser-Dateiauswahl für Einzel-/Mehrfachdateien und Ordnerauswahl integriert; relative Unterordnerstruktur bleibt erhalten.
+- [x] Backend- und Frontend-Regressionstests für Upload, Pfad-Traversal und Größenlimit ergänzt.\n- [ ] CI und visuelle Abnahme auf Windows/Linux durchführen.
