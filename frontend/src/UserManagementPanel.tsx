@@ -30,6 +30,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
 }
 
 export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) {
+  const [view, setView] = useState<"list" | "create">("list");
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [roleDrafts, setRoleDrafts] = useState<Record<number, string[]>>({});
   const [username, setUsername] = useState("");
@@ -78,6 +79,7 @@ export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) 
       setPassword("");
       setNewRoles(["operator"]);
       setMessage(`Benutzer „${body.username}“ wurde angelegt.`);
+      setView("list");
       await loadUsers();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Benutzer konnte nicht angelegt werden.");
@@ -163,38 +165,25 @@ export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) 
   return <section className="user-admin-page">
     <div className="section-heading">
       <div><p className="eyebrow">ADMINISTRATION</p><h2>Benutzerverwaltung</h2></div>
-      <button className="secondary-button" type="button" onClick={() => void loadUsers()} disabled={loading || saving}>Aktualisieren</button>
+      <div className="user-admin-actions">{view === "list" ? <><button className="secondary-button" type="button" onClick={() => void loadUsers()} disabled={loading || saving}>Aktualisieren</button><button className="primary-button" type="button" onClick={() => { setError(""); setMessage(""); setView("create"); }}>Neuen Benutzer anlegen</button></> : <button className="secondary-button" type="button" onClick={() => { setView("list"); setError(""); }}>Zur Benutzerliste</button>}</div>
     </div>
     <p className="field-help">Lokale Benutzerkonten und ihre Rollen verwalten. Deaktivierte Konten können sich nicht anmelden; bestehende Sitzungen werden beendet.</p>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
 
-    <section className="panel user-create-panel">
-      <h3>Benutzer anlegen</h3>
+    {view === "create" && <section className="panel user-create-panel" aria-label="Neuen Benutzer anlegen">
+      <h3>Neuen Benutzer anlegen</h3>
       <form onSubmit={event => void createUser(event)}>
         <div className="user-create-fields">
-          <label>Benutzername
-            <input value={username} onChange={event => setUsername(event.target.value)} maxLength={80} autoComplete="off" required />
-          </label>
-          <label>Initiales Passwort
-            <input type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={12} maxLength={1024} autoComplete="new-password" required />
-          </label>
+          <label>Benutzername<input value={username} onChange={event => setUsername(event.target.value)} maxLength={80} autoComplete="off" required /></label>
+          <label>Initiales Passwort<input type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={12} maxLength={1024} autoComplete="new-password" required /></label>
         </div>
         <p className="field-help">Mindestens 12 Zeichen. Das Passwort wird nur bei der Anlage übermittelt und nicht erneut angezeigt.</p>
-        <fieldset className="role-fieldset">
-          <legend>Rollen</legend>
-          <div className="role-options">
-            {ROLE_OPTIONS.map(role => <label key={role.id}>
-              <input type="checkbox" checked={newRoles.includes(role.id)} onChange={event => setNewRoles(current => event.target.checked ? [...current, role.id] : current.filter(item => item !== role.id))} />
-              {role.label}
-            </label>)}
-          </div>
-        </fieldset>
-        <button className="primary-button" type="submit" disabled={saving || !username.trim() || password.length < 12 || newRoles.length === 0}>Benutzer anlegen</button>
+        <fieldset className="role-fieldset"><legend>Rollen</legend><div className="role-options">{ROLE_OPTIONS.map(role => <label key={role.id}><input type="checkbox" checked={newRoles.includes(role.id)} onChange={event => setNewRoles(current => event.target.checked ? [...current, role.id] : current.filter(item => item !== role.id))} />{role.label}</label>)}</div></fieldset>
+        <div className="user-actions"><button className="secondary-button" type="button" onClick={() => setView("list")}>Abbrechen</button><button className="primary-button" type="submit" disabled={saving || !username.trim() || password.length < 12 || newRoles.length === 0}>{saving ? "Speichert …" : "Benutzer anlegen"}</button></div>
       </form>
-    </section>
-
-    <section className="user-list-section">
+    </section>}
+    {view === "list" && <section className="user-list-section">
       <div className="section-heading"><h3>Vorhandene Benutzer ({users.length})</h3></div>
       {loading ? <p className="muted-message">Benutzerliste wird geladen …</p> : users.length === 0 ? <p className="muted-message">Keine Benutzer vorhanden.</p> : <div className="user-list">
         {users.map(user => {
@@ -224,6 +213,7 @@ export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) 
         })}
       </div>}
     </section>
-    <p className="field-help">Schutzregeln: Das eigene Konto kann nicht deaktiviert oder gelöscht werden. Der letzte aktive Administrator kann weder seine Administratorrolle verlieren noch deaktiviert oder gelöscht werden. LDAP-Konten werden bei erfolgreicher LDAP-Anmeldung synchronisiert.</p>
+    </section>}
+    {view === "list" && <p className="field-help">Schutzregeln: Das eigene Konto kann nicht deaktiviert oder gelöscht werden. Der letzte aktive Administrator kann weder seine Administratorrolle verlieren noch deaktiviert oder gelöscht werden. LDAP-Konten werden bei erfolgreicher LDAP-Anmeldung synchronisiert.</p>}
   </section>;
 }
