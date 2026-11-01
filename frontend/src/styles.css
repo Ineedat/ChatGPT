@@ -622,3 +622,36 @@ input:not([type=checkbox]):not([type=file]), select, textarea { min-width: 0; }
   .review-details, .rule-form-grid { grid-template-columns: minmax(0, 1fr); }
   .rule-file-scroll { height: 34vh; min-height: 160px; }
 }
+
+
+
+/* Focused project creation dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(20, 25, 32, .42);
+}
+.project-dialog {
+  width: min(100%, 460px);
+  max-height: min(90vh, 620px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid #8a8a8a;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f1f1f;
+  box-shadow: 0 16px 48px rgba(0,0,0,.28);
+}
+.project-dialog .section-heading { align-items: center; margin-bottom: 12px; }
+.project-dialog h3 { margin: 0; }
+.project-dialog form { display: grid; gap: 8px; }
+.project-dialog form label { display: grid; gap: 5px; margin: 4px 0; font-weight: 600; }
+.project-dialog form input { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid #777; border-radius: 3px; background: #fff; color: #1f1f1f; }
+.project-dialog .field-help { margin: 4px 0 8px; }
+.project-dialog .rule-actions { justify-content: flex-end; }
+.home-projects { margin-top: 18px; }
+.home-projects .section-heading { align-items: center; }
