@@ -155,3 +155,15 @@ def test_rule_library_api_returns_templates_without_changing_active_config(tmp_p
         assert len(body["templates"]) == 20
         assert all(template["enabled"] is False for template in body["templates"])
         assert not (tmp_path / "rules" / "rules-v1.json").exists()
+
+
+
+def test_fresh_install_loads_curated_rules_disabled(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "fresh-rules"))
+
+    config = load_rule_config()
+
+    assert len(config.rules) == 20
+    assert all(rule.enabled is False for rule in config.rules)
+    assert all(rule.profile_id is None for rule in config.rules)
+    assert not (tmp_path / "fresh-rules" / "rules-v1.json").exists()
