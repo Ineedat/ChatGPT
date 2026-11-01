@@ -220,3 +220,13 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Rekursive Suche wird nur bei Ordnerauswahl eingeblendet; das bestehende Limit von 5.000 Kandidaten bleibt bestehen.
 - [x] Browser-Dateiauswahl für Einzel-/Mehrfachdateien und Ordnerauswahl integriert; relative Unterordnerstruktur bleibt erhalten.
 - [x] Backend- und Frontend-Regressionstests für Upload, Pfad-Traversal und Größenlimit ergänzt.\n- [x] Automatisierte CI auf Linux und Windows sowie Frontend-Tests und Build erfolgreich; Windows prüft zusätzlich Projekt- und Upload-Endpunkte.\n- [ ] Visuelle Abnahme auf realen Windows-/Linux-Bildschirmen (externe manuelle Prüfung).
+
+
+
+## Dateiimport — Speicherplatzprüfung (2026-11-01)
+
+- [x] Vor dem Upload den verfügbaren Speicherplatz auf dem Zielvolume gegen die Gesamtgröße der ausgewählten Dateien prüfen.
+- [x] Eine Reserve von mindestens 16 MiB bzw. 5 % der Uploadgröße berücksichtigen.
+- [x] Bei unzureichendem Speicherplatz den gesamten Upload vor dem ersten Kopiervorgang mit HTTP 507 ablehnen.
+- [x] Freien Speicherplatz unmittelbar vor jeder Datei erneut prüfen, um zwischenzeitliche Änderungen zu erkennen.
+- [x] Backend-Regressionstests für unzureichenden Gesamtspeicher und zwischenzeitlich sinkenden freien Speicherplatz ergänzen.
