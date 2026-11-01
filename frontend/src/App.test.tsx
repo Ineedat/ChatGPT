@@ -129,6 +129,7 @@ describe("project file registration UI", () => {
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    await screen.findByRole("region", { name: "Geöffnetes Projekt" });
     fireEvent.change(screen.getByRole("combobox", { name: "Quelle" }), { target: { value: "folder" } });
     expect(screen.getByRole("checkbox", { name: "Unterordner einbeziehen" })).toBeInTheDocument();
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Ordnerpfad" }), { target: { value: "/var/log/my-service" } });
