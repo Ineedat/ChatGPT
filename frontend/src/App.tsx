@@ -1,5 +1,4 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { HelpTooltip } from "./components/HelpTooltip";
 import { helpTopics } from "./help/content";
 import { LoginGate } from "./LoginGate";
 import { ReviewPanel } from "./ReviewPanel";
