@@ -457,3 +457,34 @@ def test_zero_byte_log_is_registered_and_detected_as_text(tmp_path, monkeypatch)
         assert validated.status_code == 200
         assert validated.json()["valid"] is True
         assert validated.json()["bytes_checked"] == 0
+
+
+
+def test_project_output_directory_is_persisted_and_validated(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    output = tmp_path / "sanitized"
+    output.mkdir()
+
+    with TestClient(app) as client:
+        project = client.post("/api/projects", json={"name": "Output directory"}).json()
+        updated = client.put(
+            f"/api/projects/{project['id']}/output-directory",
+            json={"output_directory": str(output)},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["output_directory"] == str(output.resolve())
+
+        reopened = client.get(f"/api/projects/{project['id']}")
+        assert reopened.status_code == 200
+        assert reopened.json()["output_directory"] == str(output.resolve())
+
+        relative = client.put(
+            f"/api/projects/{project['id']}/output-directory",
+            json={"output_directory": "relative/path"},
+        )
+        missing = client.put(
+            f"/api/projects/{project['id']}/output-directory",
+            json={"output_directory": str(tmp_path / "missing")},
+        )
+        assert relative.status_code == 422
+        assert missing.status_code == 422
