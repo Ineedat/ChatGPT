@@ -300,7 +300,7 @@ describe("source profile selection for project sanitization", () => {
     fireEvent.click(screen.getByRole("button", { name: "Bereinigen" }));
 
     expect(await screen.findByText(/Bereinigung für events.log abgeschlossen und validiert/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Prüfung & Verlauf öffnen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Prüfen" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/projects/${project.id}/files/${file.id}/sanitize-jobs`,
       expect.objectContaining({
