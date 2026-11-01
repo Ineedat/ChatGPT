@@ -79,6 +79,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fileId: string; fileName: string } | null>(null);
   const batchStopRequestedRef = useRef(false);
+  const batchJobIdRef = useRef<string | null>(null);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -252,7 +253,11 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const body = await response.json() as { id?: string; detail?: string };
       if (!response.ok || !body.id) throw new Error(body.detail || "Bereinigung konnte nicht gestartet werden.");
       setSanitizationJobs(current => ({ ...current, [file.id]: { id: body.id!, status: "queued", phase: "queued", processed_bytes: 0, total_bytes: file.size_bytes, lines_processed: 0 } }));
-      if (waitForCompletion) return await pollSanitizationJob(file, body.id);
+      if (waitForCompletion) {
+        batchJobIdRef.current = body.id;
+        try { return await pollSanitizationJob(file, body.id); }
+        finally { batchJobIdRef.current = null; }
+      }
       void pollSanitizationJob(file, body.id);
       return { id: body.id, status: "queued", phase: "queued", processed_bytes: 0, total_bytes: file.size_bytes, lines_processed: 0 };
     } catch (cause) {
@@ -330,6 +335,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       setImportMessage(`Mehrdatei-Lauf beendet: ${completed} erfolgreich validiert, ${failed} fehlgeschlagen, ${cancelled} abgebrochen, ${notStarted} nicht gestartet. Jede erfolgreiche Datei ist einzeln in Prüfung & Verlauf verfügbar.`);
       setSelectedFileIds([]);
     } finally {
+      batchJobIdRef.current = null;
       setBatchRunning(false);
       setBatchProgress(null);
     }
@@ -338,19 +344,20 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   function stopBatchSanitization() {
     batchStopRequestedRef.current = true;
     const currentFile = batchProgress && importedFiles.find(file => file.id === batchProgress.fileId);
-    if (currentFile) void cancelSanitization(currentFile);
+    if (currentFile && batchJobIdRef.current) void cancelSanitization(currentFile, batchJobIdRef.current);
   }
 
-  async function cancelSanitization(file: ImportedFile) {
+  async function cancelSanitization(file: ImportedFile, jobIdOverride?: string) {
     if (!selectedProject) return;
     if (batchRunning) batchStopRequestedRef.current = true;
     const job = sanitizationJobs[file.id];
-    if (!job || !["queued", "running"].includes(job.status)) return;
+    const jobId = jobIdOverride || job?.id;
+    if (!jobId || job && !["queued", "running"].includes(job.status)) return;
     try {
-      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
       const body = await response.json() as { status?: string; detail?: string };
       if (!response.ok) throw new Error(body.detail || "Abbruch konnte nicht angefordert werden.");
-      setSanitizationJobs(current => ({ ...current, [file.id]: { ...job, status: "cancelling" } }));
+      if (job) setSanitizationJobs(current => ({ ...current, [file.id]: { ...job, status: "cancelling" } }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Abbruch konnte nicht angefordert werden.");
     }
