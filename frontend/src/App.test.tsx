@@ -33,7 +33,7 @@ describe("LogSanitizer app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Regeln" }));
     expect(await screen.findByRole("heading", { name: "Bereinigungsregeln" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Zurück zum Projekt" }));
-    expect(await screen.findByRole("heading", { name: "Projekt vorbereiten" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Projekte verwalten." })).toBeInTheDocument();
   });
 
   it("navigates from review history back to the project workspace", async () => {
@@ -42,7 +42,7 @@ describe("LogSanitizer app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Prüfung & Verlauf" }));
     expect(await screen.findByRole("heading", { name: "Prüfung & Verlauf" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Zurück zum Projekt" }));
-    expect(await screen.findByRole("heading", { name: "Projekt vorbereiten" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Projekte verwalten." })).toBeInTheDocument();
   });
 
   it("offers local help topics", async () => {
