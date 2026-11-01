@@ -218,7 +218,7 @@ export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) 
             <div className="user-actions">
               <button className="secondary-button" type="button" onClick={() => void saveRoles(user)} disabled={saving || !changed || roles.length === 0}>Rollen speichern</button>
               <button className="secondary-button" type="button" onClick={() => void toggleEnabled(user)} disabled={saving || isSelf}>{user.enabled ? "Deaktivieren" : "Aktivieren"}</button>
-              <button className="danger-button" type="button" onClick={() => void deleteUser(user)} disabled={saving || isSelf}>Löschen</button>
+              <button className="danger-button" type="button" onClick={() => void deleteUser(user)} disabled={saving || isSelf || user.external} title={user.external ? "LDAP-Konten werden durch den Verzeichnisdienst verwaltet; bei Bedarf deaktivieren." : undefined}>Löschen</button>
             </div>
           </article>;
         })}
