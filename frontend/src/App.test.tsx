@@ -290,13 +290,13 @@ describe("source profile selection for project sanitization", () => {
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled());
     const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
     fireEvent.focus(profileSelect);
     expect(await screen.findByRole("option", { name: "Nginx" })).toBeInTheDocument();
     fireEvent.change(profileSelect, { target: { value: "nginx" } });
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigung starten" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Bereinigung starten" }));
 
     expect(await screen.findByText(/Bereinigung für events.log abgeschlossen und validiert/)).toBeInTheDocument();
