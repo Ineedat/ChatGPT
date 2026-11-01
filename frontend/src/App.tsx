@@ -14,7 +14,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-type Tab = "overview" | "rules" | "review" | "users" | "help";
+type Tab = "overview" | "project" | "rules" | "review" | "users" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type ImportMode = "file" | "folder";
@@ -44,6 +44,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [tab, setTab] = useState<Tab>("overview");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -400,6 +401,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const project = await response.json() as Project;
       setProjects(current => [project, ...current.filter(item => item.id !== project.id)]);
       setSelectedProject(project);
+      setShowProjectDialog(false);
+      setTab("project");
       setProjectName("");
       setProjectDescription("");
     } catch (cause) {
@@ -415,6 +418,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const response = await apiFetch(`/api/projects/${encodeURIComponent(id)}`);
       if (!response.ok) throw new Error("Projekt konnte nicht geöffnet werden.");
       setSelectedProject(await response.json() as Project);
+      setTab("project");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unbekannter Fehler beim Öffnen.");
     }
@@ -433,47 +437,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
 
-  return <main className="app-shell">
-    <header className="topbar">
-      <div><p className="eyebrow">LOKAL · OFFLINE-FIRST</p><h1>LogSanitizer</h1></div>
-      <nav aria-label="Hauptnavigation" className="nav-tabs">
-        <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Übersicht</button>
-        {user.roles.some(role => ["admin", "rule_owner"].includes(role)) && <button className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}>Regeln</button>}
-        {user.roles.includes("admin") && <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Benutzer</button>}
-        <button className={tab === "review" ? "active" : ""} onClick={() => setTab("review")}>Prüfung &amp; Verlauf</button>
-        <button className={tab === "help" ? "active" : ""} onClick={() => setTab("help")}>Hilfe</button>
-      </nav>
-      <button type="button" onClick={async () => { await apiFetch("/api/auth/logout", { method: "POST" }); onLogout(); }}>Abmelden</button>
-    </header>
-    {tab === "overview" ? <>
-      <section className="hero">
-        <span className="status-pill"><span className="status-dot" /> Lokaler Arbeitsbereich</span>
-        <h2>Logs sicher vorbereiten.</h2>
-        <p>Die lokale Arbeitsumgebung für die regelbasierte Bereinigung von Anwendungslogs.</p>
-        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt UTF-8-Text, JSON Lines und vollständige JSON-Dokumente. Vor dem produktiven Einsatz müssen die Erkennungsregeln fachlich geprüft und die Verarbeitung großer Dateien auf Zielhardware gemessen werden. Prüf- und Freigabeworkflow sind bereits integriert.</span></div>
-      </section>
-      <section className="panel">
-        <div className="section-heading"><div><p className="eyebrow">ARBEITSBEREICH</p><h3>Projekt vorbereiten</h3></div>
-          <HelpTooltip label="Projektname" help="Ein Projekt gruppiert Logdateien, Regeln und konsistente Platzhalterzuordnungen. Der Projektname und die optionale Beschreibung werden lokal in SQLite gespeichert. Noch werden keine Dateien importiert oder verarbeitet."><span className="help-label">Hilfe zum Projekt</span></HelpTooltip>
-        </div>
-        <form onSubmit={event => void createProject(event)}>
-          <label htmlFor="project-name">Projektname</label>
-          <input id="project-name" value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="z. B. Testprojekt" maxLength={80} required />
-          <label htmlFor="project-description">Beschreibung <span className="optional-label">(optional)</span></label>
-          <input id="project-description" value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="z. B. Analyse eines Anwendungsfehlers" maxLength={500} />
-          <p className="field-help">Projekte werden lokal gespeichert. Das Anlegen startet keinen Import und keine Verarbeitung.</p>
-          <button className="primary-button" type="submit" disabled={!projectName.trim() || saving}>{saving ? "Speichert …" : "Projekt anlegen"}</button>
-        </form>
-      </section>
-      {error && <p className="error-message" role="alert">{error}</p>}
-      <section className="projects-section">
-        <div className="section-heading"><div><p className="eyebrow">LOKALE METADATEN</p><h3>Vorhandene Projekte</h3></div><button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}>{loading ? "Lädt …" : "Aktualisieren"}</button></div>
-        {loading ? <p className="muted-message">Projektliste wird geladen …</p> : projects.length === 0 ? <p className="muted-message">Noch keine Projekte vorhanden. Lege oben ein Projekt an.</p> : <div className="project-list">{projects.map(project => <article className={selectedProject?.id === project.id ? "project-card selected" : "project-card"} key={project.id}>
-          <div><h4>{project.name}</h4><p>{project.description || "Keine Beschreibung"}</p><span className="project-meta">Erstellt: {new Date(project.created_at).toLocaleString("de-DE")} · Status: {project.status === "draft" ? "Entwurf" : project.status}</span></div>
-          <button className="secondary-button" onClick={() => void openProject(project.id)}>Öffnen</button>
-        </article>)}</div>}
-      </section>
-      {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
+  const projectWorkspace = selectedProject ?       {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
         <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
@@ -566,15 +530,66 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           {loadingProfiles && <p className="field-help">Quellprofile werden geladen …</p>}
           {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen", interrupted: "Unterbrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}{sanitizationJobs[file.id].status === "completed" && <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfung & Verlauf öffnen</button>}</div>}
         </li>)}</ul>}
-      </section>}
+      </section>} : <p className="muted-message">Bitte zuerst ein Projekt auf der Startseite öffnen.</p>;
+
+  return <main className="app-shell">
+    <header className="topbar">
+      <div><p className="eyebrow">LOKAL · OFFLINE-FIRST</p><h1>LogSanitizer</h1></div>
+      <nav aria-label="Hauptnavigation" className="nav-tabs">
+        <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Startseite</button>
+        {selectedProject && <button className={tab === "project" ? "active" : ""} onClick={() => setTab("project")}>Projekt</button>}
+        {user.roles.some(role => ["admin", "rule_owner"].includes(role)) && <button className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}>Regeln</button>}
+        {user.roles.includes("admin") && <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Benutzer</button>}
+        <button className={tab === "review" ? "active" : ""} onClick={() => setTab("review")}>Prüfung &amp; Verlauf</button>
+        <button className={tab === "help" ? "active" : ""} onClick={() => setTab("help")}>Hilfe</button>
+      </nav>
+      <button type="button" onClick={async () => { await apiFetch("/api/auth/logout", { method: "POST" }); onLogout(); }}>Abmelden</button>
+    </header>
+    {tab === "overview" ? <>
+      <section className="hero">
+        <span className="status-pill"><span className="status-dot" /> Lokaler Arbeitsbereich</span>
+        <h2>Logs sicher vorbereiten.</h2>
+        <p>Die lokale Arbeitsumgebung für die regelbasierte Bereinigung von Anwendungslogs.</p>
+        <div className="notice" role="status"><strong>Noch nicht für echte Logdaten freigegeben.</strong><span>Die Verarbeitung unterstützt UTF-8-Text, JSON Lines und vollständige JSON-Dokumente. Vor dem produktiven Einsatz müssen die Erkennungsregeln fachlich geprüft und die Verarbeitung großer Dateien auf Zielhardware gemessen werden. Prüf- und Freigabeworkflow sind bereits integriert.</span></div>
+      </section>
+      <section className="projects-section home-projects">
+        <div className="section-heading"><div><p className="eyebrow">ARBEITSBEREICH</p><h3>Projekte</h3></div>
+          <div className="rule-actions"><button className="secondary-button" type="button" onClick={() => void loadProjects()} disabled={loading}>{loading ? "Lädt …" : "Aktualisieren"}</button><button className="primary-button" type="button" onClick={() => setShowProjectDialog(true)}>Neues Projekt</button></div>
+        </div>
+        {loading ? <p className="muted-message">Projektliste wird geladen …</p> : projects.length === 0 ? <p className="muted-message">Noch keine Projekte vorhanden. Über „Neues Projekt“ kannst du ein Projekt anlegen.</p> : <div className="project-list">{projects.map(project => <article className="project-card" key={project.id}>
+          <div><h4>{project.name}</h4><p>{project.description || "Keine Beschreibung"}</p><span className="project-meta">Erstellt: {new Date(project.created_at).toLocaleString("de-DE")} · Status: {project.status === "draft" ? "Entwurf" : project.status}</span></div>
+          <button className="secondary-button" onClick={() => void openProject(project.id)}>Öffnen</button>
+        </article>)}</div>}
+      </section>
+      {error && <p className="error-message" role="alert">{error}</p>}
+      <section className="projects-section">
+        <div className="section-heading"><div><p className="eyebrow">LOKALE METADATEN</p><h3>Vorhandene Projekte</h3></div><button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}>{loading ? "Lädt …" : "Aktualisieren"}</button></div>
+        {loading ? <p className="muted-message">Projektliste wird geladen …</p> : projects.length === 0 ? <p className="muted-message">Noch keine Projekte vorhanden. Lege oben ein Projekt an.</p> : <div className="project-list">{projects.map(project => <article className={selectedProject?.id === project.id ? "project-card selected" : "project-card"} key={project.id}>
+          <div><h4>{project.name}</h4><p>{project.description || "Keine Beschreibung"}</p><span className="project-meta">Erstellt: {new Date(project.created_at).toLocaleString("de-DE")} · Status: {project.status === "draft" ? "Entwurf" : project.status}</span></div>
+          <button className="secondary-button" onClick={() => void openProject(project.id)}>Öffnen</button>
+        </article>)}</div>}
+      </section>
       {!selectedProject && <section className="feature-grid" aria-label="Projektprinzipien">
         <article className="feature-card"><span className="feature-number">01</span><h3>Lokal bleiben</h3><p>Keine Cloud- oder externen API-Abhängigkeiten im vorgesehenen Betrieb.</p></article>
         <article className="feature-card"><span className="feature-number">02</span><h3>Originale schützen</h3><p>Quelldateien bleiben unverändert. Verarbeitung erfolgt in getrennten Arbeitsbereichen.</p></article>
         <article className="feature-card"><span className="feature-number">03</span><h3>Freigabe kontrollieren</h3><p>Unvollständige Läufe dürfen später nicht exportiert oder freigegeben werden.</p></article>
       </section>}
-    </> : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("overview")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("overview")} /> : tab === "users" ? <UserManagementPanel currentUser={user} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
+    </> : tab === "project" ? projectWorkspace : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("project")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("project")} /> : tab === "users" ? <UserManagementPanel currentUser={user} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
       <div className="help-list">{helpTopics.map(topic => <article className="help-topic" key={topic.id}><h3>{topic.title}</h3><p>{topic.summary}</p><ul>{topic.steps.map(step => <li key={step}>{step}</li>)}</ul></article>)}</div>
     </section>}
+    {showProjectDialog && <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowProjectDialog(false); }}>
+      <section className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title">
+        <div className="section-heading"><div><p className="eyebrow">PROJEKT ANLEGEN</p><h3 id="project-dialog-title">Neues Projekt</h3></div><button className="secondary-button" type="button" onClick={() => setShowProjectDialog(false)}>Schließen</button></div>
+        <form onSubmit={event => void createProject(event)}>
+          <label htmlFor="project-name">Projektname</label>
+          <input id="project-name" value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="z. B. Analyse Anwendungsfehler" maxLength={80} required autoFocus />
+          <label htmlFor="project-description">Beschreibung <span className="optional-label">(optional)</span></label>
+          <input id="project-description" value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Kurze Beschreibung" maxLength={500} />
+          <p className="field-help">Das Projekt wird lokal angelegt. Anschließend wechselst du direkt in den Projektbereich.</p>
+          <div className="rule-actions"><button className="secondary-button" type="button" onClick={() => setShowProjectDialog(false)}>Abbrechen</button><button className="primary-button" type="submit" disabled={!projectName.trim() || saving}>{saving ? "Speichert …" : "Projekt erstellen"}</button></div>
+        </form>
+      </section>
+    </div>}
     <footer><span>LogSanitizer · 0.1.0-dev</span><span>Keine echten oder vertraulichen Logs in diesem Entwicklungsstand verarbeiten.</span></footer>
   </main>;
 }
