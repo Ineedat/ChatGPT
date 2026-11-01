@@ -531,5 +531,7 @@ def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path,
         assert state["status"] == "completed"
         assert state["result"]["validated"] is True
 
-    assert output.read_bytes() == b'{"message":"hidden=REDACTED"}'
+    work_output = _stored_output_path(tmp_path, job_id)
+    assert work_output.read_bytes() == b'{"message":"hidden=REDACTED"}'
+    assert not output.exists()
     assert source.read_bytes() == original
