@@ -328,7 +328,8 @@ def project_file_set_format(
 @app.post("/api/projects/{project_id}/files/{file_id}/validate-format", tags=["files"])
 def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str | int | bool]:
     """Validate the entire source file locally using the effective selected format."""
-    if get_project(project_id) is None:
+    project = get_project(project_id)
+    if project is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
@@ -464,6 +465,20 @@ class SanitizationRequest(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     tags=["sanitization"],
 )
+def _relative_project_source_path(project_id: str, source: Path) -> Path:
+    """Return the source's path relative to the project's uploaded-source root."""
+    sources_root = (database_path().parent / "projects" / project_id / "sources").resolve()
+    try:
+        relative = source.resolve(strict=False).relative_to(sources_root)
+        if relative.parts and all(part not in {"", ".", ".."} for part in relative.parts):
+            return relative
+    except ValueError:
+        pass
+    # Backend-path imports are external to the project workspace and retain
+    # their basename rather than leaking their absolute source directory.
+    return Path(source.name)
+
+
 def project_file_sanitize_start(
     project_id: str,
     file_id: str,
@@ -486,11 +501,25 @@ def project_file_sanitize_start(
     output = Path(payload.output_path).expanduser()
     if not output.is_absolute():
         raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
-    if not output.parent.is_dir():
-        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
+    output_root = Path(project.output_directory).expanduser()
+    if not project.output_directory or not output_root.is_dir():
+        raise HTTPException(status_code=422, detail="Der Projekt-Ausgabeordner muss festgelegt werden und existieren.")
+    try:
+        resolved_root = output_root.resolve(strict=True)
+        relative_source = _relative_project_source_path(project_id, source)
+        expected_output = (resolved_root / relative_source).resolve(strict=False)
+        if output.resolve(strict=False) != expected_output:
+            raise HTTPException(status_code=422, detail="Die Ausgabedatei muss die relative Quellpfadstruktur im Projekt-Ausgabeordner beibehalten.")
+        expected_output.parent.mkdir(parents=True, exist_ok=True)
+        resolved_parent = expected_output.parent.resolve(strict=True)
+        if not resolved_parent.is_relative_to(resolved_root):
+            raise HTTPException(status_code=422, detail="Der Ausgabepfad liegt außerhalb des Projekt-Ausgabeordners.")
+        output = resolved_parent / expected_output.name
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Die Ausgabeverzeichnisstruktur konnte nicht angelegt werden.") from exc
     if output.resolve(strict=False) == source.resolve(strict=False):
         raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
-    if output.exists():
+    if output.is_symlink() or output.exists():
         raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
     selected_format = row["format_override"] or row["detected_format"]
     if source.is_symlink() or not source.is_file():
