@@ -681,3 +681,21 @@ input:not([type=checkbox]):not([type=file]), select, textarea { min-width: 0; }
 .file-row-actions button{margin:2px;padding:4px 6px;font-size:10px}
 .bulk-file-settings button{white-space:nowrap}
 @media(max-width:760px){.bulk-file-settings{grid-template-columns:1fr 1fr}.bulk-file-settings>strong{grid-column:1/-1}.bulk-file-settings button{grid-column:1/-1}.registered-files-table{min-width:900px}}
+
+/* Reviewer workspace: distinct, compact views and bounded side-by-side file windows. */
+.review-view-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0 14px;padding:4px;border:1px solid var(--border);border-radius:8px;background:#0f1728}
+.review-view-tabs button{border:0;border-radius:5px;background:transparent;color:var(--muted);padding:6px 10px;font-size:11px}
+.review-view-tabs button.active{background:var(--panel-soft);color:#fff}
+.review-project-files{max-width:100%;overflow:auto}
+.review-project-files table{width:100%;border-collapse:collapse;font-size:11px}
+.review-project-files th,.review-project-files td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+.review-project-files th{color:var(--muted);font-weight:700;white-space:nowrap}
+.review-project-files td:first-child{overflow-wrap:anywhere;min-width:180px}
+.review-compare-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.review-compare-pane{min-width:0;border:1px solid var(--border);border-radius:8px;background:#0d1425;padding:8px}
+.review-compare-pane h4{margin:0 0 7px;font-size:11px}
+.review-compare-pane pre{height:min(52vh,520px);min-height:180px;overflow:auto;margin:0;padding:8px;border:1px solid var(--border);border-radius:5px;background:#080d18;color:#e5e7eb;font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;tab-size:4}
+.review-compare-navigation{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.user-admin-actions{display:flex;gap:8px;flex-wrap:wrap}
+.user-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.review-compare-grid{grid-template-columns:minmax(0,1fr)}.review-compare-pane pre{height:38vh;min-height:150px}.review-project-files table{min-width:620px}}
