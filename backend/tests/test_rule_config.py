@@ -167,3 +167,68 @@ def test_fresh_install_loads_curated_rules_disabled(tmp_path, monkeypatch) -> No
     assert all(rule.enabled is False for rule in config.rules)
     assert all(rule.profile_id is None for rule in config.rules)
     assert not (tmp_path / "fresh-rules" / "rules-v1.json").exists()
+
+def test_source_profiles_can_be_created_edited_and_removed_through_rule_api(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "profiles-rules"))
+    initial = sample_config()
+    initial["profiles"] = []
+    initial["rules"][1]["profile_id"] = None
+
+    with TestClient(app) as client:
+        created = {
+            **initial,
+            "profiles": [{"id": "webserver", "name": "Webserver", "source_hint": "nginx"}],
+        }
+        validation = client.post("/api/rules/config/validate", json=created)
+        assert validation.status_code == 200
+        assert validation.json()["valid"] is True
+        response = client.put("/api/rules/config", json=created)
+        assert response.status_code == 200
+        assert response.json()["profiles"] == created["profiles"]
+
+        edited = {
+            **created,
+            "profiles": [{
+                "id": "webserver",
+                "name": "Produktiv-Webserver",
+                "source_hint": "nginx-prod",
+            }],
+        }
+        response = client.put("/api/rules/config", json=edited)
+        assert response.status_code == 200
+        assert response.json()["profiles"] == edited["profiles"]
+        assert client.get("/api/rules/config").json()["profiles"] == edited["profiles"]
+
+        referenced = {
+            **edited,
+            "rules": [
+                *edited["rules"],
+                {
+                    "id": "webserver-secret",
+                    "name": "Webserver-Token",
+                    "category": "secret",
+                    "match_type": "plain",
+                    "pattern": "token=",
+                    "replacement": "token=[REDACTED]",
+                    "profile_id": "webserver",
+                    "priority": 30,
+                },
+            ],
+        }
+        response = client.put("/api/rules/config", json=referenced)
+        assert response.status_code == 200
+
+        invalid_delete = {**referenced, "profiles": []}
+        rejected = client.put("/api/rules/config", json=invalid_delete)
+        assert rejected.status_code == 422
+        assert "nicht definiertes Quellprofil" in rejected.text
+
+        removable = {
+            **referenced,
+            "rules": [rule for rule in referenced["rules"] if rule["profile_id"] != "webserver"],
+            "profiles": [],
+        }
+        response = client.put("/api/rules/config", json=removable)
+        assert response.status_code == 200
+        assert response.json()["profiles"] == []
+        assert client.get("/api/rules/config").json()["profiles"] == []
