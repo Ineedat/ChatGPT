@@ -423,7 +423,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
     outputPaths[file.id]?.trim() && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
-  ) && !batchHasDuplicateOutputs;
+  );
 
   return <main className="app-shell">
     <header className="topbar">
