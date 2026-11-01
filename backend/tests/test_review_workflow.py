@@ -256,6 +256,13 @@ def test_approved_file_is_visible_and_locked_against_further_sanitization(tmp_pa
         assert files.status_code == 200
         assert next(item for item in files.json() if item["id"] == file["id"])["state"] == "approved"
 
+        locked_calls = [
+            client.post(f"/api/projects/{project['id']}/files/{file['id']}/detect-format"),
+            client.put(f"/api/projects/{project['id']}/files/{file['id']}/format", json={"format_override": "json"}),
+            client.post(f"/api/projects/{project['id']}/files/{file['id']}/validate-format"),
+        ]
+        assert [item.status_code for item in locked_calls] == [409, 409, 409]
+
         retry = client.post(
             f"/api/projects/{project['id']}/files/{file['id']}/sanitize",
             json={"output_path": str(tmp_path / "second-output.log")},
