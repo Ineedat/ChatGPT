@@ -208,7 +208,7 @@ def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, mo
         )
         assert approved.status_code == 200
         assert approved.json()["status"] == "approved_with_exception"
-        assert output.read_bytes() == b"REDACTED\\n"
+        assert output.read_bytes() == b"REDACTED\n"
         assert _stored_output_path(tmp_path, run_id) == output
         events = client.get("/api/reviews/audit").json()
         event = next(item for item in events if item["action"] == "approve")
