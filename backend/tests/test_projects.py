@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from test_client import TestClient
 
 from logsanitizer.main import _relative_project_source_path, app
