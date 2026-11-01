@@ -423,7 +423,7 @@ def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, m
         })
         assert login.status_code == 200
         client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
-        response, _, file, output = _sanitized_run(
+        response, _, _, output = _sanitized_run(
             client, tmp_path, contents=b"secret=alpha\\nsecond line\\n"
         )
         assert response.status_code == 200
