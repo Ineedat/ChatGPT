@@ -14,7 +14,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
 }
 
 type Tab = "overview" | "project" | "rules" | "review" | "users" | "help";
-type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
+type ImportedFile = { id: string; project_id: string; display_name: string; relative_path?: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type ImportMode = "file" | "folder";
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
@@ -79,6 +79,9 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [profileSelections, setProfileSelections] = useState<Record<string, string>>({});
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [bulkFormatOverride, setBulkFormatOverride] = useState("");
+  const [bulkProfileId, setBulkProfileId] = useState("");
+  const [applyingBulkSettings, setApplyingBulkSettings] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fileId: string; fileName: string } | null>(null);
   const batchStopRequestedRef = useRef(false);
