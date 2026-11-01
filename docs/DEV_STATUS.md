@@ -208,3 +208,19 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Projektweite Mapping-Konsistenz wird durch `test_indexed_mapping_is_stable_across_files_and_isolated_by_project` abgesichert.
 - Mehrdatei-Frontendtests bestätigen, dass die zweite Datei erst nach dem terminalen Status der ersten gestartet wird und doppelte Ausgabepfade vor dem Start erkannt werden.
 - PR #2 bleibt offen und ungemergt.
+
+
+## Relative Ausgabepfade und tabellarische Dateiverwaltung (2026-11-01)
+
+- SQLite-Schema Version 5 speichert den relativen Quellpfad je registrierter Datei. Browser-Uploads und Ordnerimporte bewahren damit Unterordner und erlauben gleiche Dateinamen in unterschiedlichen Quellordnern.
+- Dateien aus dem Backend-Pfad-Fallback erhalten als relativen Pfad ihren Dateinamen; absolute Quellpfade werden nicht an die Oberfläche ausgegeben.
+- Bereinigungsjobs müssen im konfigurierten Projekt-Ausgabeordner und unter dem gespeicherten relativen Quellpfad schreiben. Fehlende Unterordner werden automatisch erstellt; vorhandene Ausgabedateien werden nicht überschrieben. Symlink-/Traversal-Ausbrüche aus dem Ausgabeordner werden abgewiesen.
+- Die Dateikarten wurden durch eine kompakte Tabelle ersetzt. Format, Quellprofil, Validierungsstatus, Bereinigungsstatus und zeilenbezogene Aktionen sind direkt sichtbar und bedienbar.
+- „Gemeinsame Einstellungen“ wendet Format und Quellprofil auf alle registrierten Dateien des Projekts an.
+- Formatänderung und erneute Erkennung setzen einen zuvor ermittelten Validierungsstatus zurück, damit keine veraltete Gültigkeitsanzeige bestehen bleibt.
+- Offline-Hilfe aktualisiert; Regressionen decken relative Pfade, gleiche Basenames in verschiedenen Unterordnern, Dateitabelle und die neuen Ausgabeordnerregeln ab.
+- CI für Commit `75a81ac31a23`, Lauf [41341831979](https://github.com/Ineedat/ChatGPT/actions/runs/41341831979), vollständig erfolgreich:
+  - Frontend: 31 Tests und Produktionsbuild erfolgreich.
+  - Backend Linux: 118 passed, 1 skipped; Ruff erfolgreich.
+  - Backend Windows: 23 gezielte Projekt-/Mappingtests; Ruff erfolgreich.
+- PR #2 bleibt offen und nicht gemergt. Das portable Linux-Paket wurde für diesen Stand noch nicht neu gebaut; die visuelle Abnahme auf dem Zielsystem steht weiterhin aus.
