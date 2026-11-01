@@ -191,7 +191,7 @@ describe("local format detection UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, detected_format: "json", sample_limit_bytes: "65536" }) } as Response));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Format lokal prüfen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Erkennen" }));
     expect(await screen.findByText(/Erkannt: JSON/)).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/detect-format`, expect.objectContaining({ method: "POST" }));
   });
@@ -227,7 +227,7 @@ describe("full format validation UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, format: "json", valid: true, bytes_checked: 25 }) } as Response));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Vollständig validieren" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Validieren" }));
     expect(await screen.findByText(/Format gültig · json · 25 Byte geprüft/)).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/validate-format`, expect.objectContaining({ method: "POST" }));
   });
@@ -295,7 +295,7 @@ describe("source profile selection for project sanitization", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
     const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
     fireEvent.focus(profileSelect);
-    expect(within(profileSelect).getByRole("option", { name: "Nginx" })).toBeInTheDocument();
+    await waitFor(() => expect(profileSelect).toHaveTextContent("Nginx"));
     fireEvent.change(profileSelect, { target: { value: "nginx" } });
     fireEvent.click(screen.getByRole("button", { name: "Bereinigen" }));
 
@@ -423,7 +423,7 @@ describe("multi-file project sanitization workflow", () => {
     fireEvent.click(duplicateFileChecks[1]);
     await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
-    expect(await screen.findByText(/gleichen relativen Pfad/)).toBeInTheDocument();
+    expect(await screen.findByText(/denselben relativen Pfad/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
   });
 });
