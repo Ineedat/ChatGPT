@@ -225,7 +225,7 @@ def test_source_profiles_can_be_created_edited_and_removed_through_rule_api(tmp_
 
         removable = {
             **referenced,
-            "rules": [rule for rule in referenced["rules"] if rule["profile_id"] != "webserver"],
+            "rules": [rule for rule in referenced["rules"] if rule.get("profile_id") != "webserver"],
             "profiles": [],
         }
         response = client.put("/api/rules/config", json=removable)
