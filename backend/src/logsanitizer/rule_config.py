@@ -13,6 +13,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .rule_library import list_rule_templates
+
 CONFIG_VERSION = 1
 DEFAULT_RULES_DIR = ".logsanitizer/rules"
 
@@ -119,7 +121,10 @@ def config_path() -> Path:
 def load_rule_config() -> RuleConfig:
     path = config_path()
     if not path.exists():
-        return RuleConfig()
+        # Make the curated starter rules visible immediately in a fresh installation.
+        # They remain disabled until an operator reviews and explicitly enables them.
+        templates = list_rule_templates()
+        return RuleConfig.model_validate({"schema_version": CONFIG_VERSION, "profiles": [], "rules": templates})
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
