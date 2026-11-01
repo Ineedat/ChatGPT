@@ -215,7 +215,7 @@ def create_run(run_id: str, project_id: str, file_id: str, display_name: str,
 def _publish_approved_output(db: sqlite3.Connection, row: sqlite3.Row) -> str:
     """Move a validated work file into its final output location without overwriting."""
     work_path = Path(row["output_path"])
-    publish_value = row["publish_path"] if "publish_path" in row.keys() else ""
+    publish_value = row["publish_path"]
     publish_path = Path(publish_value) if publish_value else work_path
     if work_path == publish_path:
         signature = _file_signature(work_path)
