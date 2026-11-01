@@ -194,7 +194,7 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Ein Stapelabbruch fordert den kooperativen Abbruch der aktiven Datei an und verhindert den Start weiterer Dateien.
 - Die projektbezogene SQLite-Mapping-Tabelle wird von jedem Job mit derselben Projekt-ID verwendet; derselbe Originalwert erhält daher dateiübergreifend denselben Platzhalter. Der Backend-Regressionstest `test_indexed_mapping_is_stable_across_files_and_isolated_by_project` deckt dies ab.
 - Frontend-Tests prüfen die sequentielle Reihenfolge (Datei 2 startet erst nach dem terminalen Status von Datei 1) sowie die Abweisung doppelter Ausgabepfade.
-- CI-Verifizierung des neuen Frontend- und Dokumentationsstands steht noch aus.
+- CI-Verifizierung des Mehrdatei-Frontend- und Dokumentationsstands ist mit Push-Lauf [41324254157](https://github.com/Ineedat/ChatGPT/actions/runs/41324254157) und PR-Lauf [41324257605](https://github.com/Ineedat/ChatGPT/actions/runs/41324257605) vollständig abgeschlossen; alle drei Jobs waren erfolgreich.
 
 
 
