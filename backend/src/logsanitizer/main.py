@@ -34,8 +34,8 @@ from logsanitizer.database import (
     Project,
     ProjectCreate,
     connect_database,
-    database_path,
     create_project,
+    database_path,
     get_project,
     initialize_database,
     list_imported_files,
@@ -850,7 +850,7 @@ def _copy_upload_to_temporary(source: BinaryIO, destination: Path) -> int:
 )
 async def project_files_upload(
     project_id: str,
-    files: list[UploadFile] = File(...),
+    files: list[UploadFile] = File(...),  # noqa: B008
     relative_paths: str = Form("[]"),
 ) -> FolderImportResult:
     """Copy browser-selected files into the project workspace using bounded chunks."""
