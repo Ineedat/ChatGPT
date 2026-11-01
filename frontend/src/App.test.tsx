@@ -427,3 +427,35 @@ describe("multi-file project sanitization workflow", () => {
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
   });
 });
+
+
+describe("approved file lock UI", () => {
+  it("shows approved files as locked and disables further editing and sanitization", async () => {
+    const project = {
+      id: "project-approved", name: "Freigabeprojekt", description: "", status: "active",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00",
+      output_directory: "/tmp/approved-output"
+    };
+    const file = {
+      id: "file-approved", project_id: project.id, display_name: "service.log",
+      size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00",
+      imported_at: "2026-11-01T10:00:00+00:00", state: "approved",
+      format_hint: "text", detected_format: "text", format_override: null
+    };
+    vi.stubGlobal("fetch", vi.fn(async input => {
+      const url = String(input);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === "/api/projects/" + project.id) return { ok: true, json: async () => project } as Response;
+      if (url === "/api/projects/" + project.id + "/files") return { ok: true, json: async () => [file] } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    }));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    expect(await screen.findByText("Freigegeben · gesperrt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bereinigen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Für Stapel auswählen: service.log" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Format für service.log" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Quellprofil für service.log" })).toBeDisabled();
+  });
+});
