@@ -482,3 +482,40 @@ footer { margin-top: 14px; padding-top: 8px; border-color: #bdbdbd; }
 .path-import-fallback .import-source-fields { margin-top: 7px; grid-template-columns: minmax(0, 1fr) auto; }
 .selected-upload-list { margin: 0; padding: 5px 7px; border: 1px solid #d0d0d0; background: #f5f5f5; overflow-wrap: anywhere; }
 .import-source-fields input[type=file] { width: 100%; min-width: 0; padding: 4px; border: 1px solid #858585; background: #fff; color: #1f1f1f; }
+
+
+/* Compact multi-file processing controls */
+.batch-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #202020;
+}
+.batch-selection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.batch-selection-actions span { color: #444; }
+.batch-toolbar .field-help { grid-column: 1 / -1; margin: 0; }
+.batch-file-select { display: inline-flex; align-items: center; gap: 6px; margin: 0 !important; min-width: 0; }
+.batch-file-select input { width: 14px !important; height: 14px; margin: 0; accent-color: #0067c0; }
+.batch-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid #7b9ab9;
+  border-radius: 4px;
+  background: #eaf2fb;
+  color: #17324d;
+}
+.batch-progress span { flex: 1 1 auto; }
+@media (max-width: 760px) {
+  .batch-toolbar { grid-template-columns: 1fr; }
+  .batch-toolbar .field-help { grid-column: auto; }
+}
