@@ -193,6 +193,7 @@ class ImportedFile(BaseModel):
     id: str
     project_id: str
     display_name: str
+    relative_path: str = ""
     size_bytes: int
     modified_at: str
     imported_at: str
@@ -321,6 +322,19 @@ def create_project(payload: ProjectCreate) -> Project:
 
 def _imported_file_from_row(row: sqlite3.Row) -> ImportedFile:
     values = dict(row)
+    source_path = values.pop("source_path", None)
+    relative_path = values["display_name"]
+    if source_path:
+        sources_root = (
+            database_path().parent / "projects" / values["project_id"] / "sources"
+        ).resolve()
+        try:
+            relative_path = Path(source_path).resolve(strict=False).relative_to(sources_root).as_posix()
+        except ValueError:
+            # Files registered through the backend-path fallback have no project-relative
+            # directory structure; retain their basename in the output workspace.
+            pass
+    values["relative_path"] = relative_path
     values["format_hint"] = format_hint_for_name(values["display_name"])
     return ImportedFile(**values)
 
@@ -333,7 +347,7 @@ def update_detected_format(project_id: str, file_id: str, detected_format: str) 
         )
         row = connection.execute(
             """
-            SELECT id, project_id, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE project_id = ? AND id = ?
             """,
@@ -381,7 +395,7 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
     file_id = str(uuid4())
     with connect_database() as connection:
         existing = connection.execute(
-            "SELECT id, project_id, display_name, size_bytes, modified_at, imported_at, "
+            "SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at, "
             "detected_format, format_override FROM imported_files WHERE project_id = ? AND source_path = ?",
             (project_id, absolute_path),
         ).fetchone()
