@@ -163,6 +163,7 @@ describe("review workflow UI", () => {
     render(<ReviewPanel roles={["operator"]} />);
     fireEvent.click((await screen.findAllByRole("button", { name: "Details" }))[1]);
     expect(await screen.findByRole("button", { name: /app-reworked.log.*Zur Überarbeitung zurückgegeben/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Prüfverlauf (2)" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Suche in Läufen" }), { target: { value: "app-reworked" } });
     expect(screen.getByText("Laufhistorie (1 von 2)")).toBeInTheDocument();
     expect(screen.getByText("app-reworked.log")).toBeInTheDocument();
@@ -170,4 +171,31 @@ describe("review workflow UI", () => {
     expect(screen.getByText("Laufhistorie (1 von 2)")).toBeInTheDocument();
   });
 
+});
+
+describe("project file comparison view", () => {
+  it("shows the active project's file list and opens bounded original/output panes", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/reviews/runs?limit=100") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/projects/project-1/files") return { ok: true, json: async () => [{
+        id: "file-1", display_name: "app.log", relative_path: "logs/app.log", size_bytes: 100, state: "registered"
+      }] } as Response;
+      if (url === "/api/reviews/queue") return { ok: true, json: async () => [run] } as Response;
+      if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+      if (url.includes("/compare-preview")) return { ok: true, json: async () => ({
+        original: { content: "secret=alpha\\n", byte_offset: 0, next_offset: null, total_bytes: 13 },
+        sanitized: { content: "REDACTED\\n", byte_offset: 0, next_offset: null, total_bytes: 9 }
+      }) } as Response;
+      return { ok: true, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["reviewer"]} selectedProject={{ id: "project-1", name: "Testprojekt" }} />);
+    expect(await screen.findByText("logs/app.log")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Dateien vergleichen" }));
+    expect(await screen.findByText("secret=alpha\\n")).toBeInTheDocument();
+    expect(screen.getByText("REDACTED\\n")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Original" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sanitisiert" })).toBeInTheDocument();
+  });
 });
