@@ -602,7 +602,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
               </tr>;
             })}</tbody>
           </table>
-        </div>
+        </div>}
       </section> : <p className="muted-message">Bitte zuerst ein Projekt auf der Startseite öffnen.</p>;
 
   return <main className="app-shell">
