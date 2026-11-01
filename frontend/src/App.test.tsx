@@ -252,7 +252,8 @@ describe("JSON document sanitization UI", () => {
     vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
@@ -277,6 +278,7 @@ describe("source profile selection for project sanitization", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ profiles: [{ id: "nginx", name: "Nginx" }] }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "job-profile", status: "queued" }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({
@@ -343,7 +345,7 @@ describe("multi-file project sanitization workflow", () => {
     };
     const files = [
       { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
-      { id: "file-two", project_id: project.id, display_name: "first.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+      { id: "file-two", project_id: project.id, display_name: "second.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
     ];
     const calls: string[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -399,7 +401,7 @@ describe("multi-file project sanitization workflow", () => {
     };
     const files = [
       { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
-      { id: "file-two", project_id: project.id, display_name: "second.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+      { id: "file-two", project_id: project.id, display_name: "first.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
     ];
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
