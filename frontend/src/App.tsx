@@ -16,6 +16,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
 type Tab = "overview" | "rules" | "review" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
+type ImportMode = "file" | "folder";
 type FolderImportResult = { registered_count: number; skipped_count: number; registered_files: ImportedFile[]; issues: { file_name: string; reason: string }[]; limit_reached: boolean };
 type FormatValidationResult = { file_id: string; format: string; valid: boolean; bytes_checked: number; error?: string };
 type SanitizationJob = {
@@ -47,7 +48,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [sourcePath, setSourcePath] = useState("");
-  const [folderPath, setFolderPath] = useState("");
+  const [importMode, setImportMode] = useState<ImportMode>("file");
   const [recursive, setRecursive] = useState(true);
   const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([]);
   const [importing, setImporting] = useState(false);
@@ -104,61 +105,48 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     else setImportedFiles([]);
   }, [selectedProject, loadImportedFiles]);
 
-  async function registerSingleFile(event: FormEvent<HTMLFormElement>) {
+  async function registerSources(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedProject || !sourcePath.trim() || importing) return;
-    setImporting(true);
-    setError("");
-    setImportMessage("");
-    setImportIssues([]);
-    try {
-      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: sourcePath })
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({})) as { detail?: string };
-        throw new Error(body.detail || "Datei konnte nicht registriert werden.");
-      }
-      const file = await response.json() as ImportedFile;
-      setImportedFiles(current => [...current.filter(item => item.id !== file.id), file]);
-      setSourcePath("");
-      setImportMessage("Datei registriert. Der Inhalt wurde nicht verarbeitet.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Datei konnte nicht registriert werden.");
-    } finally {
-      setImporting(false);
-    }
-  }
+    const path = sourcePath.trim();
+    if (!selectedProject || !path || importing) return;
 
-  async function registerFolder(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedProject || !folderPath.trim() || importing) return;
+    const isFolder = importMode === "folder";
+    const endpoint = isFolder
+      ? `/api/projects/${encodeURIComponent(selectedProject.id)}/files/import-folder`
+      : `/api/projects/${encodeURIComponent(selectedProject.id)}/files`;
+
     setImporting(true);
     setError("");
     setImportMessage("");
     setImportIssues([]);
     try {
-      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/import-folder`, {
+      const response = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: folderPath, recursive })
+        body: JSON.stringify(isFolder ? { path, recursive } : { path })
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { detail?: string };
-        throw new Error(body.detail || "Ordner konnte nicht importiert werden.");
+        throw new Error(body.detail || (isFolder ? "Ordner konnte nicht importiert werden." : "Datei konnte nicht registriert werden."));
       }
-      const result = await response.json() as FolderImportResult;
-      setImportedFiles(current => {
-        const byId = new Map(current.map(file => [file.id, file]));
-        result.registered_files.forEach(file => byId.set(file.id, file));
-        return [...byId.values()];
-      });
-      setImportIssues(result.issues);
-      setImportMessage(`Registriert: ${result.registered_count}; übersprungen: ${result.skipped_count}.${result.limit_reached ? " Das Dateilimit wurde erreicht." : ""} Es wurden keine Log-Inhalte gelesen.`);
+
+      if (isFolder) {
+        const result = await response.json() as FolderImportResult;
+        setImportedFiles(current => {
+          const byId = new Map(current.map(file => [file.id, file]));
+          result.registered_files.forEach(file => byId.set(file.id, file));
+          return [...byId.values()];
+        });
+        setImportIssues(result.issues);
+        setImportMessage(`Registriert: ${result.registered_count}; übersprungen: ${result.skipped_count}.${result.limit_reached ? " Das Dateilimit wurde erreicht." : ""} Es wurden keine Log-Inhalte gelesen.`);
+      } else {
+        const file = await response.json() as ImportedFile;
+        setImportedFiles(current => [...current.filter(item => item.id !== file.id), file]);
+        setImportMessage("Datei registriert. Der Inhalt wurde nicht verarbeitet.");
+      }
+      setSourcePath("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Ordner konnte nicht importiert werden.");
+      setError(cause instanceof Error ? cause.message : "Dateien konnten nicht registriert werden.");
     } finally {
       setImporting(false);
     }
@@ -370,24 +358,24 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
-        <div className="import-grid">
-          <form onSubmit={event => void registerSingleFile(event)} aria-label="Einzeldatei registrieren">
-            <h4>Einzelne Datei</h4>
-            <label htmlFor="source-path">Absoluter Dateipfad</label>
-            <input id="source-path" value={sourcePath} onChange={event => setSourcePath(event.target.value)} placeholder="z. B. /var/log/service.log" maxLength={4096} required />
-            <p className="field-help">Der Pfad muss auf dem Rechner des lokalen FastAPI-Backends existieren. Quelldateien bleiben unverändert.</p>
-            <button className="secondary-button" type="submit" disabled={!sourcePath.trim() || importing}>{importing ? "Registriert …" : "Datei registrieren"}</button>
-          </form>
-          <form onSubmit={event => void registerFolder(event)} aria-label="Ordner registrieren">
-            <h4>Ordner importieren</h4>
-            <label htmlFor="folder-path">Absoluter Ordnerpfad</label>
-            <input id="folder-path" value={folderPath} onChange={event => setFolderPath(event.target.value)} placeholder="z. B. /var/log/my-service" maxLength={4096} required />
-            <label className="checkbox-label" htmlFor="recursive"><input id="recursive" type="checkbox" checked={recursive} onChange={event => setRecursive(event.target.checked)} /> Unterordner einbeziehen</label>
-            <p className="field-help">Bis zu 5.000 Dateikandidaten pro Aufruf. Doppelte Dateien und übersprungene Einträge werden angezeigt.</p>
-            <button className="secondary-button" type="submit" disabled={!folderPath.trim() || importing}>{importing ? "Importiert …" : "Ordner registrieren"}</button>
-          </form>
-        </div>
-        <p className="field-help">Hinweis: Dies ist eine Pfadeingabe, noch kein nativer Dateiauswahldialog. Ein Browser-Dateidialog kann dem lokalen Backend nicht sicher den lokalen Dateisystempfad übergeben.</p>
+        <form className="import-source-form" onSubmit={event => void registerSources(event)} aria-label="Dateien hinzufügen">
+          <div className="import-source-fields">
+            <label htmlFor="import-mode">Quelle
+              <select id="import-mode" value={importMode} onChange={event => setImportMode(event.target.value as ImportMode)}>
+                <option value="file">Einzelne Datei</option>
+                <option value="folder">Ordner mit Dateien</option>
+              </select>
+            </label>
+            <label htmlFor="source-path">{importMode === "folder" ? "Absoluter Ordnerpfad" : "Absoluter Dateipfad"}
+              <input id="source-path" value={sourcePath} onChange={event => setSourcePath(event.target.value)} placeholder={importMode === "folder" ? "z. B. /var/log/my-service" : "z. B. /var/log/service.log"} maxLength={4096} required />
+            </label>
+            {importMode === "folder" && <label className="import-recursive-option" htmlFor="recursive"><input id="recursive" type="checkbox" checked={recursive} onChange={event => setRecursive(event.target.checked)} /> Unterordner einbeziehen</label>}
+          </div>
+          <div className="import-source-footer">
+            <p className="field-help">{importMode === "folder" ? "Bis zu 5.000 Dateikandidaten pro Aufruf. Bereits registrierte Dateien und übersprungene Einträge werden ausgewiesen." : "Die Datei wird nur registriert. Ihr Inhalt bleibt unangetastet."} Der Pfad bezieht sich auf das Dateisystem des lokalen Backends.</p>
+            <button className="primary-button" type="submit" disabled={!sourcePath.trim() || importing}>{importing ? "Registriert …" : importMode === "folder" ? "Ordnerinhalt hinzufügen" : "Datei hinzufügen"}</button>
+          </div>
+        </form>
         {importMessage && <p className="success-message" role="status">{importMessage}</p>}
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
         <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
