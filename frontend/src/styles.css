@@ -655,3 +655,5 @@ input:not([type=checkbox]):not([type=file]), select, textarea { min-width: 0; }
 .project-dialog .rule-actions { justify-content: flex-end; }
 .home-projects { margin-top: 18px; }
 .home-projects .section-heading { align-items: center; }
+
+.project-output-setting{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:end;margin:12px 0;padding:10px;border:1px solid var(--border);border-radius:5px;background:#f7f7f7}.project-output-setting label{display:grid;gap:5px;min-width:0;font-weight:600}.project-output-setting input{width:100%;min-width:0;padding:7px 8px;border:1px solid #777;border-radius:3px;background:#fff;color:#1f1f1f}.project-output-setting .field-help{grid-column:1/-1;margin:0}@media(max-width:520px){.project-output-setting{grid-template-columns:1fr}.project-output-setting .field-help{grid-column:auto}}
