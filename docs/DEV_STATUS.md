@@ -141,3 +141,13 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 
 
 - Im geöffneten Projekt werden die allgemeinen Prinzipien-Karten ausgeblendet; sie bleiben nur in der Übersicht ohne ausgewähltes Projekt sichtbar. Dadurch steht mehr Bildschirmfläche für Dateiverwaltung und Verarbeitung zur Verfügung.
+
+
+## Dateiimport — Bedienungsvereinheitlichung (2026-11-01)
+
+- Einzeldatei und Ordner werden über ein gemeinsames Formular mit Auswahl des Quelltyps hinzugefügt.
+- Eine gemeinsame Pfadeingabe, Ladeanzeige, Fehlerbehandlung und Statusmeldung reduziert doppelte UI-Logik.
+- Die rekursive Option erscheint nur bei Ordnerimport; das Limit von 5.000 Kandidaten, Duplikaterkennung und Fehlerliste bleiben erhalten.
+- Die Registrierung liest weiterhin keine Log-Inhalte und verändert keine Quelldateien.
+- Noch offen: geeigneten lokalen Dateibrowser für Windows/Linux-Standalone und Air-Gap-Betrieb integrieren. Die aktuelle Pfadeingabe ist bis dahin ein technischer Zwischenschritt.
+- CI für den Implementierungsstand steht noch aus.
