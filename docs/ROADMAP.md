@@ -230,3 +230,17 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Bei unzureichendem Speicherplatz den gesamten Upload vor dem ersten Kopiervorgang mit HTTP 507 ablehnen.
 - [x] Freien Speicherplatz unmittelbar vor jeder Datei erneut prüfen, um zwischenzeitliche Änderungen zu erkennen.
 - [x] Backend-Regressionstests für unzureichenden Gesamtspeicher und zwischenzeitlich sinkenden freien Speicherplatz ergänzen.
+
+
+
+## Projektworkflow mit mehreren Dateien — Umsetzung (2026-11-01)
+
+- [x] Geeignete Projektdateien per Kontrollkästchen einzeln oder gesammelt auswählen.
+- [x] Mehrdatei-Bereinigung über einen gemeinsamen Start auslösen; Dateien werden nacheinander statt parallel verarbeitet, um CPU-, RAM- und Datenträgerlast kontrollierbar zu halten.
+- [x] Pro Datei bleiben Quellprofil, Ausgabepfad, Fortschritt, Fehler und Abbruch getrennt.
+- [x] Doppelte oder leere Ausgabeziele vor dem Start der Stapelverarbeitung abweisen; bestehende Zielkonflikte werden weiterhin serverseitig geprüft.
+- [x] Stapelabbruch beendet die aktive Datei kooperativ und startet keine weiteren ausgewählten Dateien.
+- [x] Projektweite Mapping-Konsistenz über mehrere Dateien ist durch die SQLite-Implementierung und den bestehenden Backend-Regressionstest abgesichert.
+- [x] Erfolgreiche Dateien erzeugen weiterhin eigene validierte Review-Läufe; Freigabe bleibt pro Datei getrennt.
+- [x] Offline-Hilfe und Frontend-Regressionen für Reihenfolge und doppelte Ausgabeziele ergänzt.
+- [ ] Push-/PR-CI für den neuen Mehrdateiablauf vollständig erfolgreich abschließen.
