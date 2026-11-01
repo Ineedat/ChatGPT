@@ -295,7 +295,7 @@ describe("source profile selection for project sanitization", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
     const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
     fireEvent.focus(profileSelect);
-    expect(await screen.findByRole("option", { name: "Nginx" })).toBeInTheDocument();
+    expect(within(profileSelect).getByRole("option", { name: "Nginx" })).toBeInTheDocument();
     fireEvent.change(profileSelect, { target: { value: "nginx" } });
     fireEvent.click(screen.getByRole("button", { name: "Bereinigen" }));
 
