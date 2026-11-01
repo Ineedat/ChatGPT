@@ -376,7 +376,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   }
 
   async function setFileFormatOverride(file: ImportedFile, formatOverride: string): Promise<boolean> {
-    if (!selectedProject) return false;
+    if (!selectedProject || file.state === "approved") return false;
     setError("");
     try {
       const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/format`, {
@@ -397,22 +397,23 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   }
 
   async function applySettingsToAllFiles() {
-    if (applyingBulkSettings || batchRunning || importedFiles.length === 0) return;
+    const editableFiles = importedFiles.filter(file => file.state !== "approved");
+    if (applyingBulkSettings || batchRunning || editableFiles.length === 0) return;
     setApplyingBulkSettings(true);
     setError("");
     try {
       let successful = 0;
-      for (const file of importedFiles) {
+      for (const file of editableFiles) {
         if (await setFileFormatOverride(file, bulkFormatOverride)) successful += 1;
         else break;
       }
-      if (successful !== importedFiles.length) return;
+      if (successful !== editableFiles.length) return;
       setProfileSelections(current => {
         const next = { ...current };
-        importedFiles.forEach(file => { next[file.id] = bulkProfileId; });
+        editableFiles.forEach(file => { next[file.id] = bulkProfileId; });
         return next;
       });
-      setImportMessage(`Format und Quellprofil wurden auf alle ${importedFiles.length} Dateien angewendet.`);
+      setImportMessage(`Format und Quellprofil wurden auf ${editableFiles.length} nicht freigegebene Dateien angewendet.`);
     } finally {
       setApplyingBulkSettings(false);
     }
@@ -547,7 +548,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
               <option value="">Globale Regeln (kein Quellprofil)</option>{sourceProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
             </select>
           </label>
-          <button className="secondary-button" type="button" onClick={() => void applySettingsToAllFiles()} disabled={batchRunning || applyingBulkSettings || importedFiles.length === 0}>{applyingBulkSettings ? "Wird angewendet …" : "Auf alle Dateien anwenden"}</button>
+          <button className="secondary-button" type="button" onClick={() => void applySettingsToAllFiles()} disabled={batchRunning || applyingBulkSettings || importedFiles.every(file => file.state === "approved")}>{applyingBulkSettings ? "Wird angewendet …" : "Auf nicht freigegebene anwenden"}</button>
         </div>
         {importedFiles.length > 0 && <div className="batch-toolbar" aria-label="Mehrdatei-Bereinigung">
           <div className="batch-selection-actions">
