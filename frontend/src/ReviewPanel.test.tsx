@@ -185,7 +185,8 @@ describe("project file comparison view", () => {
       if (url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
       if (url.includes("/compare-preview")) return { ok: true, json: async () => ({
         original: { content: "secret=alpha\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 13 },
-        sanitized: { content: "REDACTED\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 9 }
+        sanitized: { content: "REDACTED\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 9 },
+        original_changed_lines: [1], sanitized_changed_lines: [1]
       }) } as Response;
       return { ok: true, json: async () => ({}) } as Response;
     });
@@ -197,5 +198,12 @@ describe("project file comparison view", () => {
     expect(screen.getByText("REDACTED\\n")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Original" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sanitisiert" })).toBeInTheDocument();
+    expect(document.querySelector(".review-compare-changed-original")).toHaveTextContent("secret=alpha");
+    expect(document.querySelector(".review-compare-changed-sanitized")).toHaveTextContent("REDACTED");
+    const originalPane = document.querySelector(".review-compare-pane pre") as HTMLPreElement;
+    const sanitizedPane = document.querySelectorAll(".review-compare-pane pre")[1] as HTMLPreElement;
+    originalPane.scrollTop = 120;
+    fireEvent.scroll(originalPane);
+    expect(sanitizedPane.scrollTop).toBe(120);
   });
 });
