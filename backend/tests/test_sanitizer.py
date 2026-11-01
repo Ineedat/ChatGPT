@@ -303,8 +303,16 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
     original = b"secret=alpha\\n"
     source.write_bytes(original)
 
+    first_output_dir = tmp_path / "first-output"
+    first_output_dir.mkdir()
+    second_output_dir = tmp_path / "second-output"
+    second_output_dir.mkdir()
     with TestClient(app) as client:
         project_id = client.post("/api/projects", json={"name": "Background sanitize"}).json()["id"]
+        client.put(
+            f"/api/projects/{project_id}/output-directory",
+            json={"output_directory": str(first_output_dir)},
+        )
         file = client.post(
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
@@ -312,9 +320,10 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
             f"/api/projects/{project_id}/files/{file['id']}/format",
             json={"format_override": "text"},
         )
+        outside_output = first_output_dir / "service.log"
         outside_start = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
-            json={"output_path": str(tmp_path / "outside-job.log")},
+            json={"output_path": str(outside_output)},
         )
         assert outside_start.status_code == 202
         outside_job_id = outside_start.json()["id"]
@@ -322,9 +331,13 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs/{outside_job_id}"
         ).json()
         assert outside_state["status"] == "completed"
-        assert (tmp_path / "outside-job.log").read_bytes() == b"hidden=REDACTED\\n"
+        assert outside_output.read_bytes() == b"hidden=REDACTED\\n"
 
-        output = tmp_path / "job-clean.log"
+        client.put(
+            f"/api/projects/{project_id}/output-directory",
+            json={"output_directory": str(second_output_dir)},
+        )
+        output = second_output_dir / "service.log"
         started = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
             json={"output_path": str(output)},
@@ -346,7 +359,7 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
 
     assert output.read_bytes() == b"hidden=REDACTED\\n"
     assert source.read_bytes() == original
-    assert list(tmp_path.glob(".job-clean.log.logsanitizer-*.tmp")) == []
+    assert list(second_output_dir.glob(".service.log.logsanitizer-*.tmp")) == []
 
 
 def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Path) -> None:
@@ -472,10 +485,16 @@ def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path,
     source = tmp_path / "events.json"
     original = b'{"message":"secret=alpha"}'
     source.write_bytes(original)
-    output = tmp_path / "events.cleaned.json"
+    output_dir = tmp_path / "json-output"
+    output_dir.mkdir()
+    output = output_dir / "events.json"
 
     with TestClient(app) as client:
         project_id = client.post("/api/projects", json={"name": "JSON document"}).json()["id"]
+        client.put(
+            f"/api/projects/{project_id}/output-directory",
+            json={"output_directory": str(output_dir)},
+        )
         imported = client.post(
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
