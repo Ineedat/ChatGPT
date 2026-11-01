@@ -264,19 +264,126 @@ def me(request: Request):
     if user is None: raise HTTPException(401,"Anmeldung erforderlich.")
     return {k:user[k] for k in ("id","username","roles")}
 
+class UserUpdate(BaseModel):
+    roles: list[str] | None = Field(default=None, min_length=1)
+    enabled: bool | None = None
+
+
+def _user_summary(db, user_id: int):
+    row = db.execute(
+        """SELECT u.id,u.username,u.enabled,u.created_at,
+                  EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id) AS external
+           FROM users u WHERE u.id=?""",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        **dict(row),
+        "enabled": bool(row["enabled"]),
+        "external": bool(row["external"]),
+        "roles": [r["role"] for r in db.execute(
+            "SELECT role FROM user_roles WHERE user_id=? ORDER BY role", (user_id,)
+        )],
+    }
+
+
+def _active_admin_count(db) -> int:
+    return int(db.execute(
+        """SELECT COUNT(DISTINCT u.id) FROM users u
+           JOIN user_roles r ON r.user_id=u.id
+           WHERE u.enabled=1 AND r.role='admin'"""
+    ).fetchone()[0])
+
+
 @router.get("/users")
 def users():
     initialize_auth_database()
     with _db() as db:
-        rows=db.execute("SELECT id,username,enabled,created_at FROM users ORDER BY username").fetchall()
-        return [{**dict(row),"roles":[r["role"] for r in db.execute("SELECT role FROM user_roles WHERE user_id=?",(row["id"],))]} for row in rows]
+        rows = db.execute("SELECT id FROM users ORDER BY username COLLATE NOCASE").fetchall()
+        return [_user_summary(db, int(row["id"])) for row in rows]
 
-@router.post("/users",status_code=201)
+
+@router.post("/users", status_code=201)
 def add_user(payload: NewUser):
-    try: uid=create_user(payload.username,payload.password,payload.roles)
-    except ValueError as exc: raise HTTPException(422,str(exc)) from exc
-    except sqlite3.IntegrityError as exc: raise HTTPException(409,"Benutzername ist bereits vergeben.") from exc
-    return {"id":uid,"username":payload.username.strip(),"roles":payload.roles}
+    try:
+        uid = create_user(payload.username, payload.password, payload.roles)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(409, "Benutzername ist bereits vergeben.") from exc
+    with _db() as db:
+        return _user_summary(db, uid)
+
+
+@router.put("/users/{user_id}")
+def update_user(user_id: int, payload: UserUpdate, request: Request):
+    if payload.roles is None and payload.enabled is None:
+        raise HTTPException(422, "Keine Änderungen angegeben.")
+    if payload.roles is not None and (
+        not payload.roles or len(set(payload.roles)) != len(payload.roles)
+        or not set(payload.roles) <= ROLES
+    ):
+        raise HTTPException(422, "Mindestens eine gültige Rolle muss ausgewählt sein.")
+
+    actor_id = int(request.state.user["id"])
+    with _db() as db:
+        db.execute("BEGIN IMMEDIATE")
+        target = db.execute(
+            "SELECT id,enabled FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+        if target is None:
+            raise HTTPException(404, "Benutzer nicht gefunden.")
+        current_roles = {
+            row["role"] for row in db.execute(
+                "SELECT role FROM user_roles WHERE user_id=?", (user_id,)
+            )
+        }
+        next_roles = set(payload.roles) if payload.roles is not None else current_roles
+        next_enabled = bool(payload.enabled) if payload.enabled is not None else bool(target["enabled"])
+
+        if user_id == actor_id and not next_enabled:
+            raise HTTPException(409, "Das eigene Konto kann nicht deaktiviert werden.")
+        if user_id == actor_id and "admin" not in next_roles:
+            raise HTTPException(409, "Die eigene Administratorrolle kann nicht entzogen werden.")
+        if "admin" in current_roles and ("admin" not in next_roles or not next_enabled):
+            if _active_admin_count(db) <= 1:
+                raise HTTPException(409, "Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.")
+
+        if payload.roles is not None:
+            db.execute("DELETE FROM user_roles WHERE user_id=?", (user_id,))
+            db.executemany(
+                "INSERT INTO user_roles(user_id,role) VALUES(?,?)",
+                [(user_id, role) for role in sorted(next_roles)],
+            )
+        if payload.enabled is not None:
+            db.execute("UPDATE users SET enabled=? WHERE id=?", (int(next_enabled), user_id))
+            if not next_enabled:
+                db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+        return _user_summary(db, user_id)
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, request: Request):
+    actor_id = int(request.state.user["id"])
+    if user_id == actor_id:
+        raise HTTPException(409, "Das eigene Konto kann nicht gelöscht werden.")
+    with _db() as db:
+        db.execute("BEGIN IMMEDIATE")
+        target = db.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
+        if target is None:
+            raise HTTPException(404, "Benutzer nicht gefunden.")
+        roles = {
+            row["role"] for row in db.execute(
+                "SELECT role FROM user_roles WHERE user_id=?", (user_id,)
+            )
+        }
+        if "admin" in roles:
+            enabled = db.execute("SELECT enabled FROM users WHERE id=?", (user_id,)).fetchone()
+            if bool(enabled["enabled"]) and _active_admin_count(db) <= 1:
+                raise HTTPException(409, "Der letzte aktive Administrator kann nicht gelöscht werden.")
+        db.execute("DELETE FROM users WHERE id=?", (user_id,))
+    return {"deleted": True, "id": user_id}
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
