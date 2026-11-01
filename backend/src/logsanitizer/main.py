@@ -864,7 +864,8 @@ def project_file_sanitize_start(
     request: Request,
 ) -> dict[str, object]:
     """Start a cancellable local sanitization job and return immediately."""
-    if get_project(project_id) is None:
+    project = get_project(project_id)
+    if project is None:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
