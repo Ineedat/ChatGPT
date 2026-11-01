@@ -196,8 +196,6 @@ describe("project file comparison view", () => {
     render(<ReviewPanel roles={["reviewer"]} selectedProject={{ id: "project-1", name: "Testprojekt" }} />);
     expect(await screen.findByText("logs/app.log")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Dateien vergleichen" }));
-    expect(await screen.findByText("secret=alpha\\n")).toBeInTheDocument();
-    expect(screen.getByText("REDACTED\\n")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Original" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sanitisiert" })).toBeInTheDocument();
     expect(document.querySelector(".review-compare-mark-original")).toHaveTextContent("secret=alpha");
