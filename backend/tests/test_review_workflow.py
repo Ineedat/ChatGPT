@@ -409,3 +409,41 @@ def test_operator_cannot_access_review_decisions_search_comments_or_audit(tmp_pa
         assert [item.status_code for item in denied] == [403] * len(denied)
         assert client.get("/api/reviews/runs").status_code == 200
         assert client.get("/api/reviews/runs").json()[0]["status"] == "pending_review"
+
+
+def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+
+    with BaseTestClient(app) as client:
+        create_user("compare-reviewer", "compare-reviewer-password-123", ["operator", "reviewer"])
+        login = client.post("/api/auth/login", json={
+            "username": "compare-reviewer", "password": "compare-reviewer-password-123"
+        })
+        assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        response, _, file, output = _sanitized_run(
+            client, tmp_path, contents=b"secret=alpha\\nsecond line\\n"
+        )
+        assert response.status_code == 200
+        run_id = response.json()["review_run_id"]
+
+        preview = client.get(f"/api/reviews/runs/{run_id}/compare-preview")
+        assert preview.status_code == 200
+        body = preview.json()
+        assert "secret=alpha" in body["original"]["content"]
+        assert "REDACTED" in body["sanitized"]["content"]
+        assert body["original"]["total_bytes"] == len(b"secret=alpha\\nsecond line\\n")
+        assert body["sanitized"]["total_bytes"] == output.stat().st_size
+        assert "source_path" not in body and "output_path" not in body
+
+        create_user("compare-operator", "compare-operator-password-123", ["operator"])
+        login = client.post("/api/auth/login", json={
+            "username": "compare-operator", "password": "compare-operator-password-123"
+        })
+        assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        denied = client.get(f"/api/reviews/runs/{run_id}/compare-preview")
+        assert denied.status_code == 403
+
