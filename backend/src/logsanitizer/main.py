@@ -333,7 +333,7 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
+            "SELECT source_path, detected_format, format_override, display_name, relative_path FROM imported_files "
             "WHERE project_id = ? AND id = ?",
             (project_id, file_id),
         ).fetchone()
@@ -465,18 +465,19 @@ class SanitizationRequest(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     tags=["sanitization"],
 )
-def _relative_project_source_path(project_id: str, source: Path) -> Path:
-    """Return the source's path relative to the project's uploaded-source root."""
+def _relative_project_source_path(project_id: str, source: Path, stored_relative_path: str = "") -> Path:
+    """Return a validated project-relative path without exposing absolute source paths."""
+    relative = PurePosixPath(stored_relative_path.replace("\\", "/")) if stored_relative_path else None
+    if relative is not None and not relative.is_absolute() and relative.parts and all(
+        part not in {"", ".", ".."} and ":" not in part for part in relative.parts
+    ):
+        return Path(*relative.parts)
     sources_root = (database_path().parent / "projects" / project_id / "sources").resolve()
     try:
-        relative = source.resolve(strict=False).relative_to(sources_root)
-        if relative.parts and all(part not in {"", ".", ".."} for part in relative.parts):
-            return relative
+        return source.resolve(strict=False).relative_to(sources_root)
     except ValueError:
-        pass
-    # Backend-path imports are external to the project workspace and retain
-    # their basename rather than leaking their absolute source directory.
-    return Path(source.name)
+        # Backend-path imports outside the project workspace keep only their basename.
+        return Path(source.name)
 
 
 @app.get("/api/health", tags=["system"])
@@ -1226,7 +1227,7 @@ def project_folder_import(
                         FolderImportIssue(file_name=name, reason="Keine reguläre Datei.")
                     )
                     continue
-                registered.append(register_imported_file(project_id, resolved))
+                registered.append(register_imported_file(project_id, resolved, candidate.relative_to(folder).as_posix()))
             except FileAlreadyRegisteredError:
                 issues.append(
                     FolderImportIssue(file_name=name, reason="Bereits in diesem Projekt registriert.")
@@ -1389,7 +1390,7 @@ async def project_files_upload(
             await asyncio.to_thread(_copy_upload_to_temporary, upload.file, temporary)
             os.replace(temporary, destination)
             try:
-                registered.append(register_imported_file(project_id, destination))
+                registered.append(register_imported_file(project_id, destination, relative.as_posix()))
             except FileAlreadyRegisteredError:
                 destination.unlink(missing_ok=True)
                 issues.append(
