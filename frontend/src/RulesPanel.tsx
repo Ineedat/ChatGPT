@@ -165,8 +165,8 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
   }
 
   async function persistProfileConfig(nextConfig: RuleConfig, successMessage: string): Promise<boolean> {
-    if (draftDirty) {
-      setError("Bitte übernehmen oder verwerfen Sie zuerst den offenen Regelentwurf, bevor Sie ein Quellprofil speichern.");
+    if (draftDirty || dirty) {
+      setError("Bitte speichern oder verwerfen Sie zuerst andere Regeländerungen, bevor Sie ein Quellprofil separat speichern.");
       return false;
     }
     setSaving(true); setError(""); setMessage("");
