@@ -498,6 +498,10 @@ def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, m
         assert body["sanitized_changed_lines"] == [1]
         assert body["original_changed_spans"][0]["line_number"] == 1
         assert body["sanitized_changed_spans"][0]["line_number"] == 1
+        assert body["original_changed_spans"][0]["start"] == 0
+        assert body["original_changed_spans"][0]["end"] == 12
+        assert body["sanitized_changed_spans"][0]["start"] == 0
+        assert body["sanitized_changed_spans"][0]["end"] == 8
         assert "source_path" not in body and "output_path" not in body
 
         create_user("compare-operator", "compare-operator-password-123", ["operator"])
