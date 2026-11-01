@@ -34,6 +34,7 @@ from logsanitizer.database import (
     ImportedFile,
     Project,
     ProjectCreate,
+    ProjectOutputDirectoryUpdate,
     connect_database,
     create_project,
     database_path,
@@ -44,6 +45,7 @@ from logsanitizer.database import (
     register_imported_file,
     update_detected_format,
     update_format_override,
+    update_project_output_directory,
 )
 from logsanitizer.deployment import load_settings
 from logsanitizer.format_validation import validate_file
@@ -129,6 +131,25 @@ def projects_get(project_id: str) -> Project:
     project = get_project(project_id)
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+    return project
+
+@app.put("/api/projects/{project_id}/output-directory", response_model=Project, tags=["projects"])
+def projects_set_output_directory(
+    project_id: str, payload: ProjectOutputDirectoryUpdate
+) -> Project:
+    """Persist the single output directory used by all files in a project."""
+    if payload.output_directory:
+        directory = Path(payload.output_directory).expanduser()
+        if not directory.exists() or not directory.is_dir():
+            raise HTTPException(status_code=422, detail="Der Ausgabeordner muss bereits existieren.")
+        if directory.is_symlink():
+            raise HTTPException(status_code=422, detail="Symbolische Links sind als Ausgabeordner nicht zulässig.")
+        normalized = str(directory.resolve())
+    else:
+        normalized = ""
+    project = update_project_output_directory(project_id, normalized)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     return project
 
 
