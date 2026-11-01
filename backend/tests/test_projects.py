@@ -166,6 +166,8 @@ def test_folder_import_registers_files_and_reports_duplicates(tmp_path, monkeypa
             "one.log",
             "two.log",
         }
+        relative_paths = {item["display_name"]: item["relative_path"] for item in result["registered_files"]}
+        assert relative_paths == {"one.log": "one.log", "two.log": "nested/two.log"}
         assert all("source_path" not in item for item in result["registered_files"])
 
         repeated = client.post(
@@ -329,6 +331,10 @@ def test_browser_upload_copies_files_and_preserves_relative_paths(tmp_path, monk
     body = response.json()
     assert body["registered_count"] == 2
     assert body["skipped_count"] == 0
+    assert {item["display_name"]: item["relative_path"] for item in body["registered_files"]} == {
+        "service.log": "service.log",
+        "nested.jsonl": "subfolder/nested.jsonl",
+    }
     workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
     assert (workspace / "service.log").read_bytes() == b"first log line\\n"
     assert (workspace / "subfolder" / "nested.jsonl").read_bytes() == b'{"ok":true}\\n'
