@@ -132,6 +132,7 @@ describe("project file registration UI", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     await screen.findByRole("region", { name: "Geöffnetes Projekt" });
     fireEvent.change(screen.getByRole("combobox", { name: "Quelle" }), { target: { value: "folder" } });
+    expect(screen.getByLabelText("Lokaler Ordner")).toHaveAttribute("webkitdirectory");
     expect(screen.getByRole("checkbox", { name: "Unterordner einbeziehen" })).toBeInTheDocument();
     fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Ordnerpfad" }), { target: { value: "/var/log/my-service" } });
