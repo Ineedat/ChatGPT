@@ -23,6 +23,9 @@ type ReviewRun = {
 type SavedSearch = { id: string; name: string; query: string; match_type: "literal" | "regex"; created_at: string };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type SearchResult = { line_number: number; snippet: string };
+type ProjectFile = { id: string; display_name: string; relative_path?: string; size_bytes: number; state: string; detected_format?: string; format_override?: string | null };
+type CompareWindow = { content: string; byte_offset: number; next_offset: number | null; total_bytes: number };
+type ComparePreview = { original: CompareWindow; sanitized: CompareWindow };
 type AuditEvent = {
   id: number;
   run_id: string;
@@ -56,8 +59,13 @@ async function reviewFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBackToProject?: () => void }) {
+export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles: string[]; onBackToProject?: () => void; selectedProject?: { id: string; name: string } | null }) {
   const canReview = roles.some(role => ["admin", "reviewer", "approver"].includes(role));
+  const [activeView, setActiveView] = useState<"inspect" | "queue" | "history">("inspect");
+  const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
+  const [comparePreview, setComparePreview] = useState<ComparePreview | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState("");
   const [queue, setQueue] = useState<ReviewRun[]>([]);
   const [history, setHistory] = useState<ReviewRun[]>([]);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -90,6 +98,11 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
       const historyResponse = await reviewFetch("/api/reviews/runs?limit=100");
       if (!historyResponse.ok) throw new Error("Laufhistorie konnte nicht geladen werden.");
       setHistory(await historyResponse.json() as ReviewRun[]);
+      if (selectedProject?.id) {
+        const filesResponse = await reviewFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files`);
+        if (!filesResponse.ok) throw new Error("Projektdateien konnten nicht geladen werden.");
+        setProjectFiles(await filesResponse.json() as ProjectFile[]);
+      } else setProjectFiles([]);
       if (canReview) {
         const [queueResponse, searchesResponse, auditResponse] = await Promise.all([
           reviewFetch("/api/reviews/queue"),
@@ -106,7 +119,7 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Prüfdaten konnten nicht geladen werden.");
     }
-  }, [canReview]);
+  }, [canReview, selectedProject?.id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -133,6 +146,23 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
     });
     return () => { cancelled = true; };
   }, [selectedRun?.status, selectedRun?.id, roles]);
+
+  async function loadComparePreview(runId: string, originalOffset = 0, outputOffset = 0) {
+    setCompareLoading(true); setCompareError("");
+    try {
+      const params = new URLSearchParams({ original_offset: String(originalOffset), output_offset: String(outputOffset) });
+      const response = await reviewFetch(`/api/reviews/runs/${encodeURIComponent(runId)}/compare-preview?${params}`);
+      const body = await response.json() as ComparePreview & { detail?: string };
+      if (!response.ok) throw new Error(body.detail || "Dateivergleich konnte nicht geladen werden.");
+      setComparePreview(body);
+    } catch (cause) { setComparePreview(null); setCompareError(cause instanceof Error ? cause.message : "Dateivergleich konnte nicht geladen werden."); }
+    finally { setCompareLoading(false); }
+  }
+
+  function openRunForInspection(run: ReviewRun) {
+    setSelectedId(run.id); setActiveView("inspect"); setMatches([]); setMessage("");
+    void loadComparePreview(run.id);
+  }
 
   async function searchOutput(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -286,17 +316,26 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
       <div className="review-actions"><button className="secondary-button" type="button" onClick={() => void refresh()} disabled={busy}>Aktualisieren</button>{onBackToProject && <button className="secondary-button" type="button" onClick={onBackToProject}>Zurück zum Projekt</button>}</div>
     </div>
     <p className="review-intro">Nur erfolgreich validierte Bereinigungen können in die Prüfer-Warteschlange gelangen. Die Suche durchsucht ausschließlich die bereinigte Ausgabe, niemals die Originaldatei.</p>
+    <nav className="review-view-tabs" aria-label="Prüfbereiche">
+      <button type="button" className={activeView === "inspect" ? "active" : ""} onClick={() => setActiveView("inspect")}>Dateien prüfen</button>
+      {canReview && <button type="button" className={activeView === "queue" ? "active" : ""} onClick={() => setActiveView("queue")}>Warteschlange ({queue.length})</button>}
+      <button type="button" className={activeView === "history" ? "active" : ""} onClick={() => setActiveView("history")}>Prüfverlauf ({history.length})</button>
+    </nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}
-    {canReview && <section className="review-section" aria-label="Prüfer-Warteschlange">
+    {activeView === "inspect" && <section className="review-section" aria-label="Projektdateien zur Prüfung">
+      <div className="section-heading"><h3>Dateien im Projekt {selectedProject?.name || ""}</h3><span className="field-help">{projectFiles.length} registrierte Dateien</span></div>
+      {!selectedProject ? <p className="muted-message">Bitte zuerst ein Projekt öffnen, um dessen Dateien zu prüfen.</p> : projectFiles.length === 0 ? <p className="muted-message">In diesem Projekt sind noch keine Dateien registriert.</p> : <div className="review-project-files"><table><thead><tr><th>Datei</th><th>Größe</th><th>Letzter Lauf</th><th>Status</th><th></th></tr></thead><tbody>{projectFiles.map(file => { const run = history.find(item => item.file_id === file.id); return <tr key={file.id}><td>{file.relative_path || file.display_name}</td><td>{file.size_bytes.toLocaleString("de-DE")} Byte</td><td>{run ? new Date(run.created_at).toLocaleString("de-DE") : "–"}</td><td>{run ? statusLabel(run.status) : "Noch nicht bereinigt"}</td><td>{run && canReview ? <button className="secondary-button" type="button" onClick={() => openRunForInspection(run)}>Dateien vergleichen</button> : <span className="field-help">Keine prüfbare Ausgabe</span>}</td></tr>; })}</tbody></table></div>}
+    </section>}
+    {activeView === "queue" && canReview && <section className="review-section" aria-label="Prüfer-Warteschlange">
       <div className="section-heading"><h3>Warteschlange ({queue.length})</h3><span className="field-help">Bewusste Freigabe erforderlich</span></div>
       {queue.length === 0 ? <p className="muted-message">Keine ausstehenden Prüfungen.</p> : <ul className="review-run-list">{queue.map(run =>
         <li key={run.id} className={selectedId === run.id ? "selected" : ""}>
           <div><strong>{run.display_name}</strong><span>Ausgabe: {run.output_name}</span><span>Erstellt: {new Date(run.created_at).toLocaleString("de-DE")}</span><span>{run.replacements} Ersetzungen · {run.lines_processed.toLocaleString("de-DE")} Zeilen</span></div>
-          <button className="secondary-button" type="button" onClick={() => { setSelectedId(run.id); setMatches([]); setQuery(""); setSavedSearchId(""); setMessage(""); }}>Prüfen</button>
+          <button className="secondary-button" type="button" onClick={() => { openRunForInspection(run); setQuery(""); setSavedSearchId(""); }}>Prüfen</button>
         </li>)}</ul>}
     </section>}
-    {canReview && selectedRun?.status === "pending_review" && <section className="review-section" aria-label="Ausgabe prüfen">
+    {activeView === "inspect" && canReview && selectedRun?.status === "pending_review" && <section className="review-section" aria-label="Ausgabe prüfen">
       <h3>Stichprobensuche: {selectedRun.display_name}</h3>
       <form className="review-search-form" onSubmit={event => void searchOutput(event)}>
         <label>Suchbegriff
@@ -333,7 +372,14 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
         <button className="secondary-button" type="button" disabled={busy || exception} onClick={() => void decide("stop")}>Vorgang stoppen</button>
       </div>
     </section>}
-    {selectedRun && <section className="review-section" aria-label="Laufdetails">
+    {activeView === "inspect" && selectedRun && <section className="review-section" aria-label="Original und bereinigte Datei vergleichen">
+      <div className="section-heading"><h3>Dateivergleich: {selectedRun.display_name}</h3><button className="secondary-button" type="button" onClick={() => void loadComparePreview(selectedRun.id)} disabled={compareLoading}>Neu laden</button></div>
+      {compareError && <p className="error-message" role="alert">{compareError}</p>}{compareLoading && <p className="muted-message">Dateifenster werden geladen …</p>}
+      {comparePreview && <><div className="review-compare-grid"><div className="review-compare-pane"><h4>Original</h4><pre>{comparePreview.original.content || "(Leere Datei)"}</pre><span className="field-help">{comparePreview.original.byte_offset.toLocaleString("de-DE")} / {comparePreview.original.total_bytes.toLocaleString("de-DE")} Byte</span></div><div className="review-compare-pane"><h4>Sanitisiert</h4><pre>{comparePreview.sanitized.content || "(Leere Datei)"}</pre><span className="field-help">{comparePreview.sanitized.byte_offset.toLocaleString("de-DE")} / {comparePreview.sanitized.total_bytes.toLocaleString("de-DE")} Byte</span></div></div>
+      <div className="review-compare-navigation"><button className="secondary-button" type="button" disabled={compareLoading || (comparePreview.original.byte_offset === 0 && comparePreview.sanitized.byte_offset === 0)} onClick={() => void loadComparePreview(selectedRun.id, 0, 0)}>Zum Anfang</button><button className="secondary-button" type="button" disabled={compareLoading || (comparePreview.original.next_offset === null && comparePreview.sanitized.next_offset === null)} onClick={() => void loadComparePreview(selectedRun.id, comparePreview.original.next_offset ?? comparePreview.original.total_bytes, comparePreview.sanitized.next_offset ?? comparePreview.sanitized.total_bytes)}>Nächstes Fenster</button></div></>}
+      <p className="field-help">Es wird nur ein begrenztes Dateifenster geladen. Die Quelldatei bleibt unverändert; die Ausgabe wird vor dem Anzeigen auf unveränderte Identität geprüft.</p>
+    </section>}
+    {activeView === "inspect" && selectedRun && <section className="review-section" aria-label="Laufdetails">
       <h3>Ausgewählter Lauf</h3>
       <dl className="review-details">
         <div><dt>Status</dt><dd>{statusLabel(selectedRun.status)}</dd></div>
@@ -354,7 +400,7 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
         <button className="secondary-button" type="submit" disabled={busy || retryProfilesLoading || !retryOutput.trim()}>Erneut bereinigen</button>
       </form>}
     </section>}
-    <section className="review-section" aria-label="Laufhistorie">
+    {activeView === "history" && <section className="review-section" aria-label="Laufhistorie">
       <div className="section-heading"><h3>Laufhistorie ({filteredHistory.length} von {history.length})</h3></div>
       <div className="review-history-filters">
         <label>Suche in Läufen<input value={historyQuery} onChange={event => setHistoryQuery(event.target.value)} placeholder="Datei, Ausgabe, Lauf-ID oder Kommentar" /></label>
@@ -363,10 +409,10 @@ export function ReviewPanel({ roles, onBackToProject }: { roles: string[]; onBac
       {history.length === 0 ? <p className="muted-message">Noch keine Bereinigungsläufe gespeichert.</p> : filteredHistory.length === 0 ? <p className="muted-message">Keine Läufe passen zu den gewählten Filtern.</p> : <ul className="review-run-list">{filteredHistory.map(run =>
         <li key={run.id} className={selectedId === run.id ? "selected" : ""}>
           <div><strong>{run.display_name}</strong><span>{run.output_name} · {statusLabel(run.status)}</span><span>{new Date(run.created_at).toLocaleString("de-DE")}</span>{run.last_comment && <span>Kommentar: {run.last_comment}</span>}</div>
-          <button className="secondary-button" type="button" onClick={() => { setSelectedId(run.id); setMatches([]); setMessage(""); }}>Details</button>
+          <button className="secondary-button" type="button" onClick={() => openRunForInspection(run)}>Details</button>
         </li>)}</ul>}
     </section>
-    {canReview && <section className="review-section" aria-label="Audit-Protokoll">
+    {activeView === "history" && canReview && <section className="review-section" aria-label="Audit-Protokoll">
       <div className="section-heading"><h3>Audit-Protokoll ({visibleAudit.length} Ereignisse)</h3>{selectedRun && <label className="review-audit-filter"><input type="checkbox" checked={auditRunOnly} onChange={event => setAuditRunOnly(event.target.checked)} /> Nur ausgewählten Lauf anzeigen</label>}</div>
       {visibleAudit.length === 0 ? <p className="muted-message">{audit.length === 0 ? "Noch keine Audit-Ereignisse." : "Für diesen Lauf liegen in den letzten Audit-Ereignissen keine Einträge vor."}</p> : <ul className="audit-list">{visibleAudit.map(event =>
         <li key={event.id}><div><strong>{statusLabel(event.action)}</strong><span>{event.actor_username} · Lauf {event.run_id}</span><span>{new Date(event.created_at).toLocaleString("de-DE")}</span>{event.comment && <p>{event.comment}</p>}{event.exception_reason && <p>Ausnahme: {event.exception_reason}</p>}</div></li>)}</ul>}
