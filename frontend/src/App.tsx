@@ -4,6 +4,7 @@ import { helpTopics } from "./help/content";
 import { LoginGate } from "./LoginGate";
 import { ReviewPanel } from "./ReviewPanel";
 import { RulesPanel } from "./RulesPanel";
+import { UserManagementPanel } from "./UserManagementPanel";
 
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const method = (init.method || "GET").toUpperCase();
@@ -13,7 +14,7 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-type Tab = "overview" | "rules" | "review" | "help";
+type Tab = "overview" | "rules" | "review" | "users" | "help";
 type ImportedFile = { id: string; project_id: string; display_name: string; size_bytes: number; modified_at: string; imported_at: string; state: string; format_hint?: string; detected_format?: string; format_override?: string | null };
 type RuleProfile = { id: string; name: string; source_hint?: string | null };
 type ImportMode = "file" | "folder";
@@ -438,6 +439,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       <nav aria-label="Hauptnavigation" className="nav-tabs">
         <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Übersicht</button>
         {user.roles.some(role => ["admin", "rule_owner"].includes(role)) && <button className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}>Regeln</button>}
+        {user.roles.includes("admin") && <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Benutzer</button>}
         <button className={tab === "review" ? "active" : ""} onClick={() => setTab("review")}>Prüfung &amp; Verlauf</button>
         <button className={tab === "help" ? "active" : ""} onClick={() => setTab("help")}>Hilfe</button>
       </nav>
@@ -570,7 +572,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <article className="feature-card"><span className="feature-number">02</span><h3>Originale schützen</h3><p>Quelldateien bleiben unverändert. Verarbeitung erfolgt in getrennten Arbeitsbereichen.</p></article>
         <article className="feature-card"><span className="feature-number">03</span><h3>Freigabe kontrollieren</h3><p>Unvollständige Läufe dürfen später nicht exportiert oder freigegeben werden.</p></article>
       </section>}
-    </> : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("overview")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("overview")} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
+    </> : tab === "rules" ? <RulesPanel onBackToProject={() => setTab("overview")} /> : tab === "review" ? <ReviewPanel roles={user.roles} onBackToProject={() => setTab("overview")} /> : tab === "users" ? <UserManagementPanel currentUser={user} /> : <section className="help-page"><p className="eyebrow">OFFLINE-HANDBUCH</p><h2>Hilfe und Grundlagen</h2><p className="intro">Diese Hilfe ist vollständig lokal eingebunden. Drücke jederzeit F1, um sie zu öffnen. Die Hinweise funktionieren ohne Internetverbindung.</p>
       <div className="help-list">{helpTopics.map(topic => <article className="help-topic" key={topic.id}><h3>{topic.title}</h3><p>{topic.summary}</p><ul>{topic.steps.map(step => <li key={step}>{step}</li>)}</ul></article>)}</div>
     </section>}
     <footer><span>LogSanitizer · 0.1.0-dev</span><span>Keine echten oder vertraulichen Logs in diesem Entwicklungsstand verarbeiten.</span></footer>
