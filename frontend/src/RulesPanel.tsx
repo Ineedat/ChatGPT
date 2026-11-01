@@ -164,10 +164,10 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
     setError("");
   }
 
-  async function persistProfileConfig(nextConfig: RuleConfig, successMessage: string) {
+  async function persistProfileConfig(nextConfig: RuleConfig, successMessage: string): Promise<boolean> {
     if (draftDirty) {
       setError("Bitte übernehmen oder verwerfen Sie zuerst den offenen Regelentwurf, bevor Sie ein Quellprofil speichern.");
-      return;
+      return false;
     }
     setSaving(true); setError(""); setMessage("");
     try {
@@ -183,8 +183,10 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
       const body = await response.json() as RuleConfig & { detail?: unknown };
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Quellprofil konnte nicht gespeichert werden.");
       setConfig(body); setDirty(false); setMessage(successMessage); setConflicts([]);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Quellprofil konnte nicht gespeichert werden.");
+      return false;
     } finally { setSaving(false); }
   }
 
@@ -198,8 +200,9 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
         ? config.profiles.map(profile => profile.id === id ? next : profile)
         : [...config.profiles, next]
     };
-    await persistProfileConfig(nextConfig, `Quellprofil „${next.name}“ wurde gespeichert.`);
-    setProfileDraft({ id: "", name: "", source_hint: "" });
+    if (await persistProfileConfig(nextConfig, `Quellprofil „${next.name}“ wurde gespeichert.`)) {
+      setProfileDraft({ id: "", name: "", source_hint: "" });
+    }
   }
 
   async function removeProfile(id: string) {
