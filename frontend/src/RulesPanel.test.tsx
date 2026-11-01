@@ -106,3 +106,30 @@ describe("rule editor", () => {
     expect(screen.getByRole("button", { name: "Konfiguration speichern" })).toBeEnabled();
   });
 });
+
+  it("creates and edits source profiles with immediate persistence", async () => {
+    let saved = { ...initialConfig, profiles: [] as { id: string; name: string; source_hint: string | null }[] };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
+      if (url === "/api/rules/config/validate") return { ok: true, json: async () => ({ valid: true, conflicts: [] }) } as Response;
+      if (url === "/api/rules/config" && init?.method === "PUT") {
+        saved = JSON.parse(String(init.body));
+        return { ok: true, json: async () => saved } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<RulesPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: /Quellprofile/ }));
+    fireEvent.change(screen.getByLabelText("Profilname"), { target: { value: "Apache" } });
+    fireEvent.change(screen.getByLabelText("Quellhinweis (optional)"), { target: { value: "httpd" } });
+    fireEvent.click(screen.getByRole("button", { name: "Profil speichern" }));
+    expect(await screen.findByText(/Quellprofil „Apache“ wurde gespeichert/)).toBeInTheDocument();
+    expect(saved.profiles).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
+    fireEvent.change(screen.getByLabelText("Profilname"), { target: { value: "Apache Webserver" } });
+    fireEvent.click(screen.getByRole("button", { name: "Profil speichern" }));
+    expect(await screen.findByText(/Quellprofil „Apache Webserver“ wurde gespeichert/)).toBeInTheDocument();
+    expect(saved.profiles[0].name).toBe("Apache Webserver");
+  });
