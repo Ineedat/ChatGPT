@@ -387,6 +387,7 @@ def _read_compare_window(path: Path, byte_offset: int) -> dict[str, object]:
     return {
         "content": text,
         "byte_offset": actual_offset,
+        "previous_offset": max(0, actual_offset - MAX_COMPARE_PREVIEW_BYTES) if actual_offset else None,
         "next_offset": next_offset if next_offset < total_bytes else None,
         "total_bytes": total_bytes,
     }
