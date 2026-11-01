@@ -208,6 +208,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const body = await response.json() as { detected_format?: string; format_override?: string | null; detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format konnte nicht erkannt werden.");
       setImportedFiles(current => current.map(item => item.id === file.id ? { ...item, detected_format: body.detected_format, format_override: body.format_override ?? item.format_override } : item));
+      setValidationResults(current => { const next = { ...current }; delete next[file.id]; return next; });
       setImportMessage(`Format-Erkennung für ${file.display_name}: ${body.detected_format}. Es wurden höchstens 64 KiB lokal untersucht und das Ergebnis lokal gespeichert.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Format konnte nicht erkannt werden.");
@@ -386,6 +387,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const body = await response.json() as ImportedFile & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format-Auswahl konnte nicht gespeichert werden.");
       setImportedFiles(current => current.map(item => item.id === file.id ? body : item));
+      setValidationResults(current => { const next = { ...current }; delete next[file.id]; return next; });
       setImportMessage(formatOverride ? `Manuelles Format für ${file.display_name} gespeichert: ${formatOverride}.` : `Manuelle Format-Auswahl für ${file.display_name} entfernt.`);
       return true;
     } catch (cause) {
