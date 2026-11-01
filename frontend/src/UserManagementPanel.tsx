@@ -212,7 +212,6 @@ export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) 
           </article>;
         })}
       </div>}
-    </section>
     </section>}
     {view === "list" && <p className="field-help">Schutzregeln: Das eigene Konto kann nicht deaktiviert oder gelöscht werden. Der letzte aktive Administrator kann weder seine Administratorrolle verlieren noch deaktiviert oder gelöscht werden. LDAP-Konten werden bei erfolgreicher LDAP-Anmeldung synchronisiert.</p>}
   </section>;
