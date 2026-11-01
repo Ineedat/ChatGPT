@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
 from logsanitizer.notifications import notify_returned_run
+from logsanitizer.database import connect_database
 
 router = APIRouter(prefix="/api/reviews", tags=["review"])
 VALID_STATUSES = {
@@ -355,6 +356,78 @@ class ReviewComment(BaseModel):
         if not value:
             raise ValueError("Kommentar darf nicht leer sein.")
         return value
+
+
+
+MAX_COMPARE_PREVIEW_BYTES = 65_536
+
+
+def _read_compare_window(path: Path, byte_offset: int) -> dict[str, object]:
+    """Read one bounded UTF-8 window without loading the complete log into memory."""
+    if path.is_symlink() or not path.is_file():
+        raise HTTPException(status_code=410, detail="Datei ist nicht mehr verfügbar.")
+    total_bytes = path.stat().st_size
+    requested = max(0, min(byte_offset, total_bytes))
+    with path.open("rb") as stream:
+        stream.seek(requested)
+        if requested:
+            stream.readline(MAX_LINE_BYTES + 1)
+        actual_offset = stream.tell()
+        raw = stream.read(MAX_COMPARE_PREVIEW_BYTES + 1)
+    if len(raw) > MAX_COMPARE_PREVIEW_BYTES:
+        raw = raw[:MAX_COMPARE_PREVIEW_BYTES]
+        last_newline = raw.rfind(b"\n")
+        if last_newline > 0:
+            raw = raw[:last_newline + 1]
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail="Datei enthält an dieser Stelle kein gültiges UTF-8.") from exc
+    next_offset = actual_offset + len(raw)
+    return {
+        "content": text,
+        "byte_offset": actual_offset,
+        "next_offset": next_offset if next_offset < total_bytes else None,
+        "total_bytes": total_bytes,
+    }
+
+
+@router.get("/runs/{run_id}/compare-preview")
+def compare_run_preview(
+    run_id: str,
+    request: Request,
+    original_offset: int = Query(default=0, ge=0),
+    output_offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    """Show bounded original/output windows for a reviewer, validating output identity."""
+    user = getattr(request.state, "user", None)
+    if not user or not set(user.get("roles", [])).intersection({"admin", "reviewer", "approver"}):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung für den Dateivergleich.")
+    initialize_review_database()
+    with _db() as db:
+        row = db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+        if row["status"] in {"queued", "running", "failed", "cancelled", "stopped"}:
+            raise HTTPException(status_code=409, detail="Für diesen Lauf liegt keine prüfbare Ausgabe vor.")
+        output_path = Path(row["output_path"])
+        expected_signature = row["output_signature"]
+        project_id, file_id = row["project_id"], row["file_id"]
+    with connect_database() as db:
+        source_row = db.execute(
+            "SELECT source_path FROM imported_files WHERE project_id=? AND id=?",
+            (project_id, file_id),
+        ).fetchone()
+    if source_row is None:
+        raise HTTPException(status_code=410, detail="Originaldatei ist nicht mehr registriert.")
+    source_path = Path(source_row["source_path"])
+    if not expected_signature or _file_signature(output_path) != expected_signature:
+        raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
+    return {
+        "run_id": run_id,
+        "original": _read_compare_window(source_path, original_offset),
+        "sanitized": _read_compare_window(output_path, output_offset),
+    }
 
 
 @router.get("/queue")
