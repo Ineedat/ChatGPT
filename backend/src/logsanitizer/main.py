@@ -711,7 +711,7 @@ def project_file_validate_format(project_id: str, file_id: str) -> dict[str, str
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT source_path, detected_format, format_override, display_name FROM imported_files "
+            "SELECT source_path, detected_format, format_override, display_name, relative_path FROM imported_files "
             "WHERE project_id = ? AND id = ?",
             (project_id, file_id),
         ).fetchone()
