@@ -437,7 +437,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
 
-  const projectWorkspace = selectedProject ?       {selectedProject && <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
+  const projectWorkspace = selectedProject ? <section className="panel selected-project" aria-label="Geöffnetes Projekt" aria-live="polite">
         <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
@@ -530,7 +530,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           {loadingProfiles && <p className="field-help">Quellprofile werden geladen …</p>}
           {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen", interrupted: "Unterbrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}{sanitizationJobs[file.id].status === "completed" && <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfung & Verlauf öffnen</button>}</div>}
         </li>)}</ul>}
-      </section>} : <p className="muted-message">Bitte zuerst ein Projekt auf der Startseite öffnen.</p>;
+      </section> : <p className="muted-message">Bitte zuerst ein Projekt auf der Startseite öffnen.</p>;
 
   return <main className="app-shell">
     <header className="topbar">
