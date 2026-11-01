@@ -24,6 +24,14 @@ def _config():
     })
 
 
+def _stored_output_path(tmp_path, run_id):
+    with sqlite3.connect(tmp_path / "data" / "review.sqlite3") as db:
+        row = db.execute("SELECT output_path FROM review_runs WHERE id=?", (run_id,)).fetchone()
+    assert row is not None
+    from pathlib import Path
+    return Path(row[0])
+
+
 def _sanitized_run(client, tmp_path, name="app.log", contents=b"secret=alpha\n"):
     source = tmp_path / name
     source.write_bytes(contents)
@@ -123,7 +131,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         ).fetchone()
         audit_db.close()
         assert stored[0] == "pending_review"
-        assert stored[1] == str(output)
+        assert stored[1] == str(work_output)
         assert client.get("/api/reviews/audit").status_code == 200
 
 
@@ -184,7 +192,7 @@ def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, mo
     save_rule_config(_config())
 
     with TestClient(app) as client:
-        response, _, _, _ = _sanitized_run(client, tmp_path)
+        response, _, _, output = _sanitized_run(client, tmp_path)
         run_id = response.json()["review_run_id"]
         approved = client.post(
             f"/api/reviews/runs/{run_id}/approve",
@@ -196,6 +204,8 @@ def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, mo
         )
         assert approved.status_code == 200
         assert approved.json()["status"] == "approved_with_exception"
+        assert output.read_bytes() == b"REDACTED\\n"
+        assert _stored_output_path(tmp_path, run_id) == output
         events = client.get("/api/reviews/audit").json()
         event = next(item for item in events if item["action"] == "approve")
         assert event["exception_reason"] == "Manuell geprüft; dokumentierte fachliche Ausnahme."
@@ -217,6 +227,7 @@ def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(t
         assert response.status_code == 200
         assert response.json()["review_status"] == "approved"
         assert client.get("/api/reviews/runs").json()[0]["status"] == "approved"
+        assert output.exists() and output.read_bytes() == b"REDACTED\\n"
         assert client.get("/api/reviews/queue").status_code == 403
 
 
