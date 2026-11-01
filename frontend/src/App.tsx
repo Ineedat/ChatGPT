@@ -253,7 +253,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   }
 
   async function startSanitization(file: ImportedFile, waitForCompletion = false): Promise<SanitizationJob | null> {
-    if (!selectedProject || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
+    if (file.state === "approved" || !selectedProject || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
     const separator = projectOutputDirectory.includes("\\") ? "\\" : "/";
     const relativePath = (file.relative_path || file.display_name).replace(/[\\/]+/g, separator);
     const outputPath = projectOutputDirectory.replace(/[\\/]+$/, "") + separator + relativePath;
@@ -479,7 +479,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   }
 
   const selectableFiles = importedFiles.filter(file =>
-    ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    file.state !== "approved" && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
   const selectedBatchFiles = importedFiles.filter(file => selectedFileIds.includes(file.id));
@@ -487,7 +487,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US")
   )).size !== selectedBatchFiles.length;
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
-    Boolean(projectOutputDirectory.trim()) && projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    file.state !== "approved" && Boolean(projectOutputDirectory.trim()) && projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
 
@@ -573,14 +573,15 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
               const job = sanitizationJobs[file.id];
               const effectiveFormat = file.format_override || file.detected_format || "unknown";
               const activeJob = Boolean(job && ["queued", "running", "cancelling"].includes(job.status));
+              const approved = file.state === "approved";
               return <tr key={file.id}>
                 <td className="registered-file-name">
-                  <label className="batch-file-select"><input type="checkbox" aria-label={`Für Stapel auswählen: ${relativePath}`} checked={selectedFileIds.includes(file.id)} disabled={batchRunning || activeJob || !selectableFiles.some(item => item.id === file.id)} onChange={event => setSelectedFileIds(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><span title={relativePath}>{relativePath}</span></label>
-                  <span className="table-file-state">{file.state === "registered" ? "Registriert" : file.state}</span>
+                  <label className="batch-file-select"><input type="checkbox" aria-label={`Für Stapel auswählen: ${relativePath}`} checked={selectedFileIds.includes(file.id)} disabled={batchRunning || activeJob || approved || !selectableFiles.some(item => item.id === file.id)} onChange={event => setSelectedFileIds(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><span title={relativePath}>{relativePath}</span></label>
+                  <span className={approved ? "table-file-state file-state-ready" : "table-file-state"}>{approved ? "Freigegeben · gesperrt" : file.state === "registered" ? "Registriert" : file.state}</span>
                 </td>
                 <td className="file-size">{file.size_bytes.toLocaleString("de-DE")} Byte</td>
                 <td>
-                  <select aria-label={`Format für ${relativePath}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)} disabled={batchRunning || activeJob || applyingBulkSettings}>
+                  <select aria-label={`Format für ${relativePath}`} value={file.format_override || ""} onChange={event => void setFileFormatOverride(file, event.target.value)} disabled={batchRunning || activeJob || applyingBulkSettings || approved}>
                     <option value="">Automatisch ({effectiveFormat.toUpperCase()})</option><option value="text">Text</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="xml">XML</option><option value="csv">CSV</option><option value="unknown">Unbekannt</option>
                   </select>
                   <span className="table-subtext">Erkannt: {(file.detected_format || "noch nicht geprüft").toUpperCase()} · Endung: {(file.format_hint || "unbekannt").toUpperCase()}</span>
@@ -597,9 +598,9 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                   {job && ["queued", "running"].includes(job.status) && <span className="table-subtext">{job.processed_bytes.toLocaleString("de-DE")} / {job.total_bytes.toLocaleString("de-DE")} Byte</span>}
                 </td>
                 <td className="file-row-actions">
-                  <button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)} disabled={batchRunning || activeJob}>Erkennen</button>
-                  <button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={batchRunning || activeJob || validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Prüft …" : "Validieren"}</button>
-                  {job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
+                  <button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)} disabled={batchRunning || activeJob || approved}>Erkennen</button>
+                  <button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={batchRunning || activeJob || approved || validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Prüft …" : "Validieren"}</button>
+                  {approved ? <span className="file-state file-state-ready">Freigegeben</span> : job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
                 </td>
               </tr>;
             })}</tbody>
