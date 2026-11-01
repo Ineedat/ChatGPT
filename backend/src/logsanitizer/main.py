@@ -460,6 +460,17 @@ class SanitizationRequest(BaseModel):
 
 
 
+def _staging_output_path(project_id: str, run_id: str, output_name: str) -> Path:
+    """Create an isolated per-run work directory outside the configured output folder."""
+    work_root = database_path().parent / "projects" / project_id / "work"
+    work_root.mkdir(parents=True, exist_ok=True)
+    if work_root.is_symlink():
+        raise HTTPException(status_code=422, detail="Der Arbeitsordner darf kein symbolischer Link sein.")
+    run_directory = work_root / run_id
+    run_directory.mkdir()
+    return run_directory / output_name
+
+
 def _relative_project_source_path(project_id: str, source: Path, stored_relative_path: str = "") -> Path:
     """Return a validated project-relative path without exposing absolute source paths."""
     relative = PurePosixPath(stored_relative_path.replace("\\", "/")) if stored_relative_path else None
@@ -538,23 +549,29 @@ def project_file_sanitize_start(
         raise HTTPException(status_code=422, detail="Das angegebene Quellprofil ist nicht definiert.")
 
     job_id = uuid.uuid4().hex
+    publish_output = output
+    try:
+        work_output = _staging_output_path(project_id, job_id, output.name)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="Arbeitsordner konnte nicht angelegt werden.") from exc
     user = request.state.user
     try:
         create_review_run(
-            job_id, project_id, file_id, row["display_name"], output,
+            job_id, project_id, file_id, row["display_name"], work_output,
             int(user["id"]), str(user["username"]), payload.retry_of_run_id,
+            publish_path=publish_output,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
-        create_job(job_id, project_id, file_id, source, output, source.stat().st_size)
+        create_job(job_id, project_id, file_id, source, work_output, source.stat().st_size)
     except (OSError, RuntimeError) as exc:
         fail_review_run(job_id, "failed", "Der Laufstatus konnte nicht dauerhaft gespeichert werden.")
         raise HTTPException(status_code=500, detail="Laufstatus konnte nicht gespeichert werden.") from exc
     with _SANITIZATION_LOCK:
         _SANITIZATION_CANCEL[job_id] = threading.Event()
     background_tasks.add_task(
-        _run_sanitization_job, job_id, project_id, file_id, source, output,
+        _run_sanitization_job, job_id, project_id, file_id, source, work_output,
         config, payload.profile_id, selected_format,
     )
     return {"id": job_id, "status": "queued", "status_url": f"/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}"}
@@ -638,12 +655,14 @@ def project_file_sanitize(
     user = request.state.user
     run_id = uuid.uuid4().hex
     try:
+        work_output = _staging_output_path(project_id, run_id, output.name)
         create_review_run(
-            run_id, project_id, file_id, row["display_name"], output,
+            run_id, project_id, file_id, row["display_name"], work_output,
             int(user["id"]), str(user["username"]), payload.retry_of_run_id,
+            publish_path=output,
         )
         set_review_run_running(run_id)
-        result = sanitize_file(source, output, config, payload.profile_id, selected_format, project_id)
+        result = sanitize_file(source, work_output, config, payload.profile_id, selected_format, project_id)
         review_run = finish_review_run(run_id, result)
         notify_pending_review(review_run)
         return {
