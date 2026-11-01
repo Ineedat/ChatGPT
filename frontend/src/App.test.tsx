@@ -417,9 +417,10 @@ describe("multi-file project sanitization workflow", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
     fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgabeordner speichern" })).toBeDisabled());
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
     expect(await screen.findByText(/gleichem Originalnamen/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
