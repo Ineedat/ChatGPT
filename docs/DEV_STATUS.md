@@ -183,3 +183,15 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Unmittelbar vor jeder einzelnen Datei erfolgt eine erneute Prüfung, damit zwischenzeitlich belegter Speicher erkannt wird.
 - Die Prüfung läuft serverseitig auf dem tatsächlichen Zielvolume und funktioniert damit für Windows- und Linux-Zielsysteme.
 - Regressionstests decken die Gesamtprüfung und einen zwischenzeitlichen Rückgang des freien Speicherplatzes ab; CI-Verifizierung steht noch aus.
+
+
+
+## Mehrdatei-Projektworkflow (2026-11-01)
+
+- Projektdateien können im Arbeitsbereich einzeln oder gesammelt für einen Stapellauf ausgewählt werden.
+- Die ausgewählten Dateien werden nacheinander über die bestehenden dauerhaften Einzeldatei-Jobs verarbeitet. Damit bleiben Jobstatus, Fortschritt, Abbruch, Pflichtvalidierung, Audit und Review pro Datei unabhängig.
+- Quellprofil und Ausgabepfad werden weiterhin pro Datei festgelegt. Vor dem Start prüft die UI, dass alle ausgewählten Dateien ein unterstütztes Format und einen eigenen Ausgabepfad besitzen; doppelte Ausgabeziele werden abgewiesen.
+- Ein Stapelabbruch fordert den kooperativen Abbruch der aktiven Datei an und verhindert den Start weiterer Dateien.
+- Die projektbezogene SQLite-Mapping-Tabelle wird von jedem Job mit derselben Projekt-ID verwendet; derselbe Originalwert erhält daher dateiübergreifend denselben Platzhalter. Der Backend-Regressionstest `test_indexed_mapping_is_stable_across_files_and_isolated_by_project` deckt dies ab.
+- Frontend-Tests prüfen die sequentielle Reihenfolge (Datei 2 startet erst nach dem terminalen Status von Datei 1) sowie die Abweisung doppelter Ausgabepfade.
+- CI-Verifizierung des neuen Frontend- und Dokumentationsstands steht noch aus.
