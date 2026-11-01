@@ -367,3 +367,64 @@ def test_browser_upload_enforces_size_limit_and_removes_partial_files(tmp_path, 
     workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
     assert not (workspace / "large.log").exists()
     assert not list(workspace.rglob("*.part")) if workspace.exists() else True
+
+
+
+def test_browser_upload_checks_total_destination_disk_space_before_copy(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import logsanitizer.main as main_module
+
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    monkeypatch.setattr(
+        main_module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=100_000_000, used=99_000_000, free=16 * 1024 * 1024 + 5),
+    )
+    with TestClient(app) as client:
+        project = client.post("/api/projects", json={"name": "Upload"}).json()
+        response = client.post(
+            f"/api/projects/{project['id']}/files/upload",
+            files=[
+                ("files", ("one.log", b"123", "text/plain")),
+                ("files", ("two.log", b"456", "text/plain")),
+            ],
+            data={"relative_paths": '["one.log", "two.log"]'},
+        )
+
+    assert response.status_code == 507
+    assert "Nicht genügend freier Speicherplatz" in response.json()["detail"]
+    workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
+    assert not (workspace / "one.log").exists()
+    assert not (workspace / "two.log").exists()
+    assert not list(workspace.rglob("*.part"))
+
+
+def test_browser_upload_checks_disk_space_again_before_each_file(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import logsanitizer.main as main_module
+
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    usage_calls = 0
+
+    def changing_disk_usage(_path):
+        nonlocal usage_calls
+        usage_calls += 1
+        free = 100 * 1024 * 1024 if usage_calls == 1 else 1
+        return SimpleNamespace(total=200 * 1024 * 1024, used=200 * 1024 * 1024 - free, free=free)
+
+    monkeypatch.setattr(main_module.shutil, "disk_usage", changing_disk_usage)
+    with TestClient(app) as client:
+        project = client.post("/api/projects", json={"name": "Upload"}).json()
+        response = client.post(
+            f"/api/projects/{project['id']}/files/upload",
+            files=[("files", ("one.log", b"123", "text/plain"))],
+            data={"relative_paths": '["one.log"]'},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["registered_count"] == 0
+    assert "Nicht genügend freier Speicherplatz" in response.json()["issues"][0]["reason"]
+    workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
+    assert not (workspace / "one.log").exists()
