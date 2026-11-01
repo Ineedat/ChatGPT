@@ -555,7 +555,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           </div>
           <button className="primary-button" type="button" onClick={() => void startBatchSanitization()} disabled={batchRunning || !batchReady}>Ausgewählte Dateien nacheinander bereinigen</button>
           <p className="field-help">Alle bereinigten Dateien werden im Ausgabeordner dieses Projekts unter ihrem Originalnamen gespeichert. Die Verarbeitung läuft nacheinander; Projekt-Mappings bleiben dateiübergreifend identisch.</p>
-          {batchHasDuplicateOutputs && selectedBatchFiles.length > 1 && <p className="error-message" role="alert">Mehrere Quelldateien haben denselben Namen und würden sich im Ausgabeordner überschreiben.</p>}
+          {batchHasDuplicateOutputs && selectedBatchFiles.length > 1 && <p className="error-message" role="alert">Mehrere Dateien besitzen denselben relativen Pfad und würden sich im Ausgabeordner überschreiben.</p>}
         </div>}
         {batchRunning && batchProgress && <div className="batch-progress" role="status">
           <strong>Mehrdatei-Lauf · Datei {batchProgress.current} von {batchProgress.total}</strong>
@@ -597,7 +597,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                 <td className="file-row-actions">
                   <button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)} disabled={batchRunning || activeJob}>Erkennen</button>
                   <button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={batchRunning || activeJob || validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Prüft …" : "Validieren"}</button>
-                  {job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
+                  {job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
                 </td>
               </tr>;
             })}</tbody>
