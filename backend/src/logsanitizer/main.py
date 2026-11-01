@@ -162,7 +162,11 @@ def project_files_list(project_id: str) -> list[ImportedFile]:
     """List registered source-file metadata for a project."""
     if get_project(project_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
-    return list_imported_files(project_id)
+    files = list_imported_files(project_id)
+    for imported_file in files:
+        if is_file_approved(project_id, imported_file.id):
+            imported_file.state = "approved"
+    return files
 
 
 @app.post(
