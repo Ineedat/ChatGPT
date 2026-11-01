@@ -311,3 +311,59 @@ def test_manual_format_override_persists_and_can_be_cleared(tmp_path, monkeypatc
             json={"format_override": "executable"},
         )
         assert invalid.status_code == 422
+
+
+def test_browser_upload_copies_files_and_preserves_relative_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    with TestClient(app) as client:
+        project = client.post("/api/projects", json={"name": "Upload"}).json()
+        response = client.post(
+            f"/api/projects/{project['id']}/files/upload",
+            files=[
+                ("files", ("service.log", b"first log line\\n", "text/plain")),
+                ("files", ("nested.jsonl", b'{"ok":true}\\n', "application/json")),
+            ],
+            data={"relative_paths": '["service.log", "subfolder/nested.jsonl"]'},
+        )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["registered_count"] == 2
+    assert body["skipped_count"] == 0
+    workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
+    assert (workspace / "service.log").read_bytes() == b"first log line\\n"
+    assert (workspace / "subfolder" / "nested.jsonl").read_bytes() == b'{"ok":true}\\n'
+
+
+def test_browser_upload_rejects_path_traversal(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    with TestClient(app) as client:
+        project = client.post("/api/projects", json={"name": "Upload"}).json()
+        response = client.post(
+            f"/api/projects/{project['id']}/files/upload",
+            files=[("files", ("escape.log", b"not written", "text/plain"))],
+            data={"relative_paths": '["../escape.log"]'},
+        )
+    assert response.status_code == 200
+    assert response.json()["registered_count"] == 0
+    assert response.json()["issues"][0]["reason"] == "Ungültiger relativer Dateipfad."
+    assert not (tmp_path / "private-data" / "projects" / "escape.log").exists()
+
+
+def test_browser_upload_enforces_size_limit_and_removes_partial_files(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "private-data"))
+    import logsanitizer.main as main_module
+
+    monkeypatch.setattr(main_module, "MAX_UPLOAD_BYTES", 4)
+    with TestClient(app) as client:
+        project = client.post("/api/projects", json={"name": "Upload"}).json()
+        response = client.post(
+            f"/api/projects/{project['id']}/files/upload",
+            files=[("files", ("large.log", b"12345", "text/plain"))],
+            data={"relative_paths": '["large.log"]'},
+        )
+    assert response.status_code == 200
+    assert response.json()["registered_count"] == 0
+    assert "5 GiB" in response.json()["issues"][0]["reason"]
+    workspace = tmp_path / "private-data" / "projects" / project["id"] / "sources"
+    assert not (workspace / "large.log").exists()
+    assert not list(workspace.rglob("*.part")) if workspace.exists() else True
