@@ -457,7 +457,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     file.display_name.toLocaleLowerCase("en-US")
   )).size !== selectedBatchFiles.length;
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
-    projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    Boolean(projectOutputDirectory.trim()) && projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
 
