@@ -151,3 +151,12 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Die Registrierung liest weiterhin keine Log-Inhalte und verändert keine Quelldateien.
 - Noch offen: geeigneten lokalen Dateibrowser für Windows/Linux-Standalone und Air-Gap-Betrieb integrieren. Die aktuelle Pfadeingabe ist bis dahin ein technischer Zwischenschritt.
 - CI für den Implementierungsstand steht noch aus.
+
+
+## Lokaler Datei-/Ordnerbrowser und Upload (2026-11-01)
+
+- Browser-Dateiauswahl für Mehrfachdateien und Ordner mit relativer Unterordnerstruktur ergänzt; manuelle Backend-Pfadeingabe bleibt als aufklappbarer Fallback.
+- Upload-Endpunkt legt Dateien im Projektarbeitsbereich unter dem konfigurierten Datenverzeichnis ab und registriert sie erst nach vollständigem Kopieren.
+- Backend liest Uploads in 1-MiB-Blöcken, begrenzt jede Datei auf 5 GiB und eine Auswahl auf 5.000 Dateien; unvollständige temporäre Dateien werden bei Fehlern entfernt.
+- Relative Uploadpfade werden auf absolute Pfade, Laufwerkspräfixe und Traversal geprüft; Originaldateien auf dem Client werden nicht verändert.
+- Regressionstests decken Upload, Ordnerstruktur, Traversal-Schutz und Größenlimit ab. CI-Verifizierung steht noch aus.
