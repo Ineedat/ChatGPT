@@ -447,3 +447,38 @@ def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, m
         denied = client.get(f"/api/reviews/runs/{run_id}/compare-preview")
         assert denied.status_code == 403
 
+
+
+def test_review_comparison_reads_large_files_in_bounded_windows(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+
+    contents = b"safe application log line\\n" * 5000
+    with BaseTestClient(app) as client:
+        create_user("window-reviewer", "window-reviewer-password-123", ["operator", "reviewer"])
+        login = client.post("/api/auth/login", json={
+            "username": "window-reviewer", "password": "window-reviewer-password-123"
+        })
+        assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        response, _, _, _ = _sanitized_run(client, tmp_path, contents=contents)
+        assert response.status_code == 200
+        run_id = response.json()["review_run_id"]
+
+        first = client.get(f"/api/reviews/runs/{run_id}/compare-preview").json()
+        assert len(first["original"]["content"].encode("utf-8")) <= 65_536
+        assert first["original"]["next_offset"] is not None
+        assert first["original"]["content"].startswith("safe application log line")
+
+        second = client.get(
+            f"/api/reviews/runs/{run_id}/compare-preview",
+            params={
+                "original_offset": first["original"]["next_offset"],
+                "output_offset": first["sanitized"]["next_offset"],
+            },
+        )
+        assert second.status_code == 200
+        assert second.json()["original"]["byte_offset"] == first["original"]["next_offset"]
+        assert second.json()["original"]["content"].startswith("safe application log line")
+
