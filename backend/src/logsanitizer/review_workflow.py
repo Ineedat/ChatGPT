@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import difflib
 import os
+import shutil
 import sqlite3
+import tempfile
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -85,6 +87,7 @@ def initialize_review_database() -> None:
             display_name TEXT NOT NULL,
             output_name TEXT NOT NULL,
             output_path TEXT NOT NULL,
+            publish_path TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL CHECK (status IN (
                 'queued','running','pending_review','returned','approved',
                 'approved_with_exception','stopped','failed','cancelled'
@@ -140,6 +143,8 @@ def initialize_review_database() -> None:
         );
         """)
         columns = {row["name"] for row in db.execute("PRAGMA table_info(review_runs)")}
+        if "publish_path" not in columns:
+            db.execute("ALTER TABLE review_runs ADD COLUMN publish_path TEXT NOT NULL DEFAULT ''")
         if "output_signature" not in columns:
             db.execute("ALTER TABLE review_runs ADD COLUMN output_signature TEXT NOT NULL DEFAULT ''")
         saved_columns = {row["name"] for row in db.execute("PRAGMA table_info(saved_searches)")}
@@ -181,7 +186,8 @@ def _review_assignee_state() -> bool | None:
 
 def create_run(run_id: str, project_id: str, file_id: str, display_name: str,
                output_path: Path, actor_id: int, actor_name: str,
-               parent_run_id: str | None = None) -> dict:
+               parent_run_id: str | None = None,
+               publish_path: Path | None = None) -> dict:
     initialize_review_database()
     with _db() as db:
         if parent_run_id:
@@ -194,15 +200,72 @@ def create_run(run_id: str, project_id: str, file_id: str, display_name: str,
                 raise ValueError("Nur ein zurückgegebener Lauf derselben Datei kann überarbeitet werden.")
         db.execute(
             """INSERT INTO review_runs
-               (id, project_id, file_id, display_name, output_name, output_path, status,
+               (id, project_id, file_id, display_name, output_name, output_path, publish_path, status,
                 actor_user_id, actor_username, parent_run_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)""",
             (run_id, project_id, file_id, display_name, output_path.name,
-             str(output_path), actor_id, actor_name, parent_run_id, _now()),
+             str(output_path), str(publish_path or output_path), actor_id, actor_name,
+             parent_run_id, _now()),
         )
         _audit(db, run_id, actor_id, actor_name, "queued",
                comment=f"Überarbeitung von Lauf {parent_run_id}" if parent_run_id else "")
         return _public_run(db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone())
+
+
+def _publish_approved_output(db: sqlite3.Connection, row: sqlite3.Row) -> str:
+    """Move a validated work file into its final output location without overwriting."""
+    work_path = Path(row["output_path"])
+    publish_value = row["publish_path"] if "publish_path" in row.keys() else ""
+    publish_path = Path(publish_value) if publish_value else work_path
+    if work_path == publish_path:
+        signature = _file_signature(work_path)
+        if signature is None:
+            raise HTTPException(status_code=409, detail="Arbeitsdatei fehlt oder ist nicht mehr verfügbar.")
+        return signature
+    if work_path.is_symlink() or not work_path.is_file():
+        raise HTTPException(status_code=409, detail="Arbeitsdatei fehlt oder ist nicht mehr verfügbar.")
+    publish_path.parent.mkdir(parents=True, exist_ok=True)
+    if publish_path.exists() or publish_path.is_symlink():
+        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits; Freigabe wurde nicht veröffentlicht.")
+
+    temporary: Path | None = None
+    try:
+        try:
+            os.link(work_path, publish_path)
+        except OSError:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{publish_path.name}.", suffix=".publishing", dir=publish_path.parent
+            )
+            temporary = Path(temporary_name)
+            with os.fdopen(descriptor, "wb") as target, work_path.open("rb") as source:
+                shutil.copyfileobj(source, target, length=1024 * 1024)
+                target.flush()
+                os.fsync(target.fileno())
+            try:
+                os.link(temporary, publish_path)
+            except OSError:
+                if publish_path.exists() or publish_path.is_symlink():
+                    raise FileExistsError(publish_path)
+                temporary.replace(publish_path)
+            temporary.unlink(missing_ok=True)
+            temporary = None
+        work_path.unlink()
+    except OSError as exc:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=409,
+            detail="Die bereinigte Datei konnte nicht in den Ausgabeordner übernommen werden.",
+        ) from exc
+
+    signature = _file_signature(publish_path)
+    if signature is None:
+        raise HTTPException(status_code=409, detail="Die veröffentlichte Datei konnte nicht verifiziert werden.")
+    db.execute(
+        "UPDATE review_runs SET output_path=?, output_signature=? WHERE id=?",
+        (str(publish_path), signature, row["id"]),
+    )
+    return signature
 
 
 def set_run_running(run_id: str) -> None:
@@ -232,6 +295,11 @@ def finish_run(run_id: str, result: dict[str, object]) -> dict:
         )
         if not validated:
             status = "failed"
+        elif status == "approved":
+            try:
+                signature = _publish_approved_output(db, row)
+            except HTTPException:
+                status = "failed"
         db.execute(
             """UPDATE review_runs SET status=?, completed_at=?, input_bytes=?, output_bytes=?,
                lines_processed=?, replacements=?, validated=?, residual_matches=?, validation_scope=?,
@@ -249,7 +317,7 @@ def finish_run(run_id: str, result: dict[str, object]) -> dict:
                    comment="Pflichtvalidierung bestanden; bewusste Freigabe erforderlich.")
         else:
             _audit(db, run_id, None, "system", "failed",
-                   comment="Pflichtvalidierung fehlgeschlagen oder bereinigte Ausgabe nicht mehr verfügbar.")
+                   comment="Pflichtvalidierung fehlgeschlagen oder Ausgabe konnte nicht veröffentlicht werden.")
         return _public_run(db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone())
 
 
@@ -276,7 +344,7 @@ def _public_run(row: sqlite3.Row | None) -> dict:
         "created_at", "started_at", "completed_at", "input_bytes", "output_bytes",
         "lines_processed", "replacements", "validated", "residual_matches",
         "validation_scope", "last_comment", "exception_reason",
-    )}
+    )} | {"published": row["status"] in {"approved", "approved_with_exception"}}
 
 
 def get_run(run_id: str) -> dict | None:
@@ -621,6 +689,8 @@ def _decide(run_id: str, action: str, payload: ReviewDecision, request: Request)
             "return": "returned",
             "stop": "stopped",
         }[action]
+        if action == "approve":
+            _publish_approved_output(db, row)
         db.execute(
             """UPDATE review_runs SET status=?, reviewer_user_id=?,
                last_comment=?, exception_reason=? WHERE id=? AND status='pending_review'""",
