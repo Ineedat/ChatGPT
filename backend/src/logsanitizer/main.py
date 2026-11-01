@@ -12,9 +12,9 @@ import threading
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -32,6 +32,7 @@ from logsanitizer.database import (
     Project,
     ProjectCreate,
     connect_database,
+    database_path,
     create_project,
     get_project,
     initialize_database,
@@ -820,6 +821,129 @@ def project_folder_import(
         registered_files=registered,
         issues=issues,
         limit_reached=candidates > MAX_FOLDER_FILES,
+    )
+
+
+
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+@app.post(
+    "/api/projects/{project_id}/files/upload",
+    response_model=FolderImportResult,
+    tags=["files"],
+)
+async def project_files_upload(
+    project_id: str,
+    files: list[UploadFile] = File(...),
+    relative_paths: str = Form("[]"),
+) -> FolderImportResult:
+    """Copy browser-selected files into the project workspace using bounded chunks."""
+    if get_project(project_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
+    try:
+        requested_paths = json.loads(relative_paths)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Dateiliste ist ungültig.",
+        ) from exc
+    if (
+        not isinstance(requested_paths, list)
+        or len(requested_paths) != len(files)
+        or any(not isinstance(item, str) or not item.strip() for item in requested_paths)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Dateinamen und Uploads stimmen nicht überein.",
+        )
+
+    root = (database_path().parent / "projects" / project_id / "sources").resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    registered: list[ImportedFile] = []
+    issues: list[FolderImportIssue] = []
+    limit_reached = len(files) > MAX_FOLDER_FILES
+
+    for index, upload in enumerate(files[:MAX_FOLDER_FILES]):
+        raw_relative = requested_paths[index].replace("\\", "/")
+        relative = PurePosixPath(raw_relative)
+        if (
+            relative.is_absolute()
+            or not relative.parts
+            or any(part in {"", ".", ".."} or ":" in part for part in relative.parts)
+        ):
+            issues.append(
+                FolderImportIssue(file_name=upload.filename or "Unbekannte Datei", reason="Ungültiger relativer Dateipfad.")
+            )
+            await upload.close()
+            continue
+
+        destination = (root / Path(*relative.parts)).resolve()
+        if not destination.is_relative_to(root):
+            issues.append(
+                FolderImportIssue(file_name=upload.filename or relative.name, reason="Dateipfad liegt außerhalb des Projektbereichs.")
+            )
+            await upload.close()
+            continue
+        if destination.exists():
+            issues.append(
+                FolderImportIssue(file_name=relative.name, reason="Datei ist im Projektbereich bereits vorhanden.")
+            )
+            await upload.close()
+            continue
+
+        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.part")
+        total_bytes = 0
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with temporary.open("xb") as output:
+                while chunk := await upload.read(UPLOAD_CHUNK_BYTES):
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_UPLOAD_BYTES:
+                        raise ValueError("Datei überschreitet das Limit von 5 GiB.")
+                    output.write(chunk)
+            os.replace(temporary, destination)
+            try:
+                registered.append(register_imported_file(project_id, destination))
+            except FileAlreadyRegisteredError:
+                destination.unlink(missing_ok=True)
+                issues.append(
+                    FolderImportIssue(file_name=relative.name, reason="Bereits in diesem Projekt registriert.")
+                )
+        except ValueError as exc:
+            temporary.unlink(missing_ok=True)
+            destination.unlink(missing_ok=True)
+            issues.append(FolderImportIssue(file_name=relative.name, reason=str(exc)))
+        except OSError:
+            temporary.unlink(missing_ok=True)
+            destination.unlink(missing_ok=True)
+            issues.append(
+                FolderImportIssue(file_name=relative.name, reason="Datei konnte nicht vollständig übernommen werden.")
+            )
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            destination.unlink(missing_ok=True)
+            raise
+        finally:
+            await upload.close()
+
+    if limit_reached:
+        for upload in files[MAX_FOLDER_FILES:]:
+            issues.append(
+                FolderImportIssue(
+                    file_name=upload.filename or "Unbekannte Datei",
+                    reason=f"Limit von {MAX_FOLDER_FILES} Dateien erreicht; Rest übersprungen.",
+                )
+            )
+            await upload.close()
+
+    return FolderImportResult(
+        registered_count=len(registered),
+        skipped_count=len(issues),
+        registered_files=registered,
+        issues=issues,
+        limit_reached=limit_reached,
     )
 
 
