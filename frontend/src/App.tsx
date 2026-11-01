@@ -493,7 +493,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         {error && <p className="error-message" role="alert">{error}</p>}
-        <div className="project-output-setting"><label htmlFor="project-output-directory">Ausgabeordner<input id="project-output-directory" value={projectOutputDirectory} onChange={event => setProjectOutputDirectory(event.target.value)} placeholder="Absoluter Ordnerpfad" maxLength={4096} /></label><button className="secondary-button" type="button" disabled={savingOutputDirectory || projectOutputDirectory.trim() === (selectedProject.output_directory || "")} onClick={() => void saveProjectOutputDirectory()}>{savingOutputDirectory ? "Speichert …" : "Ausgabeordner speichern"}</button><p className="field-help">Alle Ergebnisse werden hier unter ihrem Originaldateinamen abgelegt. Der Ordner muss bereits existieren.</p></div>
+        <div className="project-output-setting"><label htmlFor="project-output-directory">Ausgabeordner<input id="project-output-directory" value={projectOutputDirectory} onChange={event => setProjectOutputDirectory(event.target.value)} placeholder="Absoluter Ordnerpfad" maxLength={4096} /></label><button className="secondary-button" type="button" disabled={savingOutputDirectory || projectOutputDirectory.trim() === (selectedProject.output_directory || "")} onClick={() => void saveProjectOutputDirectory()}>{savingOutputDirectory ? "Speichert …" : "Ausgabeordner speichern"}</button><p className="field-help">Die relative Ordnerstruktur bleibt erhalten; fehlende Unterordner werden automatisch angelegt. Der Ausgabeordner selbst muss bereits existieren.</p></div>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
         <form className="import-source-form" onSubmit={event => void registerSources(event)} aria-label="Dateien hinzufügen">
           <div className="import-source-fields">
@@ -554,7 +554,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
             <span>{selectedFileIds.length} ausgewählt</span>
           </div>
           <button className="primary-button" type="button" onClick={() => void startBatchSanitization()} disabled={batchRunning || !batchReady}>Ausgewählte Dateien nacheinander bereinigen</button>
-          <p className="field-help">Alle bereinigten Dateien werden im Ausgabeordner dieses Projekts unter ihrem Originalnamen gespeichert. Die Verarbeitung läuft nacheinander; Projekt-Mappings bleiben dateiübergreifend identisch.</p>
+          <p className="field-help">Die relative Quellordnerstruktur wird im Ausgabeordner nachgebildet; Originaldateinamen bleiben erhalten. Die Verarbeitung läuft nacheinander; Projekt-Mappings bleiben dateiübergreifend identisch.</p>
           {batchHasDuplicateOutputs && selectedBatchFiles.length > 1 && <p className="error-message" role="alert">Mehrere Dateien besitzen denselben relativen Pfad und würden sich im Ausgabeordner überschreiben.</p>}
         </div>}
         {batchRunning && batchProgress && <div className="batch-progress" role="status">
