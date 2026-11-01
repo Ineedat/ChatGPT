@@ -330,3 +330,89 @@ describe("compact registered file workspace", () => {
     expect(screen.queryByRole("region", { name: "Projektprinzipien" })).not.toBeInTheDocument();
   });
 });
+
+
+
+describe("multi-file project sanitization workflow", () => {
+  it("runs selected files sequentially and retains project-wide indexed mappings", async () => {
+    const project = {
+      id: "project-batch", name: "Batchprojekt", description: "", status: "draft",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
+    };
+    const files = [
+      { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
+      { id: "file-two", project_id: project.id, display_name: "second.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+    ];
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method || "GET").toUpperCase();
+      calls.push(`${method} ${url}`);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
+      if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
+      if (method === "POST" && url.endsWith("/file-one/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-one" }) } as Response;
+      if (method === "POST" && url.endsWith("/file-two/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-two" }) } as Response;
+      if (url.endsWith("/file-one/sanitize-jobs/job-one") || url.endsWith("/file-two/sanitize-jobs/job-two")) {
+        return { ok: true, json: async () => ({
+          id: url.includes("job-one") ? "job-one" : "job-two",
+          status: "completed", phase: "completed", processed_bytes: 100, total_bytes: 100,
+          lines_processed: 10, result: { output_name: "clean.log", output_bytes: 100, replacements: 1, validated: true }
+        }) } as Response;
+      }
+      return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für first.log" }), { target: { value: "/tmp/first.clean.log" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für second.log" }), { target: { value: "/tmp/second.clean.log" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
+
+    expect(await screen.findByText(/Mehrdatei-Lauf beendet: 2 erfolgreich validiert/)).toBeInTheDocument();
+    const firstStart = calls.findIndex(call => call.endsWith("/file-one/sanitize-jobs"));
+    const firstStatus = calls.findIndex(call => call.endsWith("/file-one/sanitize-jobs/job-one"));
+    const secondStart = calls.findIndex(call => call.endsWith("/file-two/sanitize-jobs"));
+    expect(firstStart).toBeGreaterThanOrEqual(0);
+    expect(firstStatus).toBeGreaterThan(firstStart);
+    expect(secondStart).toBeGreaterThan(firstStatus);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/file-one/sanitize-jobs`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/first.clean.log", profile_id: null }) })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/file-two/sanitize-jobs`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/second.clean.log", profile_id: null }) })
+    );
+  });
+
+  it("rejects duplicate output paths before starting any file", async () => {
+    const project = {
+      id: "project-batch-duplicate", name: "Batchprojekt", description: "", status: "draft",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
+    };
+    const files = [
+      { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
+      { id: "file-two", project_id: project.id, display_name: "second.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
+      if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
+      return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für first.log" }), { target: { value: "/tmp/shared.clean.log" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für second.log" }), { target: { value: "/tmp/shared.clean.log" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Jede Datei benötigt einen eigenen Ausgabepfad/);
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
+  });
+});
