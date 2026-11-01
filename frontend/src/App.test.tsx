@@ -173,7 +173,7 @@ describe("project file registration UI", () => {
     const uploadCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/files/upload"));
     expect(uploadCall).toBeDefined();
     expect((uploadCall?.[1] as RequestInit).body).toBeInstanceOf(FormData);
-    expect((uploadCall?.[1] as RequestInit).headers).toBeUndefined();
+    expect(new Headers((uploadCall?.[1] as RequestInit).headers).has("Content-Type")).toBe(false);
   });
 
 });
