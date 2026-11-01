@@ -747,3 +747,22 @@ input:not([type=checkbox]):not([type=file]), select, textarea { min-width: 0; }
 @media (max-width: 760px) {
   .review-compare-pane pre { height: 38vh; min-height: 150px; }
 }
+
+
+.review-compare-line {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+}
+.review-compare-mark {
+  color: #1f1f1f;
+  padding: 0;
+}
+.review-compare-mark-original {
+  background: #ffe49a;
+  box-shadow: inset 0 -2px #9a6500;
+}
+.review-compare-mark-sanitized {
+  background: #ccebd1;
+  box-shadow: inset 0 -2px #17652a;
+}
