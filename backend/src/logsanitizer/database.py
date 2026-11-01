@@ -10,7 +10,7 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
@@ -351,7 +351,7 @@ def update_detected_format(project_id: str, file_id: str, detected_format: str) 
         )
         row = connection.execute(
             """
-            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, relative_path, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE project_id = ? AND id = ?
             """,
@@ -368,7 +368,7 @@ def update_format_override(project_id: str, file_id: str, format_override: str |
         )
         row = connection.execute(
             """
-            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, relative_path, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE project_id = ? AND id = ?
             """,
@@ -381,7 +381,7 @@ def list_imported_files(project_id: str) -> list[ImportedFile]:
     with connect_database() as connection:
         rows = connection.execute(
             """
-            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, relative_path, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE project_id = ?
             ORDER BY imported_at ASC, display_name COLLATE NOCASE ASC
@@ -391,15 +391,23 @@ def list_imported_files(project_id: str) -> list[ImportedFile]:
     return [_imported_file_from_row(row) for row in rows]
 
 
-def register_imported_file(project_id: str, source: Path) -> ImportedFile:
+def register_imported_file(
+    project_id: str, source: Path, relative_path: str | None = None
+) -> ImportedFile:
     """Register a local regular file without opening or modifying its contents."""
     absolute_path = str(source)
+    relative = PurePosixPath((relative_path or source.name).replace("\\", "/"))
+    if relative.is_absolute() or not relative.parts or any(
+        part in {"", ".", ".."} or ":" in part for part in relative.parts
+    ):
+        raise ValueError("Ungültiger relativer Dateipfad.")
+    normalized_relative_path = relative.as_posix()
     stat = source.stat()
     imported_at = datetime.now(UTC).isoformat(timespec="seconds")
     file_id = str(uuid4())
     with connect_database() as connection:
         existing = connection.execute(
-            "SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at, "
+            "SELECT id, project_id, source_path, display_name, relative_path, size_bytes, modified_at, imported_at, "
             "detected_format, format_override FROM imported_files WHERE project_id = ? AND source_path = ?",
             (project_id, absolute_path),
         ).fetchone()
@@ -408,14 +416,15 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
         connection.execute(
             """
             INSERT INTO imported_files
-                (id, project_id, source_path, display_name, size_bytes, modified_at, imported_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, project_id, source_path, display_name, relative_path, size_bytes, modified_at, imported_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 file_id,
                 project_id,
                 absolute_path,
                 source.name,
+                normalized_relative_path,
                 stat.st_size,
                 datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(timespec="seconds"),
                 imported_at,
@@ -423,7 +432,7 @@ def register_imported_file(project_id: str, source: Path) -> ImportedFile:
         )
         row = connection.execute(
             """
-            SELECT id, project_id, source_path, display_name, size_bytes, modified_at, imported_at,
+            SELECT id, project_id, source_path, display_name, relative_path, size_bytes, modified_at, imported_at,
                    detected_format, format_override
             FROM imported_files WHERE id = ?
             """,
