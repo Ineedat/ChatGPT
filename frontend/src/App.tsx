@@ -373,8 +373,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     }
   }
 
-  async function setFileFormatOverride(file: ImportedFile, formatOverride: string) {
-    if (!selectedProject) return;
+  async function setFileFormatOverride(file: ImportedFile, formatOverride: string): Promise<boolean> {
+    if (!selectedProject) return false;
     setError("");
     try {
       const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/format`, {
@@ -385,9 +385,32 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const body = await response.json() as ImportedFile & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Format-Auswahl konnte nicht gespeichert werden.");
       setImportedFiles(current => current.map(item => item.id === file.id ? body : item));
-      setImportMessage(formatOverride ? `Manuelles Format für ${file.display_name} gespeichert: ${formatOverride}.` : `Manuelle Format-Auswahl für ${file.display_name} entfernt.`);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Format-Auswahl konnte nicht gespeichert werden.");
+      return false;
+    }
+  }
+
+  async function applySettingsToAllFiles() {
+    if (applyingBulkSettings || batchRunning || importedFiles.length === 0) return;
+    setApplyingBulkSettings(true);
+    setError("");
+    try {
+      let successful = 0;
+      for (const file of importedFiles) {
+        if (await setFileFormatOverride(file, bulkFormatOverride)) successful += 1;
+        else break;
+      }
+      if (successful !== importedFiles.length) return;
+      setProfileSelections(current => {
+        const next = { ...current };
+        importedFiles.forEach(file => { next[file.id] = bulkProfileId; });
+        return next;
+      });
+      setImportMessage(`Format und Quellprofil wurden auf alle ${importedFiles.length} Dateien angewendet.`);
+    } finally {
+      setApplyingBulkSettings(false);
     }
   }
 
