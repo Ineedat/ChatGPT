@@ -427,3 +427,52 @@ footer { margin-top: 14px; padding-top: 8px; border-color: #bdbdbd; }
   .file-card-heading { align-items: flex-start; }
   .file-format-actions { align-items: stretch; }
 }
+
+
+/* Unified source registration form */
+.import-source-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #c8c8c8;
+  border-radius: 4px;
+  background: #ffffff;
+}
+.import-source-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, .32fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.import-source-fields label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  color: #303030;
+  font-weight: 600;
+}
+.import-source-fields input:not([type=checkbox]),
+.import-source-fields select { width: 100%; min-width: 0; }
+.import-source-fields .import-recursive-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  padding-bottom: 6px;
+}
+.import-source-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.import-source-footer .field-help { margin: 0; }
+.import-source-footer button { flex: 0 0 auto; }
+@media (max-width: 760px) {
+  .import-source-fields { grid-template-columns: minmax(0, 1fr); }
+  .import-source-fields .import-recursive-option { padding-bottom: 0; }
+  .import-source-footer { align-items: stretch; flex-direction: column; }
+}
