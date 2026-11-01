@@ -480,19 +480,56 @@ def _read_compare_window(path: Path, byte_offset: int) -> dict[str, object]:
     }
 
 
-def _changed_line_numbers(original: str, sanitized: str) -> tuple[list[int], list[int]]:
-    """Return 1-based line numbers changed by sanitization for bounded visual highlighting."""
-    original_lines = original.splitlines()
-    sanitized_lines = sanitized.splitlines()
-    matcher = difflib.SequenceMatcher(a=original_lines, b=sanitized_lines)
-    original_changed: set[int] = set()
-    sanitized_changed: set[int] = set()
+def _changed_line_spans(
+    original: str, sanitized: str
+) -> tuple[list[int], list[int], list[dict[str, int]], list[dict[str, int]]]:
+    """Return line and character spans changed by sanitization for precise highlighting."""
+    original_lines = original.splitlines(keepends=True)
+    sanitized_lines = sanitized.splitlines(keepends=True)
+    original_text = [line.rstrip("\\r\\n") for line in original_lines]
+    sanitized_text = [line.rstrip("\\r\\n") for line in sanitized_lines]
+    matcher = difflib.SequenceMatcher(a=original_text, b=sanitized_text)
+    original_spans: list[dict[str, int]] = []
+    sanitized_spans: list[dict[str, int]] = []
+
+    def add_whole_line(target: list[dict[str, int]], line_number: int, value: str) -> None:
+        target.append({"line_number": line_number, "start": 0, "end": max(1, len(value))})
+
     for tag, original_start, original_end, sanitized_start, sanitized_end in matcher.get_opcodes():
         if tag == "equal":
             continue
-        original_changed.update(range(original_start + 1, original_end + 1))
-        sanitized_changed.update(range(sanitized_start + 1, sanitized_end + 1))
-    return sorted(original_changed), sorted(sanitized_changed)
+        paired = min(original_end - original_start, sanitized_end - sanitized_start)
+        for offset in range(paired):
+            original_line_number = original_start + offset + 1
+            sanitized_line_number = sanitized_start + offset + 1
+            original_line = original_text[original_start + offset]
+            sanitized_line = sanitized_text[sanitized_start + offset]
+            if len(original_line) + len(sanitized_line) > 8192:
+                add_whole_line(original_spans, original_line_number, original_line)
+                add_whole_line(sanitized_spans, sanitized_line_number, sanitized_line)
+                continue
+            line_matcher = difflib.SequenceMatcher(a=original_line, b=sanitized_line)
+            for line_tag, a_start, a_end, b_start, b_end in line_matcher.get_opcodes():
+                if line_tag == "equal":
+                    continue
+                if a_end > a_start:
+                    original_spans.append({
+                        "line_number": original_line_number, "start": a_start, "end": a_end
+                    })
+                if b_end > b_start:
+                    sanitized_spans.append({
+                        "line_number": sanitized_line_number, "start": b_start, "end": b_end
+                    })
+        for index in range(original_start + paired, original_end):
+            add_whole_line(original_spans, index + 1, original_text[index])
+        for index in range(sanitized_start + paired, sanitized_end):
+            add_whole_line(sanitized_spans, index + 1, sanitized_text[index])
+
+    original_spans.sort(key=lambda item: (item["line_number"], item["start"]))
+    sanitized_spans.sort(key=lambda item: (item["line_number"], item["start"]))
+    original_changed = sorted({item["line_number"] for item in original_spans})
+    sanitized_changed = sorted({item["line_number"] for item in sanitized_spans})
+    return original_changed, sanitized_changed, original_spans, sanitized_spans
 
 
 @router.get("/runs/{run_id}/compare-preview")
@@ -528,15 +565,20 @@ def compare_run_preview(
         raise HTTPException(status_code=409, detail="Bereinigte Ausgabe fehlt oder wurde seit der Validierung verändert.")
     original = _read_compare_window(source_path, original_offset)
     sanitized = _read_compare_window(output_path, output_offset)
-    original_changed, sanitized_changed = _changed_line_numbers(
-        str(original["content"]), str(sanitized["content"])
-    )
+    (
+        original_changed,
+        sanitized_changed,
+        original_spans,
+        sanitized_spans,
+    ) = _changed_line_spans(str(original["content"]), str(sanitized["content"]))
     return {
         "run_id": run_id,
         "original": original,
         "sanitized": sanitized,
         "original_changed_lines": original_changed,
         "sanitized_changed_lines": sanitized_changed,
+        "original_changed_spans": original_spans,
+        "sanitized_changed_spans": sanitized_spans,
     }
 
 
