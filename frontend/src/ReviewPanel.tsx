@@ -95,7 +95,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
   const refresh = useCallback(async () => {
     setError("");
     try {
-      const historyResponse = await reviewFetch("/api/reviews/runs?limit=100");
+      const historyResponse = await reviewFetch("/api/reviews/runs?limit=200");
       if (!historyResponse.ok) throw new Error("Laufhistorie konnte nicht geladen werden.");
       setHistory(await historyResponse.json() as ReviewRun[]);
       if (selectedProject?.id) {
