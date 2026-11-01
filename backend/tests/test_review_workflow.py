@@ -454,7 +454,7 @@ def test_review_comparison_reads_large_files_in_bounded_windows(tmp_path, monkey
     monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
     save_rule_config(_config())
 
-    contents = b"safe application log line\\n" * 5000
+    contents = b"safe application log line\n" * 5000
     with BaseTestClient(app) as client:
         create_user("window-reviewer", "window-reviewer-password-123", ["operator", "reviewer"])
         login = client.post("/api/auth/login", json={
