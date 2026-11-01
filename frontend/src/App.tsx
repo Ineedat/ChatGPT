@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { HelpTooltip } from "./components/HelpTooltip";
 import { helpTopics } from "./help/content";
 import { LoginGate } from "./LoginGate";
@@ -22,7 +22,7 @@ type FolderImportResult = { registered_count: number; skipped_count: number; reg
 type FormatValidationResult = { file_id: string; format: string; valid: boolean; bytes_checked: number; error?: string };
 type SanitizationJob = {
   id: string;
-  status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
+  status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
   phase: string;
   processed_bytes: number;
   total_bytes: number;
@@ -75,6 +75,10 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [profileSelections, setProfileSelections] = useState<Record<string, string>>({});
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fileId: string; fileName: string } | null>(null);
+  const batchStopRequestedRef = useRef(false);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -236,8 +240,8 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     }
   }
 
-  async function startSanitization(file: ImportedFile) {
-    if (!selectedProject || !outputPaths[file.id]?.trim() || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return;
+  async function startSanitization(file: ImportedFile, waitForCompletion = false): Promise<SanitizationJob | null> {
+    if (!selectedProject || !outputPaths[file.id]?.trim() || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
     setError("");
     try {
       const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
@@ -248,14 +252,17 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       const body = await response.json() as { id?: string; detail?: string };
       if (!response.ok || !body.id) throw new Error(body.detail || "Bereinigung konnte nicht gestartet werden.");
       setSanitizationJobs(current => ({ ...current, [file.id]: { id: body.id!, status: "queued", phase: "queued", processed_bytes: 0, total_bytes: file.size_bytes, lines_processed: 0 } }));
+      if (waitForCompletion) return await pollSanitizationJob(file, body.id);
       void pollSanitizationJob(file, body.id);
+      return { id: body.id, status: "queued", phase: "queued", processed_bytes: 0, total_bytes: file.size_bytes, lines_processed: 0 };
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Bereinigung konnte nicht gestartet werden.");
+      return null;
     }
   }
 
-  async function pollSanitizationJob(file: ImportedFile, jobId: string): Promise<void> {
-    if (!selectedProject) return;
+  async function pollSanitizationJob(file: ImportedFile, jobId: string): Promise<SanitizationJob | null> {
+    if (!selectedProject) return null;
     try {
       const url = `/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs/${encodeURIComponent(jobId)}`;
       const response = await apiFetch(url);
@@ -264,7 +271,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       setSanitizationJobs(current => ({ ...current, [file.id]: body }));
       if (["queued", "running", "cancelling"].includes(body.status)) {
         await new Promise(resolve => window.setTimeout(resolve, 500));
-        return pollSanitizationJob(file, jobId);
+        return await pollSanitizationJob(file, jobId);
       }
       if (body.status === "completed") {
         setImportMessage(`Bereinigung für ${file.display_name} abgeschlossen und validiert: ${body.result?.output_bytes.toLocaleString("de-DE")} Byte Ausgabe, ${body.result?.replacements} Ersetzungen.`);
@@ -273,13 +280,70 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       } else if (body.error) {
         setError(body.error);
       }
+      return body;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Fortschritt konnte nicht gelesen werden.");
+      return null;
     }
+  }
+
+  async function startBatchSanitization() {
+    if (!selectedProject || batchRunning) return;
+    const batchFiles = importedFiles.filter(file => selectedFileIds.includes(file.id));
+    if (!batchFiles.length) return;
+    const invalidFile = batchFiles.find(file =>
+      !outputPaths[file.id]?.trim() ||
+      !["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") ||
+      Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
+    );
+    if (invalidFile) {
+      setError(`Bitte prüfe Format, Ausgabepfad und Laufstatus für „${invalidFile.display_name}“.`);
+      return;
+    }
+    const normalizedPaths = batchFiles.map(file =>
+      outputPaths[file.id].trim().replaceAll(String.fromCharCode(92), "/").toLocaleLowerCase("en-US")
+    );
+    if (new Set(normalizedPaths).size !== normalizedPaths.length) {
+      setError("Jede Datei benötigt einen eigenen Ausgabepfad. Doppelte Ziele wurden vor dem Start abgewiesen.");
+      return;
+    }
+
+    setError("");
+    setBatchRunning(true);
+    batchStopRequestedRef.current = false;
+    let completed = 0;
+    let failed = 0;
+    let cancelled = 0;
+    try {
+      for (let index = 0; index < batchFiles.length; index += 1) {
+        if (batchStopRequestedRef.current) break;
+        const file = batchFiles[index];
+        setBatchProgress({ current: index + 1, total: batchFiles.length, fileId: file.id, fileName: file.display_name });
+        const result = await startSanitization(file, true);
+        if (result?.status === "completed") completed += 1;
+        else if (result?.status === "cancelled") {
+          cancelled += 1;
+          batchStopRequestedRef.current = true;
+        } else failed += 1;
+      }
+      const notStarted = batchFiles.length - completed - failed - cancelled;
+      setImportMessage(`Mehrdatei-Lauf beendet: ${completed} erfolgreich validiert, ${failed} fehlgeschlagen, ${cancelled} abgebrochen, ${notStarted} nicht gestartet. Jede erfolgreiche Datei ist einzeln in Prüfung & Verlauf verfügbar.`);
+      setSelectedFileIds([]);
+    } finally {
+      setBatchRunning(false);
+      setBatchProgress(null);
+    }
+  }
+
+  function stopBatchSanitization() {
+    batchStopRequestedRef.current = true;
+    const currentFile = batchProgress && importedFiles.find(file => file.id === batchProgress.fileId);
+    if (currentFile) void cancelSanitization(currentFile);
   }
 
   async function cancelSanitization(file: ImportedFile) {
     if (!selectedProject) return;
+    if (batchRunning) batchStopRequestedRef.current = true;
     const job = sanitizationJobs[file.id];
     if (!job || !["queued", "running"].includes(job.status)) return;
     try {
@@ -347,6 +411,19 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       setError(cause instanceof Error ? cause.message : "Unbekannter Fehler beim Öffnen.");
     }
   }
+
+  const selectableFiles = importedFiles.filter(file =>
+    ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
+  );
+  const selectedBatchFiles = importedFiles.filter(file => selectedFileIds.includes(file.id));
+  const batchHasDuplicateOutputs = new Set(selectedBatchFiles.map(file =>
+    (outputPaths[file.id] || "").trim().replaceAll(String.fromCharCode(92), "/").toLocaleLowerCase("en-US")
+  )).size !== selectedBatchFiles.length;
+  const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
+    outputPaths[file.id]?.trim() && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
+  ) && !batchHasDuplicateOutputs;
 
   return <main className="app-shell">
     <header className="topbar">
@@ -429,9 +506,23 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         {importMessage && <p className="success-message" role="status">{importMessage}</p>}
         {importIssues.length > 0 && <div className="import-issues" aria-label="Übersprungene Einträge"><h4>Übersprungene Einträge ({importIssues.length})</h4><ul>{importIssues.map((issue, index) => <li key={`${issue.file_name}-${index}`}><strong>{issue.file_name}</strong>: {issue.reason}</li>)}</ul></div>}
         <div className="section-heading file-list-heading"><h4>Registrierte Dateien ({importedFiles.length})</h4><button className="secondary-button" type="button" onClick={() => void loadImportedFiles(selectedProject.id)}>Liste aktualisieren</button></div>
+        {importedFiles.length > 0 && <div className="batch-toolbar" aria-label="Mehrdatei-Bereinigung">
+          <div className="batch-selection-actions">
+            <button className="secondary-button" type="button" onClick={() => setSelectedFileIds(selectableFiles.map(file => file.id))} disabled={batchRunning || selectableFiles.length === 0}>Geeignete auswählen ({selectableFiles.length})</button>
+            <button className="secondary-button" type="button" onClick={() => setSelectedFileIds([])} disabled={batchRunning || selectedFileIds.length === 0}>Auswahl aufheben</button>
+            <span>{selectedFileIds.length} ausgewählt</span>
+          </div>
+          <button className="primary-button" type="button" onClick={() => void startBatchSanitization()} disabled={batchRunning || !batchReady}>Ausgewählte Dateien nacheinander bereinigen</button>
+          <p className="field-help">Für jede Datei müssen Format und eigener Ausgabepfad festgelegt sein. Die Verarbeitung läuft nacheinander; Projekt-Mappings bleiben dateiübergreifend identisch.</p>
+        </div>}
+        {batchRunning && batchProgress && <div className="batch-progress" role="status">
+          <strong>Mehrdatei-Lauf · Datei {batchProgress.current} von {batchProgress.total}</strong>
+          <span>Aktuell: {batchProgress.fileName}</span>
+          <button className="secondary-button" type="button" onClick={stopBatchSanitization}>Stapel abbrechen</button>
+        </div>}
         {importedFiles.length === 0 ? <p className="muted-message">Noch keine Dateien registriert.</p> : <ul className="registered-file-list">{importedFiles.map(file => <li className="registered-file-card" key={file.id}>
           <div className="file-card-heading">
-            <div className="file-title"><strong>{file.display_name}</strong><span className={file.state === "registered" ? "file-state file-state-ready" : "file-state"}>{file.state === "registered" ? "Registriert" : file.state}</span></div>
+            <div className="file-title"><label className="batch-file-select"><input type="checkbox" aria-label={`Für Stapel auswählen: ${file.display_name}`} checked={selectedFileIds.includes(file.id)} disabled={batchRunning || !selectableFiles.some(item => item.id === file.id)} onChange={event => setSelectedFileIds(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><strong>{file.display_name}</strong></label><span className={file.state === "registered" ? "file-state file-state-ready" : "file-state"}>{file.state === "registered" ? "Registriert" : file.state}</span></div>
             <span className="file-size">{file.size_bytes.toLocaleString("de-DE")} Byte</span>
           </div>
           <div className="file-format-summary">
@@ -460,7 +551,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
             <label>Ausgabepfad
               <input aria-label={`Ausgabepfad für ${file.display_name}`} value={outputPaths[file.id] || ""} onChange={event => setOutputPaths(current => ({ ...current, [file.id]: event.target.value }))} placeholder="Absoluter neuer Zielpfad" maxLength={4096} />
             </label>
-            <button className="primary-button file-sanitize-button" type="button" onClick={() => void startSanitization(file)} disabled={!outputPaths[file.id]?.trim() || !["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") || Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))}>Bereinigung starten</button>
+            <button className="primary-button file-sanitize-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !outputPaths[file.id]?.trim() || !["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") || Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))}>Bereinigung starten</button>
           </div>
           {loadingProfiles && <p className="field-help">Quellprofile werden geladen …</p>}
           {sanitizationJobs[file.id] && <div className="job-status" role="status"><strong>{({ queued: "Wartet", running: "Läuft", cancelling: "Abbruch angefordert", completed: "Abgeschlossen", failed: "Fehlgeschlagen", cancelled: "Abgebrochen" } as Record<string, string>)[sanitizationJobs[file.id].status]}</strong><span>Phase: {sanitizationJobs[file.id].phase} · {sanitizationJobs[file.id].processed_bytes.toLocaleString("de-DE")} / {sanitizationJobs[file.id].total_bytes.toLocaleString("de-DE")} Byte · {sanitizationJobs[file.id].lines_processed.toLocaleString("de-DE")} Zeilen</span>{["queued", "running"].includes(sanitizationJobs[file.id].status) && <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button>}{sanitizationJobs[file.id].error && <p className="error-message">{sanitizationJobs[file.id].error}</p>}{sanitizationJobs[file.id].status === "completed" && <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfung & Verlauf öffnen</button>}</div>}
