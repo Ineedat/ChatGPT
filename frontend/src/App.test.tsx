@@ -353,6 +353,7 @@ describe("multi-file project sanitization workflow", () => {
       if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
       if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
       if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
+      if (method === "PUT" && url.endsWith("/output-directory")) return { ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response;
       if (method === "POST" && url.endsWith("/file-one/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-one" }) } as Response;
       if (method === "POST" && url.endsWith("/file-two/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-two" }) } as Response;
       if (url.endsWith("/file-one/sanitize-jobs/job-one") || url.endsWith("/file-two/sanitize-jobs/job-two")) {
@@ -367,8 +368,9 @@ describe("multi-file project sanitization workflow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für first.log" }), { target: { value: "/tmp/first.clean.log" } });
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für second.log" }), { target: { value: "/tmp/second.clean.log" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
@@ -404,13 +406,15 @@ describe("multi-file project sanitization workflow", () => {
       if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
       if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
       if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
+      if (url.endsWith("/output-directory")) return { ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response;
       return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für first.log" }), { target: { value: "/tmp/shared.clean.log" } });
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabepfad für second.log" }), { target: { value: "/tmp/shared.clean.log" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
