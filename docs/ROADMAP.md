@@ -219,4 +219,4 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Gemeinsame Lade-, Fehler- und Erfolgsbehandlung; registrierte Dateien werden anhand ihrer IDs zusammengeführt, Ordner-Duplikate und übersprungene Einträge bleiben sichtbar.
 - [x] Rekursive Suche wird nur bei Ordnerauswahl eingeblendet; das bestehende Limit von 5.000 Kandidaten bleibt bestehen.
 - [x] Browser-Dateiauswahl für Einzel-/Mehrfachdateien und Ordnerauswahl integriert; relative Unterordnerstruktur bleibt erhalten.
-- [x] Backend- und Frontend-Regressionstests für Upload, Pfad-Traversal und Größenlimit ergänzt.\n- [ ] CI und visuelle Abnahme auf Windows/Linux durchführen.
+- [x] Backend- und Frontend-Regressionstests für Upload, Pfad-Traversal und Größenlimit ergänzt.\n- [x] Automatisierte CI auf Linux und Windows sowie Frontend-Tests und Build erfolgreich; Windows prüft zusätzlich Projekt- und Upload-Endpunkte.\n- [ ] Visuelle Abnahme auf realen Windows-/Linux-Bildschirmen (externe manuelle Prüfung).
