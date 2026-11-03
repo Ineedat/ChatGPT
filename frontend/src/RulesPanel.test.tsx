@@ -107,13 +107,16 @@ describe("rule editor", () => {
   });
 
   it("discards an uncommitted rule draft before allowing source-profile creation", async () => {
-    const saved = { ...initialConfig, profiles: [] };
+    let saved = { ...initialConfig, profiles: [] as { id: string; name: string; source_hint: string | null }[] };
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
       if (url === "/api/rules/config/validate") return { ok: true, json: async () => ({ valid: true, conflicts: [] }) } as Response;
-      if (url === "/api/rules/config" && init?.method === "PUT") return { ok: true, json: async () => JSON.parse(String(init.body)) } as Response;
+      if (url === "/api/rules/config" && init?.method === "PUT") {
+        saved = JSON.parse(String(init.body));
+        return { ok: true, json: async () => saved } as Response;
+      }
       return { ok: true, json: async () => ({}) } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -125,7 +128,9 @@ describe("rule editor", () => {
     fireEvent.change(screen.getByLabelText("Profilname"), { target: { value: "Webserver" } });
     fireEvent.click(screen.getByRole("button", { name: "Profil speichern" }));
     expect(await screen.findByText(/Quellprofil „Webserver“ wurde gespeichert/)).toBeInTheDocument();
-    expect(saved.profiles).toHaveLength(0);
+    expect(saved.profiles).toHaveLength(1);
+    expect(saved.profiles[0].name).toBe("Webserver");
+    expect(saved.rules).toHaveLength(0);
     expect(fetchMock).toHaveBeenCalledWith("/api/rules/config", expect.objectContaining({ method: "PUT" }));
   });
 
