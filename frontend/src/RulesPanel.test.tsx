@@ -109,6 +109,7 @@ describe("rule editor", () => {
   it("discards an uncommitted rule draft before allowing source-profile creation", async () => {
     let saved = { ...initialConfig, profiles: [] as { id: string; name: string; source_hint: string | null }[] };
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
@@ -162,4 +163,31 @@ describe("rule editor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Profil speichern" }));
     expect(await screen.findByText(/Quellprofil „Apache Webserver“ wurde gespeichert/)).toBeInTheDocument();
     expect(saved.profiles[0].name).toBe("Apache Webserver");
+    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    expect(await screen.findByText("Quellprofil wurde gelöscht.")).toBeInTheDocument();
+    expect(saved.profiles).toHaveLength(0);
+    expect(confirm).toHaveBeenCalledWith("Quellprofil „Apache Webserver“ wirklich löschen?");
   });
+
+
+it("prevents deleting a source profile that is still referenced by a rule", async () => {
+  const saved = {
+    ...initialConfig,
+    rules: initialConfig.rules.map(rule => ({ ...rule, profile_id: "nginx" }))
+  };
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
+    if (url === "/api/rules/config/validate") return { ok: true, json: async () => ({ valid: true, conflicts: [] }) } as Response;
+    return { ok: true, json: async () => saved } as Response;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<RulesPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: /Quellprofile/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+  expect(await screen.findByText(/Das Profil wird noch von Regeln verwendet/)).toBeInTheDocument();
+  expect(confirm).not.toHaveBeenCalled();
+  expect(fetchMock).not.toHaveBeenCalledWith("/api/rules/config", expect.objectContaining({ method: "PUT" }));
+  expect(saved.profiles).toHaveLength(1);
+});
