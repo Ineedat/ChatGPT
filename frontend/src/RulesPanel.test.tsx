@@ -109,7 +109,6 @@ describe("rule editor", () => {
   it("discards an uncommitted rule draft before allowing source-profile creation", async () => {
     let saved = { ...initialConfig, profiles: [] as { id: string; name: string; source_hint: string | null }[] };
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
@@ -140,6 +139,7 @@ describe("rule editor", () => {
 
   it("creates and edits source profiles with immediate persistence", async () => {
     let saved = { ...initialConfig, profiles: [] as { id: string; name: string; source_hint: string | null }[] };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
