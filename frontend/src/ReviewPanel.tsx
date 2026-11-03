@@ -69,7 +69,7 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
   const [compareError, setCompareError] = useState("");
   const originalComparePane = useRef<HTMLPreElement>(null);
   const sanitizedComparePane = useRef<HTMLPreElement>(null);
-  const syncingCompareScroll = useRef(false);
+  const compareRequestSequence = useRef(0);
   const [queue, setQueue] = useState<ReviewRun[]>([]);
   const [history, setHistory] = useState<ReviewRun[]>([]);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -152,14 +152,12 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
   }, [selectedRun?.status, selectedRun?.id, roles]);
 
   function syncCompareScroll(source: "original" | "sanitized") {
-    if (syncingCompareScroll.current) return;
     const from = source === "original" ? originalComparePane.current : sanitizedComparePane.current;
     const to = source === "original" ? sanitizedComparePane.current : originalComparePane.current;
-    if (!from || !to) return;
-    syncingCompareScroll.current = true;
+    if (!from || !to || Math.abs(to.scrollTop - from.scrollTop) < 1) return;
+    // Keep the same vertical position; horizontal navigation intentionally stays independent.
+    // The equality guard prevents the reciprocal scroll event from creating a feedback loop.
     to.scrollTop = from.scrollTop;
-    to.scrollLeft = from.scrollLeft;
-    syncingCompareScroll.current = false;
   }
 
   function renderCompareLines(
@@ -203,15 +201,22 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
   }
 
   async function loadComparePreview(runId: string, originalOffset = 0, outputOffset = 0) {
+    const requestId = ++compareRequestSequence.current;
     setCompareLoading(true); setCompareError(""); setComparePreview(null);
     try {
       const params = new URLSearchParams({ original_offset: String(originalOffset), output_offset: String(outputOffset) });
       const response = await reviewFetch(`/api/reviews/runs/${encodeURIComponent(runId)}/compare-preview?${params}`);
       const body = await response.json() as ComparePreview & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Dateivergleich konnte nicht geladen werden.");
-      setComparePreview(body);
-    } catch (cause) { setComparePreview(null); setCompareError(cause instanceof Error ? cause.message : "Dateivergleich konnte nicht geladen werden."); }
-    finally { setCompareLoading(false); }
+      if (requestId === compareRequestSequence.current) setComparePreview(body);
+    } catch (cause) {
+      if (requestId === compareRequestSequence.current) {
+        setComparePreview(null);
+        setCompareError(cause instanceof Error ? cause.message : "Dateivergleich konnte nicht geladen werden.");
+      }
+    } finally {
+      if (requestId === compareRequestSequence.current) setCompareLoading(false);
+    }
   }
 
   function openRunForInspection(run: ReviewRun) {
@@ -380,7 +385,8 @@ export function ReviewPanel({ roles, onBackToProject, selectedProject }: { roles
     {message && <p className="success-message" role="status">{message}</p>}
     {activeView === "inspect" && <section className="review-section" aria-label="Projektdateien zur Prüfung">
       <div className="section-heading"><h3>Dateien im Projekt {selectedProject?.name || ""}</h3><span className="field-help">{projectFiles.length} registrierte Dateien</span></div>
-      {!selectedProject ? <p className="muted-message">Bitte zuerst ein Projekt öffnen, um dessen Dateien zu prüfen.</p> : projectFiles.length === 0 ? <p className="muted-message">In diesem Projekt sind noch keine Dateien registriert.</p> : <div className="review-project-files"><table><thead><tr><th>Datei</th><th>Größe</th><th>Letzter Lauf</th><th>Status</th><th></th></tr></thead><tbody>{projectFiles.map(file => { const run = history.find(item => item.file_id === file.id); return <tr key={file.id}><td>{file.relative_path || file.display_name}</td><td>{file.size_bytes.toLocaleString("de-DE")} Byte</td><td>{run ? new Date(run.created_at).toLocaleString("de-DE") : "–"}</td><td>{run ? statusLabel(run.status) : file.state === "approved" ? "Freigegeben" : "Noch nicht bereinigt"}</td><td>{run && canReview && ["pending_review", "returned", "approved", "approved_with_exception"].includes(run.status) ? <button className="secondary-button" type="button" onClick={() => openRunForInspection(run)}>Dateien vergleichen</button> : <span className="field-help">Keine prüfbare Ausgabe</span>}</td></tr>; })}</tbody></table></div>}
+      {!selectedProject ? <p className="muted-message">Bitte zuerst ein Projekt öffnen, um dessen Dateien zu prüfen.</p> : projectFiles.length === 0 ? <p className="muted-message">In diesem Projekt sind noch keine Dateien registriert.</p> : <div className="review-project-files"><table><thead><tr><th>Datei</th><th>Größe</th><th>Letzter Lauf</th><th>Status</th><th></th></tr></thead><tbody>{projectFiles.map(file => { const run = history.find(item => item.file_id === file.id); const approved = file.state === "approved" || run?.status === "approved" || run?.status === "approved_with_exception"; const statusText = approved ? (run?.status === "approved_with_exception" ? "Freigegeben (Ausnahme) · gesperrt" : "Freigegeben · gesperrt") : run ? statusLabel(run.status) : "Noch nicht bereinigt"; return <tr key={file.id}><td>{file.relative_path || file.display_name}</td><td>{file.size_bytes.toLocaleString("de-DE")} Byte</td><td>{run ? new Date(run.created_at).toLocaleString("de-DE") : "–"}</td><td><span className={approved ? "review-file-status review-file-status-approved" : "review-file-status"} title={approved ? "Freigabe ist endgültig. Formatänderung und weitere Bereinigung sind gesperrt." : statusText}>{statusText}</span></td><td>{run && canReview && ["pending_review", "returned", "approved", "approved_with_exception"].includes(run.status) ? <button className="secondary-button" type="button" onClick={() => openRunForInspection(run)}>Dateien vergleichen</button> : <span className="field-help">Keine prüfbare Ausgabe</span>}</td></tr>; })}</tbody></table></div>}
+      {projectFiles.some(file => file.state === "approved") && <p className="review-approved-notice" role="note">Freigegebene Dateien sind gesperrt: Formatänderung, erneute Erkennung und weitere Bereinigung sind nicht möglich. Für eine neue Bearbeitung muss eine neue Quelldatei registriert werden.</p>}
     </section>}
     {activeView === "queue" && canReview && <section className="review-section" aria-label="Prüfer-Warteschlange">
       <div className="section-heading"><h3>Warteschlange ({queue.length})</h3><span className="field-help">Bewusste Freigabe erforderlich</span></div>

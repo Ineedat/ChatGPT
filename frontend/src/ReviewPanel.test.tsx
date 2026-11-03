@@ -5,6 +5,33 @@ import { ReviewPanel } from "./ReviewPanel";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+
+  it("marks approved project files as locked while keeping their comparison available", async () => {
+    const approvedRun = { ...run, status: "approved" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [approvedRun] } as Response;
+      if (url === "/api/projects/project-1/files") return { ok: true, json: async () => [{
+        id: "file-1", display_name: "app.log", relative_path: "logs/app.log", size_bytes: 100, state: "approved"
+      }] } as Response;
+      if (url === "/api/reviews/queue" || url === "/api/reviews/saved-searches" || url === "/api/reviews/audit?limit=50") return { ok: true, json: async () => [] } as Response;
+      if (url.includes("/compare-preview")) return { ok: true, json: async () => ({
+        original: { content: "secret=alpha\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 13 },
+        sanitized: { content: "REDACTED\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 9 },
+        original_changed_lines: [1], sanitized_changed_lines: [1],
+        original_changed_spans: [{ line_number: 1, start: 0, end: 12 }],
+        sanitized_changed_spans: [{ line_number: 1, start: 0, end: 8 }]
+      }) } as Response;
+      return { ok: true, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["reviewer"]} selectedProject={{ id: "project-1", name: "Testprojekt" }} />);
+    expect(await screen.findByText("Freigegeben · gesperrt")).toBeInTheDocument();
+    expect(screen.getByText(/Formatänderung, erneute Erkennung und weitere Bereinigung sind nicht möglich/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dateien vergleichen" }));
+    expect(await screen.findByRole("heading", { name: "Original" })).toBeInTheDocument();
+  });
+
 });
 
 const run = {
@@ -203,7 +230,12 @@ describe("project file comparison view", () => {
     const originalPane = document.querySelector(".review-compare-pane pre") as HTMLPreElement;
     const sanitizedPane = document.querySelectorAll(".review-compare-pane pre")[1] as HTMLPreElement;
     originalPane.scrollTop = 120;
+    originalPane.scrollLeft = 45;
     fireEvent.scroll(originalPane);
     expect(sanitizedPane.scrollTop).toBe(120);
+    expect(sanitizedPane.scrollLeft).toBe(0);
+    sanitizedPane.scrollLeft = 70;
+    fireEvent.scroll(sanitizedPane);
+    expect(originalPane.scrollLeft).toBe(45);
   });
 });

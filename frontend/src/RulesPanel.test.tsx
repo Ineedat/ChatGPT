@@ -105,6 +105,30 @@ describe("rule editor", () => {
     expect(screen.getByLabelText("Platzhalter-Präfix")).toHaveValue("IP");
     expect(screen.getByRole("button", { name: "Konfiguration speichern" })).toBeEnabled();
   });
+
+  it("discards an uncommitted rule draft before allowing source-profile creation", async () => {
+    const saved = { ...initialConfig, profiles: [] };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/rules/config" && init?.method !== "PUT") return { ok: true, json: async () => saved } as Response;
+      if (url === "/api/rules/config/validate") return { ok: true, json: async () => ({ valid: true, conflicts: [] }) } as Response;
+      if (url === "/api/rules/config" && init?.method === "PUT") return { ok: true, json: async () => JSON.parse(String(init.body)) } as Response;
+      return { ok: true, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<RulesPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Neue Regel" }));
+    fireEvent.change(screen.getByLabelText("Regelname"), { target: { value: "Noch nicht übernommene Regel" } });
+    fireEvent.click(screen.getByRole("button", { name: /Quellprofile/ }));
+    expect(confirm).toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Profilname"), { target: { value: "Webserver" } });
+    fireEvent.click(screen.getByRole("button", { name: "Profil speichern" }));
+    expect(await screen.findByText(/Quellprofil „Webserver“ wurde gespeichert/)).toBeInTheDocument();
+    expect(saved.profiles).toHaveLength(0);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rules/config", expect.objectContaining({ method: "PUT" }));
+  });
+
 });
 
   it("creates and edits source profiles with immediate persistence", async () => {

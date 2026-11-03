@@ -59,7 +59,14 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
       .finally(() => setLoading(false));
   }, []);
 
-  function confirmDiscardDraft() { return !draftDirty || window.confirm("Nicht übernommene Regeländerungen verwerfen?"); }
+  function confirmDiscardDraft() {
+    if (!draftDirty) return true;
+    if (!window.confirm("Nicht übernommene Regeländerungen verwerfen?")) return false;
+    const current = config.rules.find(rule => rule.id === selectedId);
+    setDraft(current ? { ...current } : emptyRule());
+    setDraftDirty(false);
+    return true;
+  }
   function selectRule(rule: SanitizationRule) { if (!confirmDiscardDraft()) return; setSelectedId(rule.id); setDraft({ ...rule }); setDraftDirty(false); setMessage(""); }
   function updateDraft<K extends keyof SanitizationRule>(key: K, value: SanitizationRule[K]) {
     setDraft(current => ({ ...current, [key]: value })); setDraftDirty(true); setMessage(""); setError("");
@@ -148,6 +155,26 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Speichern fehlgeschlagen."); }
     finally { setSaving(false); }
   }
+  async function discardChanges() {
+    if (!window.confirm("Alle nicht gespeicherten Regel- und Profiländerungen verwerfen?")) return;
+    setSaving(true); setError(""); setMessage(""); setConflicts([]);
+    try {
+      const response = await request("/api/rules/config");
+      if (!response.ok) throw new Error("Gespeicherte Regelkonfiguration konnte nicht erneut geladen werden.");
+      const fresh = await response.json() as RuleConfig;
+      setConfig(fresh);
+      const first = fresh.rules[0];
+      setSelectedId(first?.id || "");
+      setDraft(first ? { ...first } : emptyRule());
+      setDraftDirty(false); setDirty(false);
+      setProfileDraft({ id: "", name: "", source_hint: "" });
+      setImportPreview(null);
+      setMessage("Nicht gespeicherte Änderungen wurden verworfen.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Änderungen konnten nicht verworfen werden.");
+    } finally { setSaving(false); }
+  }
+
   function addTemplate(template: RuleTemplate) {
     if (!confirmDiscardDraft()) return;
     const id = makeId(template.id, config.rules.map(rule => rule.id));
@@ -216,7 +243,7 @@ export function RulesPanel({ onBackToProject }: { onBackToProject?: () => void }
   if (loading) return <section className="rules-page"><p role="status">Regelkonfiguration wird geladen …</p></section>;
   if (loadFailed) return <section className="rules-page"><h2>Bereinigungsregeln</h2><p className="error-message" role="alert">{error || "Regelkonfiguration konnte nicht geladen werden."} Die bestehende Konfiguration bleibt unverändert; Speichern ist deaktiviert.</p></section>;
   return <section className="rules-page">
-    <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Regeländerungen werden nach dem Speichern aktiv; Quellprofile werden separat gespeichert.</p></div><div className="rule-actions">{onBackToProject && <button className="secondary-button" type="button" onClick={onBackToProject}>Zurück zum Projekt</button>}<button className="secondary-button" type="button" onClick={exportConfig} disabled={draftDirty}>JSON exportieren</button><button className="secondary-button" type="button" onClick={() => importInput.current?.click()}>JSON importieren</button><input ref={importInput} type="file" accept="application/json,.json" hidden onChange={event => void inspectImport(event.target.files?.[0])} /><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div></div>
+    <div className="rules-heading"><div><p className="eyebrow">REGELVERWALTUNG</p><h2>Bereinigungsregeln</h2><p>Globale Regeln und Regeln für bestimmte Quellprofile. Regeländerungen werden nach dem Speichern aktiv; Quellprofile werden separat gespeichert.</p></div><div className="rule-actions">{onBackToProject && <button className="secondary-button" type="button" onClick={onBackToProject}>Zurück zum Projekt</button>}{(dirty || draftDirty) && <button className="secondary-button" type="button" onClick={() => void discardChanges()} disabled={saving}>Änderungen verwerfen</button>}<button className="secondary-button" type="button" onClick={exportConfig} disabled={draftDirty}>JSON exportieren</button><button className="secondary-button" type="button" onClick={() => importInput.current?.click()}>JSON importieren</button><input ref={importInput} type="file" accept="application/json,.json" hidden onChange={event => void inspectImport(event.target.files?.[0])} /><button className="primary-button" type="button" onClick={() => void persist()} disabled={!dirty || draftDirty || saving}>{saving ? "Prüft und speichert …" : "Konfiguration speichern"}</button></div></div>
     <nav className="rules-tabs" aria-label="Regelverwaltung"><button className={section === "rules" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("rules"); }}>Regeln ({config.rules.length})</button><button className={section === "library" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("library"); }}>Vorlagenbibliothek</button><button className={section === "profiles" ? "active" : ""} onClick={() => { if (confirmDiscardDraft()) setSection("profiles"); }}>Quellprofile ({config.profiles.length})</button><button className={section === "test" ? "active" : ""} onClick={() => setSection("test")}>Regeltest & Vorschau</button></nav>
     {error && <p className="error-message" role="alert">{error}</p>}
     {message && <p className="success-message" role="status">{message}</p>}

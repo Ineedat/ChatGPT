@@ -766,3 +766,85 @@ input:not([type=checkbox]):not([type=file]), select, textarea { min-width: 0; }
   background: #ccebd1;
   box-shadow: inset 0 -2px #17652a;
 }
+
+
+/* Review workspace contrast and approval state: final overrides for the Windows-like light UI. */
+.review-section label,
+.review-section .section-heading,
+.review-section h3,
+.review-section h4,
+.review-project-files td,
+.review-details dd,
+.review-run-list strong,
+.review-run-list span,
+.audit-list strong,
+.audit-list span {
+  color: #202020;
+}
+.review-section input:not([type="checkbox"]),
+.review-section select,
+.review-section textarea {
+  color: #202020 !important;
+  background: #ffffff !important;
+  border-color: #767676 !important;
+}
+.review-section input::placeholder,
+.review-section textarea::placeholder {
+  color: #595959 !important;
+  opacity: 1;
+}
+.review-view-tabs {
+  background: #f0f0f0;
+  border-color: #9a9a9a;
+}
+.review-view-tabs button { color: #303030; }
+.review-view-tabs button.active {
+  color: #102a43;
+  background: #dceaf8;
+  outline: 1px solid #7a9dbb;
+}
+.review-compare-pane,
+.review-compare-pane pre {
+  background: #ffffff !important;
+  color: #202020 !important;
+  border-color: #767676;
+}
+.review-compare-pane h4,
+.review-compare-pane .field-help {
+  color: #202020 !important;
+}
+.review-compare-pane pre span,
+.review-compare-pane pre mark {
+  color: #202020 !important;
+}
+.review-compare-mark-original,
+.review-compare-changed-original {
+  background: #ffe49a !important;
+  color: #202020 !important;
+}
+.review-compare-mark-sanitized,
+.review-compare-changed-sanitized {
+  background: #ccebd1 !important;
+  color: #202020 !important;
+}
+.review-file-status {
+  display: inline-block;
+  color: #303030;
+  font-weight: 600;
+}
+.review-file-status-approved {
+  padding: 2px 6px;
+  border: 1px solid #477b50;
+  border-radius: 4px;
+  background: #e5f3e7;
+  color: #174d25 !important;
+  white-space: nowrap;
+}
+.review-approved-notice {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid #8a6500;
+  background: #fff4d6;
+  color: #3d310f;
+  font-size: 10px;
+}
