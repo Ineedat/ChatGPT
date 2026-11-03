@@ -130,7 +130,8 @@ describe("rule editor", () => {
     expect(await screen.findByText(/Quellprofil „Webserver“ wurde gespeichert/)).toBeInTheDocument();
     expect(saved.profiles).toHaveLength(1);
     expect(saved.profiles[0].name).toBe("Webserver");
-    expect(saved.rules).toHaveLength(0);
+    expect(saved.rules).toHaveLength(1);
+    expect(saved.rules[0].id).toBe("ipv4");
     expect(fetchMock).toHaveBeenCalledWith("/api/rules/config", expect.objectContaining({ method: "PUT" }));
   });
 
