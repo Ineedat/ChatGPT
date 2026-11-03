@@ -214,6 +214,10 @@ def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, mo
         event = next(item for item in events if item["action"] == "approve")
         assert event["exception_reason"] == "Manuell geprüft; dokumentierte fachliche Ausnahme."
 
+        project_files = client.get(f"/api/projects/{response.json()['project_id']}/files")
+        assert project_files.status_code == 200
+        assert project_files.json()[0]["state"] == "approved"
+
 
 def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(tmp_path, monkeypatch):
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
