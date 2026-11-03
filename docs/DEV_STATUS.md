@@ -1,11 +1,11 @@
 # Entwicklungsstand — Übergabe für den nächsten Chat
 
-Stand: 2026-11-01
+Stand: 2026-11-03
 Repository: `Ineedat/ChatGPT`
 Arbeitsbranch: `feature/project-management-sqlite`
 Pull Request: [#2](https://github.com/Ineedat/ChatGPT/pull/2) — offen, nicht gemergt
-Letzter Code-Commit: `3090d30aa304095dbe6f1666a258a7704b545325`
-Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Regex-Such-Erweiterung aktualisiert
+Letzter Code-Commit: `f6af8fc9bae42a85fe37cec7b6b756034c4679a6`
+Letzter Übergabe-/Dokumentationsstand: Review-Arbeitsbereich und Quellprofilverwaltung stabilisiert; CI vollständig erfolgreich
 
 ## Projektleitplanken
 
@@ -235,4 +235,20 @@ Letzter Übergabe-/Dokumentationsstand: Dokumentation wird mit der aktuellen Reg
 - Warteschlange, Dateiprüfung und Prüfverlauf sind jetzt getrennte Ansichten innerhalb der Prüfoberfläche. Das Audit-Protokoll befindet sich im Prüfverlauf.
 - Die Benutzerverwaltung zeigt die Anlage nicht mehr inline in der Benutzerliste. „Neuen Benutzer anlegen“ öffnet eine separate Ansicht; nach erfolgreicher Anlage kehrt die Oberfläche zur Liste zurück.
 - Regressionstests ergänzt: Quellprofil anlegen/bearbeiten, separate Benutzeranlage, Projektdateiliste und Dateivergleich, rollenbeschränkter Vergleichsendpunkt sowie Navigation über große Dateien.
-- **CI-Verifizierung dieses Stands steht noch aus.** Die bisherigen grünen CI-Läufe gelten nicht für diese Änderungen. PR #2 bleibt offen und ungemergt.
+- Die Änderungen dieses Abschnitts wurden im CI-Lauf [41677942384](https://github.com/Ineedat/ChatGPT/actions/runs/41677942384) vollständig erfolgreich geprüft; Details siehe Stabilisierung vom 2026-11-03.
+
+
+## Review-Arbeitsbereich und Quellprofile — Stabilisierung (2026-11-03)
+
+- Vergleichsansicht: vertikales Scrollen der Original- und Ausgabeansicht wieder synchronisiert; horizontales Scrollen bleibt bewusst unabhängig.
+- Asynchrone Vergleichsabfragen erhalten eine Sequenzkennung. Später gestartete Anfragen können nicht mehr durch verspätete Antworten älterer Dateiauswahlen überschrieben werden.
+- Kontrast der Prüfansicht, Eingabefelder und Vergleichsfenster auf helle Windows-orientierte Flächen mit dunkler Schrift festgelegt; Fundstellen und Ersetzungen bleiben gelb bzw. grün hervorgehoben.
+- Freigegebene Dateien werden in der Projektdateiliste ausdrücklich als „Freigegeben · gesperrt“ gekennzeichnet. Der Sperrhinweis erklärt, dass Formatänderung, erneute Erkennung und weitere Bereinigung blockiert sind; die Vergleichsansicht bleibt für freigegebene Läufe verfügbar.
+- Quellprofilverwaltung: bestätigtes Verwerfen eines offenen Regelentwurfs setzt den Entwurf tatsächlich zurück. Eine eigene Aktion verwirft sämtliche ungespeicherten Konfigurationsänderungen und lädt den gespeicherten Stand neu.
+- Regressionstests prüfen Quellprofil-Anlage, Bearbeitung, Löschung, Schutz verwendeter Profile sowie die getrennte Speicherung nach Verwerfen eines Regelentwurfs.
+- Vergleichsregressionen prüfen vertikale Synchronisierung und unabhängige horizontale Navigation; Freigabestatus und Sperrhinweis sind ebenfalls abgedeckt.
+- CI-Lauf [41677942384](https://github.com/Ineedat/ChatGPT/actions/runs/41677942384) vollständig erfolgreich:
+  - Frontend: 38 Tests erfolgreich; TypeScript-/Vite-Produktionsbuild erfolgreich.
+  - Backend Linux: 122 passed, 1 skipped; Ruff ohne Befund.
+  - Backend Windows: 23 gezielte Projekt-/Mappingtests passed; Ruff ohne Befund.
+- PR #2 bleibt offen und ungemergt. Die visuelle Abnahme auf echter Windows-/Linux-Zielhardware sowie die Air-Gap-Integration mit LDAP/AD, TLS und SMTP bleiben externe Abnahmepunkte.

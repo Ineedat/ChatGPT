@@ -244,3 +244,17 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] Erfolgreiche Dateien erzeugen weiterhin eigene validierte Review-Läufe; Freigabe bleibt pro Datei getrennt.
 - [x] Offline-Hilfe und Frontend-Regressionen für Reihenfolge und doppelte Ausgabeziele ergänzt.
 - [x] Push-/PR-CI für den Mehrdateiablauf vollständig erfolgreich: Push-Lauf [41324254157](https://github.com/Ineedat/ChatGPT/actions/runs/41324254157) und PR-Lauf [41324257605](https://github.com/Ineedat/ChatGPT/actions/runs/41324257605), alle drei Jobs jeweils grün.
+
+
+## Review-Arbeitsbereich — Stabilisierung und CI-Abschluss (2026-11-03)
+
+- [x] Vergleichsansicht mit synchronem vertikalem Scrollen und unabhängigem horizontalem Scrollen wiederhergestellt.
+- [x] Veraltete Antworten asynchroner Vergleichsabfragen gegen neuere Dateiauswahlen abgesichert.
+- [x] Helle, kontrastreiche Vergleichsfenster und Eingabefelder mit dunkler Schrift verbindlich festgelegt.
+- [x] Fund- und Ersetzungsstellen auf beiden Seiten farblich hervorgehoben und durch Frontend-Regressionen abgesichert.
+- [x] Freigegebene Dateien in der Projektdateiliste deutlich als gesperrt kennzeichnen; Vergleich bleibt weiterhin möglich. Backend-Sperren gegen Formatänderung, Erkennung und erneute Bereinigung sind durch vorhandene Regressionstests abgesichert.
+- [x] Quellprofil-Anlage, Bearbeitung und Löschung einschließlich Schutz vor dem Löschen noch verwendeter Profile testen.
+- [x] Bestätigtes Verwerfen eines Regelentwurfs setzt den Entwurf tatsächlich zurück; ungespeicherte Konfiguration kann ausdrücklich verworfen und neu geladen werden.
+- [x] CI-Lauf [41677942384](https://github.com/Ineedat/ChatGPT/actions/runs/41677942384) vollständig erfolgreich: Frontend 38 Tests und Build; Backend Linux 122 passed/1 skipped; Backend Windows 23 gezielte Tests; Ruff auf beiden Plattformen.
+- [ ] Visuelle Abnahme auf realen Windows-/Linux-Bildschirmen bleibt externe manuelle Prüfung.
+
