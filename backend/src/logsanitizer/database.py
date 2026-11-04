@@ -255,7 +255,7 @@ def list_projects() -> list[Project]:
     with connect_database() as connection:
         rows = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at, output_directory
+            SELECT id, name, description, status, created_at, updated_at
             FROM projects ORDER BY updated_at DESC, name COLLATE NOCASE ASC
             """
         ).fetchall()
@@ -266,7 +266,7 @@ def get_project(project_id: str) -> Project | None:
     with connect_database() as connection:
         row = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at, output_directory
+            SELECT id, name, description, status, created_at, updated_at
             FROM projects WHERE id = ?
             """,
             (project_id,),
@@ -287,7 +287,7 @@ def create_project(payload: ProjectCreate) -> Project:
         )
         row = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at, output_directory
+            SELECT id, name, description, status, created_at, updated_at
             FROM projects WHERE id = ?
             """,
             (project_id,),
