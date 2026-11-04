@@ -253,7 +253,7 @@ describe("JSON document sanitization UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response));
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
   });
