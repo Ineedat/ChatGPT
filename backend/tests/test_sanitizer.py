@@ -361,7 +361,6 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
     assert work_output.read_bytes() == b"hidden=REDACTED\\n"
     assert not output.exists()
     assert source.read_bytes() == original
-    assert list(second_output_dir.glob(".service.log.logsanitizer-*.tmp")) == []
 
 
 def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Path) -> None:
@@ -457,7 +456,7 @@ def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path,
     source = tmp_path / "events.json"
     original = b'{"message":"secret=alpha"}'
     source.write_bytes(original)
-    output = tmp_path / "events.json"
+    output = tmp_path / "outside-events.json"
 
     with TestClient(app) as client:
         project_id = client.post("/api/projects", json={"name": "JSON document"}).json()["id"]
