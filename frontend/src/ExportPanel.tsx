@@ -52,7 +52,8 @@ async function writeStreamToFolder(root: DirectoryHandle, relativePath: string, 
 
 export function ExportPanel({ projectId }: { projectId: string }) {
   const [files, setFiles] = useState<ApprovedExport[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -66,6 +67,7 @@ export function ExportPanel({ projectId }: { projectId: string }) {
       const body = await response.json() as ApprovedExport[] & { detail?: string };
       if (!response.ok) throw new Error(body.detail || "Freigegebene Dateien konnten nicht geladen werden.");
       setFiles(body);
+      setLoaded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Freigegebene Dateien konnten nicht geladen werden.");
     } finally {
@@ -73,7 +75,6 @@ export function ExportPanel({ projectId }: { projectId: string }) {
     }
   }, [projectId]);
 
-  useEffect(() => { void loadFiles(); }, [loadFiles]);
 
   async function exportToFolder() {
     const picker = (window as PickerWindow).showDirectoryPicker;
@@ -108,10 +109,10 @@ export function ExportPanel({ projectId }: { projectId: string }) {
   return <section className="panel approved-export-panel" aria-label="Freigegebene Dateien exportieren">
     <div className="section-heading">
       <div><p className="eyebrow">NACH DER FREIGABE</p><h3>Freigegebene Dateien exportieren</h3></div>
-      <button className="secondary-button" type="button" onClick={() => void loadFiles()} disabled={loading || exporting}>Aktualisieren</button>
+      <button className="secondary-button" type="button" onClick={() => void loadFiles()} disabled={loading || exporting}>Freigaben laden / aktualisieren</button>
     </div>
     <p className="field-help">Die Bereinigungsergebnisse verbleiben zunächst im internen Arbeitsbereich. Hier werden ausschließlich freigegebene und erfolgreich validierte Dateien angeboten.</p>
-    {loading ? <p className="muted-message">Freigaben werden geladen …</p> : files.length === 0 ? <p className="muted-message">Noch keine exportierbaren Dateien freigegeben.</p> : <>
+    {loading ? <p className="muted-message">Freigaben werden geladen …</p> : !loaded ? <p className="muted-message">Aktualisiere die Liste, um freigegebene Dateien für den Export zu laden.</p> : files.length === 0 ? <p className="muted-message">Noch keine exportierbaren Dateien freigegeben.</p> : <>
       <div className="approved-export-summary"><strong>{files.length} Dateien freigegeben</strong><span>{files.reduce((sum, file) => sum + file.output_bytes, 0).toLocaleString("de-DE")} Byte</span></div>
       <div className="approved-export-list">
         {files.map(file => <div className="approved-export-item" key={file.run_id}><span>{file.relative_path}</span><span>{file.output_bytes.toLocaleString("de-DE")} Byte</span></div>)}
