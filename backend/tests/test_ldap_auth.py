@@ -11,6 +11,7 @@ from logsanitizer.ldap_auth import LDAPAuthenticationError, authenticate_ldap
 def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
     binds = []
     searches = []
+    events = []
 
     class Attribute:
         value = "alice"
@@ -30,12 +31,15 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
             binds.append((user, password))
 
         def open(self):
+            events.append(("open", self.user))
             return True
 
         def start_tls(self):
+            events.append(("start_tls", self.user))
             return True
 
         def bind(self):
+            events.append(("bind", self.user))
             if self.user == "CN=reader,DC=example,DC=invalid":
                 return self.password == "service-password"
             return self.password == accepted_user_password
@@ -55,7 +59,8 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
         return kwargs
 
     def escape_filter_chars(value):
-        return value.replace("*", r"\\2a")
+        replacements = {"\\\\": r"\\5c", "*": r"\\2a", "(": r"\\28", ")": r"\\29", "\\x00": r"\\00"}
+        return "".join(replacements.get(character, character) for character in value)
 
     ldap3 = types.ModuleType("ldap3")
     ldap3.__path__ = []
@@ -72,7 +77,7 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
     monkeypatch.setitem(sys.modules, "ldap3", ldap3)
     monkeypatch.setitem(sys.modules, "ldap3.utils", utils)
     monkeypatch.setitem(sys.modules, "ldap3.utils.conv", conv)
-    return binds, searches
+    return binds, searches, events
 
 
 def _settings():
@@ -96,7 +101,7 @@ def _settings():
 
 
 def test_ldap_login_binds_with_personal_user_password(monkeypatch):
-    binds, searches = _fake_ldap3(monkeypatch)
+    binds, searches, _events = _fake_ldap3(monkeypatch)
     monkeypatch.setenv("LOGSANITIZER_LDAP_BIND_PASSWORD", "service-password")
 
     identity = authenticate_ldap("alice", "personal-password", _settings())
@@ -115,3 +120,27 @@ def test_ldap_login_rejects_wrong_personal_user_password(monkeypatch):
 
     with pytest.raises(LDAPAuthenticationError, match="LDAP-Anmeldung abgelehnt"):
         authenticate_ldap("alice", "wrong-personal-password", _settings())
+
+
+def test_ldap_starttls_is_negotiated_before_both_password_binds(monkeypatch):
+    binds, _searches, events = _fake_ldap3(monkeypatch)
+    monkeypatch.setenv("LOGSANITIZER_LDAP_BIND_PASSWORD", "service-password")
+    settings = _settings()
+    settings["ldap"]["use_ssl"] = False
+    settings["ldap"]["start_tls"] = True
+
+    authenticate_ldap("alice", "personal-password", settings)
+
+    assert len(binds) == 2
+    for user in ("CN=reader,DC=example,DC=invalid", "CN=Alice,OU=Users,DC=example,DC=invalid"):
+        sequence = [event[0] for event in events if event[1] == user]
+        assert sequence.index("start_tls") < sequence.index("bind")
+
+
+def test_ldap_username_is_escaped_before_search(monkeypatch):
+    _binds, searches, _events = _fake_ldap3(monkeypatch)
+    monkeypatch.setenv("LOGSANITIZER_LDAP_BIND_PASSWORD", "service-password")
+
+    authenticate_ldap("alice*)(uid=*)", "personal-password", _settings())
+
+    assert searches[0][1] == r"(sAMAccountName=alice\\2a\\29\\28uid=\\2a\\29)"
