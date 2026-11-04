@@ -930,7 +930,8 @@ def list_approved_exports(project_id: str, request: Request) -> list[dict]:
     results = []
     for row in rows:
         try:
-            results.append(_exportable_run(project_id, row["id"]) | {"download_url": f"/api/reviews/projects/{project_id}/exports/approved/{row['id']}/content"})
+            item = _exportable_run(project_id, row["id"])
+            results.append({key: value for key, value in item.items() if key != "output_path"} | {"download_url": f"/api/reviews/projects/{project_id}/exports/approved/{row['id']}/content"})
         except HTTPException:
             continue
     return results
