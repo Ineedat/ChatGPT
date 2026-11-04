@@ -165,7 +165,7 @@ describe("review workflow UI", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<ReviewPanel roles={["operator"]} />);
     fireEvent.click((await screen.findAllByRole("button", { name: "Details" }))[1]);
-    expect(await screen.findByRole("button", { name: /app-reworked.log.*Zurückgewiesen – Überarbeitung erforderlich/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /app-reworked.log.*Zur Überarbeitung zurückgegeben/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Prüfverlauf (2)" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Suche in Läufen" }), { target: { value: "app-reworked" } });
     expect(screen.getByText("Laufhistorie (1 von 2)")).toBeInTheDocument();

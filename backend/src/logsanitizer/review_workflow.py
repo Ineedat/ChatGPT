@@ -585,7 +585,7 @@ def compare_run_preview(
         row = db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
-        if not roles.intersection(reviewer_roles) and int(row["actor_id"]) != int(user["id"]):
+        if not roles.intersection(reviewer_roles) and int(row["actor_user_id"]) != int(user["id"]):
             raise HTTPException(status_code=403, detail="Bearbeiter dürfen nur eigene Bereinigungsläufe vergleichen.")
         if row["status"] in {"queued", "running", "failed", "cancelled", "stopped"}:
             raise HTTPException(status_code=409, detail="Für diesen Lauf liegt keine prüfbare Ausgabe vor.")
