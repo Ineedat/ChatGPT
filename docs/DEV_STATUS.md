@@ -285,3 +285,15 @@ Letzter Übergabe-/Dokumentationsstand: Bearbeitervergleich, Rückweisungsstatus
 - Letzter Commit dieses Arbeitsschritts: `923468b93fa8827afc1035a6e09da89c6011455a`.
 - PR #2 bleibt offen und ungemergt. Für die neuen Änderungen liegen aktuell noch keine abrufbaren CI-Statuschecks oder Workflow-Runs vor; Tests sind daher noch nicht als ausgeführt/erfolgreich zu deklarieren.
 - Test-Fixture nach Review korrigiert: die simulierten `ldap3`-Module werden als importierbares Paket registriert. Letzter Test-Commit: `0bdcb81cbddf5fc02f05f6b5042d983f4434dced`.
+
+
+## LDAP-/Frontend-Nachprüfung (2026-11-04)
+
+- Die Login-Oberfläche erklärt nun ausdrücklich, dass im LDAP-/AD-Modus das persönliche Verzeichnispasswort eingegeben wird. Das technische Suchkonto bleibt davon getrennt und wird ausschließlich über `LOGSANITIZER_LDAP_BIND_PASSWORD` bereitgestellt.
+- Die Offline-Hilfe für LDAP/AD, LDAPS, StartTLS, CA-Zertifikat, HTTPS-Serverzertifikat, Gruppen-/Rollenzuordnung und SMTP wurde ergänzt.
+- Bei der Nachprüfung wurde ein fehlendes Komma zwischen zwei Hilfeeinträgen in `frontend/src/help/content.ts` gefunden und behoben (Commit `1ebf2c8`).
+- Die Meilenstein-Workflow-Datei wurde mit der aktuellen Version aus `main` synchronisiert. Damit ist die in `main` vorgenommene Auswahl des zu prüfenden Feature-Branches auch im PR-Branch vorhanden (Commit `230316e`).
+- LDAP-Regressionstests decken nun zusätzlich die Reihenfolge StartTLS-vor-Bind sowie das Escaping von Benutzereingaben im LDAP-Suchfilter ab (Commits `dde7d80`, `23a964a`, `780218e`).
+- PR #2 bleibt offen. GitHub meldet den aktuellen PR-Stand als mergebar; der Branch liegt im Commitvergleich weiterhin vier Commits hinter `main`, enthält aber die aktuelle Meilenstein-Workflow-Datei.
+- **Wichtig: Für den aktuellen Head `780218e` wurden über die verfügbaren GitHub-Abfragen keine Statuschecks und keine zugehörigen PR-Workflow-Runs zurückgegeben.** Die zuletzt dokumentierten grünen CI-Läufe beziehen sich auf ältere Commits und dürfen nicht als Nachweis für diesen Stand verwendet werden. Frontend-Build, vollständige Backend-Tests/Ruff und portable Windows-/Linux-Smoke-Tests sind für diesen Head daher noch nicht bestätigt.
+- Ein manueller Workflow-Dispatch ist über die derzeit verfügbare GitHub-Aktion nicht möglich. Vor dem Merge muss ein tatsächlicher CI-Lauf auf dem aktuellen Head mit allen erforderlichen Jobs grün vorliegen. Die reale LDAP-/AD-/SMTP-Abnahme sowie Zielhardwaretests bleiben zusätzlich externe Abnahmepunkte.
