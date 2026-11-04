@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { helpTopics } from "./help/content";
 import { LoginGate } from "./LoginGate";
+import { ExportPanel } from "./ExportPanel";
 import { ReviewPanel } from "./ReviewPanel";
 import { RulesPanel } from "./RulesPanel";
 import { UserManagementPanel } from "./UserManagementPanel";
@@ -37,7 +38,6 @@ type Project = {
   status: "draft" | "active" | "archived";
   created_at: string;
   updated_at: string;
-  output_directory: string;
 };
 
 function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) {
@@ -47,8 +47,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [projectOutputDirectory, setProjectOutputDirectory] = useState("");
-  const [savingOutputDirectory, setSavingOutputDirectory] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -112,10 +110,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       setError(cause instanceof Error ? cause.message : "Dateiliste konnte nicht geladen werden.");
     }
   }, []);
-
-  useEffect(() => {
-    setProjectOutputDirectory(selectedProject?.output_directory || "");
-  }, [selectedProject]);
 
   useEffect(() => {
     if (selectedProject) void loadImportedFiles(selectedProject.id);
@@ -253,16 +247,13 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
   }
 
   async function startSanitization(file: ImportedFile, waitForCompletion = false): Promise<SanitizationJob | null> {
-    if (file.state === "approved" || !selectedProject || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
-    const separator = projectOutputDirectory.includes("\\") ? "\\" : "/";
-    const relativePath = (file.relative_path || file.display_name).replace(/[\\/]+/g, separator);
-    const outputPath = projectOutputDirectory.replace(/[\\/]+$/, "") + separator + relativePath;
+    if (file.state === "approved" || !selectedProject || sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status)) return null;
     setError("");
     try {
       const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/files/${encodeURIComponent(file.id)}/sanitize-jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ output_path: outputPath, profile_id: profileSelections[file.id] || null })
+        body: JSON.stringify({ profile_id: profileSelections[file.id] || null })
       });
       const body = await response.json() as { id?: string; detail?: string };
       if (!response.ok || !body.id) throw new Error(body.detail || "Bereinigung konnte nicht gestartet werden.");
@@ -311,12 +302,11 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     const batchFiles = importedFiles.filter(file => selectedFileIds.includes(file.id));
     if (!batchFiles.length) return;
     const invalidFile = batchFiles.find(file =>
-      !projectOutputDirectory.trim() ||
       !["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") ||
       Boolean(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
     );
     if (invalidFile) {
-      setError(`Bitte prüfe Format, gespeicherten Ausgabeordner und Laufstatus für „${invalidFile.display_name}“.`);
+      setError(`Bitte prüfe Format und Laufstatus für „${invalidFile.display_name}“.`);
       return;
     }
     const normalizedPaths = batchFiles.map(file => (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US"));
@@ -448,25 +438,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     }
   }
 
-  async function saveProjectOutputDirectory() {
-    if (!selectedProject || savingOutputDirectory) return;
-    setSavingOutputDirectory(true);
-    setError("");
-    try {
-      const response = await apiFetch("/api/projects/" + encodeURIComponent(selectedProject.id) + "/output-directory", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ output_directory: projectOutputDirectory })
-      });
-      const body = await response.json() as Project & { detail?: string };
-      if (!response.ok) throw new Error(body.detail || "Ausgabeordner konnte nicht gespeichert werden.");
-      setSelectedProject(body);
-      setProjects(current => current.map(project => project.id === body.id ? body : project));
-      setProjectOutputDirectory(body.output_directory);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Ausgabeordner konnte nicht gespeichert werden.");
-    } finally { setSavingOutputDirectory(false); }
-  }
-
   async function openProject(id: string) {
     setError("");
     try {
@@ -488,7 +459,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US")
   )).size !== selectedBatchFiles.length;
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
-    file.state !== "approved" && Boolean(projectOutputDirectory.trim()) && projectOutputDirectory.trim() === (selectedProject?.output_directory || "") && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
+    file.state !== "approved" && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
 
@@ -496,7 +467,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
         <div className="section-heading"><div><p className="eyebrow">GEÖFFNETES PROJEKT</p><h3>{selectedProject.name}</h3></div><button className="secondary-button" type="button" onClick={() => setTab("rules")}>Regeln &amp; Quellprofile bearbeiten</button></div>
         <p>{selectedProject.description || "Keine Beschreibung hinterlegt."}</p>
         {error && <p className="error-message" role="alert">{error}</p>}
-        <div className="project-output-setting"><label htmlFor="project-output-directory">Ausgabeordner<input id="project-output-directory" value={projectOutputDirectory} onChange={event => setProjectOutputDirectory(event.target.value)} placeholder="Absoluter Ordnerpfad" maxLength={4096} /></label><button className="secondary-button" type="button" disabled={savingOutputDirectory || projectOutputDirectory.trim() === (selectedProject.output_directory || "")} onClick={() => void saveProjectOutputDirectory()}>{savingOutputDirectory ? "Speichert …" : "Ausgabeordner speichern"}</button><p className="field-help">Die relative Ordnerstruktur bleibt erhalten; fehlende Unterordner werden automatisch angelegt. Der Ausgabeordner selbst muss bereits existieren.</p></div>
         <p className="field-help">Dateien werden zunächst registriert. Die Bereinigung startest du anschließend ausdrücklich pro Datei; die Quelldateien bleiben unverändert.</p>
         <form className="import-source-form" onSubmit={event => void registerSources(event)} aria-label="Dateien hinzufügen">
           <div className="import-source-fields">
@@ -557,7 +527,7 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
             <span>{selectedFileIds.length} ausgewählt</span>
           </div>
           <button className="primary-button" type="button" onClick={() => void startBatchSanitization()} disabled={batchRunning || !batchReady}>Ausgewählte Dateien nacheinander bereinigen</button>
-          <p className="field-help">Die relative Quellordnerstruktur wird im Ausgabeordner nachgebildet; Originaldateinamen bleiben erhalten. Die Verarbeitung läuft nacheinander; Projekt-Mappings bleiben dateiübergreifend identisch.</p>
+          <p className="field-help">Alle Ergebnisse bleiben bis zur Freigabe im internen Projekt-Arbeitsbereich. Die relative Ordnerstruktur wird beim späteren Export wiederhergestellt.</p>
           {batchHasDuplicateOutputs && selectedBatchFiles.length > 1 && <p className="error-message" role="alert">Mehrere Dateien besitzen denselben relativen Pfad und würden sich im Ausgabeordner überschreiben.</p>}
         </div>}
         {batchRunning && batchProgress && <div className="batch-progress" role="status">
@@ -601,12 +571,13 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
                 <td className="file-row-actions">
                   <button className="secondary-button" type="button" onClick={() => void detectFileFormat(file)} disabled={batchRunning || activeJob || approved}>Erkennen</button>
                   <button className="secondary-button" type="button" onClick={() => void validateFileFormat(file)} disabled={batchRunning || activeJob || approved || validatingFiles.includes(file.id)}>{validatingFiles.includes(file.id) ? "Prüft …" : "Validieren"}</button>
-                  {approved ? <span className="file-state file-state-ready">Freigegeben</span> : job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !projectOutputDirectory.trim() || projectOutputDirectory.trim() !== (selectedProject?.output_directory || "") || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
+                  {approved ? <span className="file-state file-state-ready">Freigegeben</span> : job && ["queued", "running"].includes(job.status) ? <button className="secondary-button" type="button" onClick={() => void cancelSanitization(file)}>Abbrechen</button> : job?.status === "completed" ? <button className="secondary-button" type="button" onClick={() => setTab("review")}>Prüfen</button> : <button className="primary-button" type="button" onClick={() => void startSanitization(file)} disabled={batchRunning || !["text", "jsonl", "json"].includes(effectiveFormat) || activeJob}>Bereinigen</button>}
                 </td>
               </tr>;
             })}</tbody>
           </table>
         </div>}
+        {user.roles.some(role => ["admin", "operator"].includes(role)) && <ExportPanel projectId={selectedProject.id} />}
       </section> : <p className="muted-message">Bitte zuerst ein Projekt auf der Startseite öffnen.</p>;
 
   return <main className="app-shell">
