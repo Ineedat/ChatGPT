@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from typing import ClassVar
 
 import pytest
 
@@ -15,7 +16,7 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
 
     class Attribute:
         value = "alice"
-        values = ["CN=LogSanitizer-Operators,OU=Groups,DC=example,DC=invalid"]
+        values: ClassVar[list[str]] = ["CN=LogSanitizer-Operators,OU=Groups,DC=example,DC=invalid"]
 
     class FakeEntry:
         entry_dn = "CN=Alice,OU=Users,DC=example,DC=invalid"
