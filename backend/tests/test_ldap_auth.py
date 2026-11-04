@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import types
-from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +11,16 @@ from logsanitizer.ldap_auth import LDAPAuthenticationError, authenticate_ldap
 def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
     binds = []
     searches = []
+
+    class Attribute:
+        value = "alice"
+        values = ["CN=LogSanitizer-Operators,OU=Groups,DC=example,DC=invalid"]
+
+    class FakeEntry:
+        entry_dn = "CN=Alice,OU=Users,DC=example,DC=invalid"
+
+        def __getitem__(self, key):
+            return Attribute()
 
     class FakeConnection:
         def __init__(self, server, user, password, **kwargs):
@@ -33,27 +42,7 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
 
         def search(self, base, search_filter, attributes, size_limit):
             searches.append((base, search_filter, attributes, size_limit))
-            self.entries = [
-                SimpleNamespace(
-                    entry_dn="CN=Alice,OU=Users,DC=example,DC=invalid",
-                    __getitem__=None,
-                )
-            ]
-            entry = self.entries[0]
-
-            class Attribute:
-                value = "alice"
-                values = ["CN=LogSanitizer-Operators,OU=Groups,DC=example,DC=invalid"]
-
-            entry.__class__ = type(
-                "FakeEntry",
-                (),
-                {
-                    "entry_dn": entry.entry_dn,
-                    "__getitem__": lambda self, key: Attribute(),
-                },
-            )
-            self.entries = [entry]
+            self.entries = [FakeEntry()]
             return True
 
         def unbind(self):
