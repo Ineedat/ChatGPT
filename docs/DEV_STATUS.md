@@ -284,3 +284,4 @@ Letzter Übergabe-/Dokumentationsstand: Bearbeitervergleich, Rückweisungsstatus
 - Der Loginbildschirm nennt nun ausdrücklich lokale und LDAP-/Active-Directory-Konten. Die Offline-Hilfe erklärt außerdem, dass `ldap.ca_certs_file` eine CA-Datei für das LDAP-Serverzertifikat ist und kein persönliches Benutzerzertifikat.
 - Letzter Commit dieses Arbeitsschritts: `923468b93fa8827afc1035a6e09da89c6011455a`.
 - PR #2 bleibt offen und ungemergt. Für die neuen Änderungen liegen aktuell noch keine abrufbaren CI-Statuschecks oder Workflow-Runs vor; Tests sind daher noch nicht als ausgeführt/erfolgreich zu deklarieren.
+- Test-Fixture nach Review korrigiert: die simulierten `ldap3`-Module werden als importierbares Paket registriert. Letzter Test-Commit: `0bdcb81cbddf5fc02f05f6b5042d983f4434dced`.
