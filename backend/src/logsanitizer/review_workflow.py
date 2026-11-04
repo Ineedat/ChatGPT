@@ -19,8 +19,8 @@ from uuid import uuid4
 import regex as re
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
-from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field, field_validator
+from starlette.background import BackgroundTask
 
 from logsanitizer.database import connect_database
 from logsanitizer.notifications import notify_returned_run
