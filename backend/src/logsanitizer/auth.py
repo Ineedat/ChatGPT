@@ -415,7 +415,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if path.startswith("/api/reviews"):
             review_reader = path == "/api/reviews/runs" and method == "GET"
             processor_compare = method == "GET" and path.endswith("/compare-preview") and "operator" in roles
-            processor_export = path.startswith("/api/reviews/projects/") and "/exports/" in path and "operator" in roles
+            processor_export = method == "GET" and path.startswith("/api/reviews/projects/") and "/exports/" in path and "operator" in roles
             export_audit = path == "/api/reviews/exports/audit" and "operator" in roles
             if not (review_reader or processor_compare or processor_export or export_audit) and not roles.intersection({"admin","reviewer","approver"}):
                 return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
