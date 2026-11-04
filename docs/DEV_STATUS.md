@@ -297,3 +297,16 @@ Letzter Übergabe-/Dokumentationsstand: Bearbeitervergleich, Rückweisungsstatus
 - PR #2 bleibt offen. GitHub meldet den aktuellen PR-Stand als mergebar; der Branch liegt im Commitvergleich weiterhin vier Commits hinter `main`, enthält aber die aktuelle Meilenstein-Workflow-Datei.
 - **Wichtig: Für den aktuellen Head `780218e` wurden über die verfügbaren GitHub-Abfragen keine Statuschecks und keine zugehörigen PR-Workflow-Runs zurückgegeben.** Die zuletzt dokumentierten grünen CI-Läufe beziehen sich auf ältere Commits und dürfen nicht als Nachweis für diesen Stand verwendet werden. Frontend-Build, vollständige Backend-Tests/Ruff und portable Windows-/Linux-Smoke-Tests sind für diesen Head daher noch nicht bestätigt.
 - Ein manueller Workflow-Dispatch ist über die derzeit verfügbare GitHub-Aktion nicht möglich. Vor dem Merge muss ein tatsächlicher CI-Lauf auf dem aktuellen Head mit allen erforderlichen Jobs grün vorliegen. Die reale LDAP-/AD-/SMTP-Abnahme sowie Zielhardwaretests bleiben zusätzlich externe Abnahmepunkte.
+
+
+## CI-Abschluss LDAP-/Hilfe-Nachprüfung (2026-11-04)
+
+- Nach dem ersten CI-Lauf wurde der Ruff-Befund `RUF012` im LDAP-Testfixture behoben: Das veränderliche Klassenattribut ist jetzt als `ClassVar` annotiert (Commit `36cd31f`).
+- CI-Lauf [#41917400304](https://github.com/Ineedat/ChatGPT/actions/runs/41917400304) für den aktuellen Head `36cd31f5108b5c9391ac4bc0a1607c5df2fbc762` vollständig erfolgreich:
+  - Linux-Backend: 126 passed, 1 skipped; Ruff erfolgreich.
+  - Windows-Backend: 23 passed; Ruff erfolgreich.
+  - Frontend: Vitest und TypeScript-/Vite-Build erfolgreich.
+- Es verbleiben nicht-blockierende Deprecation-Warnungen (FastAPI/Starlette, Node-Abhängigkeit und GitHub-Actions-Runtime). Kein CI-Job ist fehlgeschlagen.
+- PR #2 ist offen, nicht gemergt und wird von GitHub als mergebar gemeldet. Der Feature-Branch liegt im Commitvergleich weiterhin vier Commits hinter `main`; die abweichende Meilenstein-Workflow-Datei wurde inhaltlich mit `main` synchronisiert.
+- Nicht durch diesen CI-Lauf abgedeckt: manueller Meilensteinlauf mit portablem Windows-/Linux-Paket und 5-GiB-Benchmark sowie reale LDAP-/AD-/SMTP-Verbindung und visuelle/Leistungsmessung auf der Zielhardware. Die zuvor dokumentierten 5-GiB-Ergebnisse beziehen sich auf ältere, bereits erfolgreich geprüfte Implementierungsstände.
+- **Merge-Entscheidung:** Der aktuelle Code-CI-Stand ist grün. Ob vor dem Merge zusätzlich die reale Air-Gap-/Zielhardware-Abnahme verlangt wird, bleibt eine fachliche Freigabeentscheidung; diese Tests dürfen nicht als bereits erfolgt dargestellt werden.
