@@ -59,7 +59,7 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
         return kwargs
 
     def escape_filter_chars(value):
-        replacements = {"\\\\": r"\\5c", "*": r"\\2a", "(": r"\\28", ")": r"\\29", "\\x00": r"\\00"}
+        replacements = {"\\\\": r"\${code}", "*": r"\${code}", "(": r"\${code}", ")": r"\${code}", "\x00": r"\${code}"}
         return "".join(replacements.get(character, character) for character in value)
 
     ldap3 = types.ModuleType("ldap3")
@@ -143,4 +143,4 @@ def test_ldap_username_is_escaped_before_search(monkeypatch):
 
     authenticate_ldap("alice*)(uid=*)", "personal-password", _settings())
 
-    assert searches[0][1] == r"(sAMAccountName=alice\\2a\\29\\28uid=\\2a\\29)"
+    assert searches[0][1] == r"(sAMAccountName=alice\2a\29\28uid=\2a\29)"
