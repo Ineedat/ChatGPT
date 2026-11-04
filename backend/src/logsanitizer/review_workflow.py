@@ -886,8 +886,9 @@ def list_approved_exports(project_id: str, request: Request) -> list[dict]:
 
 @router.get("/projects/{project_id}/exports/approved/{run_id}/content")
 def download_approved_content(project_id: str, run_id: str, request: Request) -> FileResponse:
-    _require_export_role(request)
+    actor_id, actor_name = _require_export_role(request)
     item = _exportable_run(project_id, run_id)
+    _record_export(project_id, actor_id, actor_name, "folder", [item["file_id"]])
     return FileResponse(item["output_path"], filename=Path(item["relative_path"]).name, media_type="application/octet-stream")
 
 
