@@ -172,7 +172,7 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
         events = client.get("/api/reviews/audit").json()
         assert any(event["action"] == "return" and event["comment"] for event in events)
 
-         retried = client.post(
+        retried = client.post(
             f"/api/projects/{project['id']}/files/{file['id']}/sanitize-jobs",
             json={"retry_of_run_id": run_id},
         )
