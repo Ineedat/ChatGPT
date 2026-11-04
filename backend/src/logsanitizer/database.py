@@ -131,10 +131,8 @@ def initialize_database() -> None:
             current_version = 3
 
         if current_version < 4:
-            # Retain the legacy column for existing installations; it is no longer used.
-            connection.execute(
-                "ALTER TABLE projects ADD COLUMN output_directory TEXT NOT NULL DEFAULT ''"
-            )
+            # Version 4 previously introduced a project output directory. New installations
+            # no longer create it; existing legacy columns remain ignored for compatibility.
             connection.execute("UPDATE schema_metadata SET version = 4")
 
         if current_version < 5:
