@@ -48,14 +48,23 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
         def unbind(self):
             return True
 
+    def fake_server(*args, **kwargs):
+        return object()
+
+    def fake_tls(**kwargs):
+        return kwargs
+
+    def escape_filter_chars(value):
+        return value.replace("*", r"\\2a")
+
     ldap3 = types.ModuleType("ldap3")
     ldap3.NONE = object()
     ldap3.Connection = FakeConnection
-    ldap3.Server = lambda *args, **kwargs: object()
-    ldap3.Tls = lambda **kwargs: kwargs
+    ldap3.Server = fake_server
+    ldap3.Tls = fake_tls
     utils = types.ModuleType("ldap3.utils")
     conv = types.ModuleType("ldap3.utils.conv")
-    conv.escape_filter_chars = lambda value: value.replace("*", r"\\2a")
+    conv.escape_filter_chars = escape_filter_chars
     monkeypatch.setitem(sys.modules, "ldap3", ldap3)
     monkeypatch.setitem(sys.modules, "ldap3.utils", utils)
     monkeypatch.setitem(sys.modules, "ldap3.utils.conv", conv)
