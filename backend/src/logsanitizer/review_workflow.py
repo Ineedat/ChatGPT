@@ -783,18 +783,6 @@ def add_review_comment(run_id: str, payload: ReviewComment, request: Request) ->
 
 
 
-class ExportAuditRequest(BaseModel):
-    method: str
-    run_ids: list[str] = Field(min_length=1, max_length=5000)
-
-    @field_validator("method")
-    @classmethod
-    def validate_method(cls, value: str) -> str:
-        if value not in {"folder", "zip"}:
-            raise ValueError("Exportart muss folder oder zip sein.")
-        return value
-
-
 def _require_export_role(request: Request) -> tuple[int, str]:
     actor_id, actor_name = _actor(request)
     user = request.state.user
@@ -890,19 +878,6 @@ def download_approved_content(project_id: str, run_id: str, request: Request) ->
     item = _exportable_run(project_id, run_id)
     _record_export(project_id, actor_id, actor_name, "folder", [item["file_id"]])
     return FileResponse(item["output_path"], filename=Path(item["relative_path"]).name, media_type="application/octet-stream")
-
-
-@router.post("/projects/{project_id}/exports/audit")
-def audit_folder_export(project_id: str, payload: ExportAuditRequest, request: Request) -> dict:
-    actor_id, actor_name = _require_export_role(request)
-    items = [_exportable_run(project_id, run_id) for run_id in payload.run_ids]
-    if len({item["run_id"] for item in items}) != len(items):
-        raise HTTPException(status_code=422, detail="Doppelte Dateien in der Exportauswahl.")
-    if payload.method == "folder":
-        _record_export(project_id, actor_id, actor_name, "folder", [item["file_id"] for item in items])
-    else:
-        raise HTTPException(status_code=422, detail="ZIP-Exporte werden direkt protokolliert.")
-    return {"recorded": True, "file_count": len(items)}
 
 
 @router.get("/projects/{project_id}/exports/approved.zip")
