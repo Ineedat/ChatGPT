@@ -227,62 +227,6 @@ def create_run(run_id: str, project_id: str, file_id: str, display_name: str,
         return _public_run(db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone())
 
 
-def _publish_approved_output(db: sqlite3.Connection, row: sqlite3.Row) -> str:
-    """Move a validated work file into its final output location without overwriting."""
-    work_path = Path(row["output_path"])
-    publish_value = row["publish_path"]
-    publish_path = Path(publish_value) if publish_value else work_path
-    if work_path == publish_path:
-        signature = _file_signature(work_path)
-        if signature is None:
-            raise HTTPException(status_code=409, detail="Arbeitsdatei fehlt oder ist nicht mehr verfügbar.")
-        return signature
-    if work_path.is_symlink() or not work_path.is_file():
-        raise HTTPException(status_code=409, detail="Arbeitsdatei fehlt oder ist nicht mehr verfügbar.")
-    publish_path.parent.mkdir(parents=True, exist_ok=True)
-    if publish_path.exists() or publish_path.is_symlink():
-        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits; Freigabe wurde nicht veröffentlicht.")
-
-    temporary: Path | None = None
-    try:
-        try:
-            os.link(work_path, publish_path)
-        except OSError:
-            descriptor, temporary_name = tempfile.mkstemp(
-                prefix=f".{publish_path.name}.", suffix=".publishing", dir=publish_path.parent
-            )
-            temporary = Path(temporary_name)
-            with os.fdopen(descriptor, "wb") as target, work_path.open("rb") as source:
-                shutil.copyfileobj(source, target, length=1024 * 1024)
-                target.flush()
-                os.fsync(target.fileno())
-            try:
-                os.link(temporary, publish_path)
-            except OSError:
-                if publish_path.exists() or publish_path.is_symlink():
-                    raise FileExistsError(publish_path)
-                temporary.replace(publish_path)
-            temporary.unlink(missing_ok=True)
-            temporary = None
-        work_path.unlink()
-    except OSError as exc:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=409,
-            detail="Die bereinigte Datei konnte nicht in den Ausgabeordner übernommen werden.",
-        ) from exc
-
-    signature = _file_signature(publish_path)
-    if signature is None:
-        raise HTTPException(status_code=409, detail="Die veröffentlichte Datei konnte nicht verifiziert werden.")
-    db.execute(
-        "UPDATE review_runs SET output_path=?, output_signature=? WHERE id=?",
-        (str(publish_path), signature, row["id"]),
-    )
-    return signature
-
-
 def set_run_running(run_id: str) -> None:
     with _db() as db:
         db.execute(
@@ -354,7 +298,7 @@ def _public_run(row: sqlite3.Row | None) -> dict:
         "created_at", "started_at", "completed_at", "input_bytes", "output_bytes",
         "lines_processed", "replacements", "validated", "residual_matches",
         "validation_scope", "last_comment", "exception_reason",
-    )} | {"published": row["status"] in {"approved", "approved_with_exception"}}
+    )} | {"released": row["status"] in {"approved", "approved_with_exception"}, "published": False}
 
 
 def is_file_approved(project_id: str, file_id: str) -> bool:
@@ -841,7 +785,7 @@ def add_review_comment(run_id: str, payload: ReviewComment, request: Request) ->
 
 class ExportAuditRequest(BaseModel):
     method: str
-    run_ids: list[str] = Field(min_length=1, max_length=500)
+    run_ids: list[str] = Field(min_length=1, max_length=5000)
 
     @field_validator("method")
     @classmethod
@@ -934,6 +878,9 @@ def list_approved_exports(project_id: str, request: Request) -> list[dict]:
             results.append({key: value for key, value in item.items() if key != "output_path"} | {"download_url": f"/api/reviews/projects/{project_id}/exports/approved/{row['id']}/content"})
         except HTTPException:
             continue
+    names = [item["relative_path"] for item in results]
+    if len(names) != len(set(names)):
+        raise HTTPException(status_code=409, detail="Mehrere freigegebene Dateien besitzen denselben relativen Pfad. Bitte die Importstruktur vor dem Export eindeutig machen.")
     return results
 
 
