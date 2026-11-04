@@ -246,18 +246,29 @@ describe("offline help keyboard shortcut", () => {
 
 
 describe("JSON document sanitization UI", () => {
-  it("allows a JSON document to start a sanitization job", async () => {
+  it("starts a JSON sanitization job without an output path", async () => {
     const project = { id: "project-json", name: "JSON", description: "", status: "draft", created_at: "2026-10-30T10:00:00+00:00", updated_at: "2026-10-30T10:00:00+00:00" };
     const file = { id: "file-json", project_id: project.id, display_name: "events.json", size_bytes: 128, modified_at: "2026-10-30T10:00:00+00:00", imported_at: "2026-10-30T10:00:00+00:00", state: "registered", detected_format: "json" };
-    vi.stubGlobal("fetch", vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
+      if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => [file] } as Response;
+      if ((init?.method || "GET") === "POST" && url.endsWith("/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-json" }) } as Response;
+      if (url.endsWith("/sanitize-jobs/job-json")) return { ok: true, json: async () => ({ id: "job-json", status: "completed", phase: "completed", processed_bytes: 128, total_bytes: 128, lines_processed: 1, result: { output_name: "events.json", output_bytes: 128, replacements: 1, validated: true } }) } as Response;
+      return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Bereinigen" }));
+    expect(await screen.findByText(/Bereinigung für events.json abgeschlossen und validiert/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/${file.id}/sanitize-jobs`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ profile_id: null }) })
+    );
   });
 });
-
 
 describe("source profile selection for project sanitization", () => {
   it("loads available source profiles and sends the selected profile with the sanitization job", async () => {
