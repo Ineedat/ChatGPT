@@ -276,3 +276,11 @@ Letzter Übergabe-/Dokumentationsstand: Bearbeitervergleich, Rückweisungsstatus
 - Neue Commits auf dem Arbeitsbranch: `d9261c4` (Offline-Hilfe), `d2003e1` (Deployment-Dokumentation), `e48905b` (Login-Hinweis) und `b647727` (Korrektur eines Help-Text-Syntaxdetails).
 - CI-Verifizierung dieser Dokumentations-/UI-Änderungen steht noch aus. GitHub lieferte für den zuletzt geprüften Commit keine Statuschecks bzw. Workflow-Runs zurück; die Änderungen dürfen daher noch nicht als CI-grün bezeichnet werden.
 - PR #2 bleibt offen und ungemergt. Reale LDAP-/AD-, TLS- und SMTP-Abnahme im Air-Gap-Netz bleibt weiterhin erforderlich.
+
+## Ergänzung: LDAP-Bind-Regression und Backend-Kurzanleitung (2026-11-04)
+
+- Zusätzliche Backend-Regression `backend/tests/test_ldap_auth.py`: prüft getrennt den Bind des technischen Suchkontos mit `LOGSANITIZER_LDAP_BIND_PASSWORD` und den anschließenden Benutzer-Bind mit dem persönlichen Passwort aus dem Loginformular. Ein falsches persönliches Passwort muss abgewiesen werden.
+- `backend/README.md` vollständig überarbeitet: veraltete und widersprüchliche Hinweise entfernt; kompakte Start-, Deployment-, LDAP-Passwort- und Geheimnis-Konfiguration ergänzt; Verweis auf die ausführliche Deployment-Referenz hinzugefügt.
+- Der Loginbildschirm nennt nun ausdrücklich lokale und LDAP-/Active-Directory-Konten. Die Offline-Hilfe erklärt außerdem, dass `ldap.ca_certs_file` eine CA-Datei für das LDAP-Serverzertifikat ist und kein persönliches Benutzerzertifikat.
+- Letzter Commit dieses Arbeitsschritts: `923468b93fa8827afc1035a6e09da89c6011455a`.
+- PR #2 bleibt offen und ungemergt. Für die neuen Änderungen liegen aktuell noch keine abrufbaren CI-Statuschecks oder Workflow-Runs vor; Tests sind daher noch nicht als ausgeführt/erfolgreich zu deklarieren.
