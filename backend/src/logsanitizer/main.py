@@ -34,7 +34,6 @@ from logsanitizer.database import (
     ImportedFile,
     Project,
     ProjectCreate,
-    ProjectOutputDirectoryUpdate,
     connect_database,
     create_project,
     database_path,
@@ -45,7 +44,6 @@ from logsanitizer.database import (
     register_imported_file,
     update_detected_format,
     update_format_override,
-    update_project_output_directory,
 )
 from logsanitizer.deployment import load_settings
 from logsanitizer.format_validation import validate_file
@@ -132,26 +130,6 @@ def projects_get(project_id: str) -> Project:
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
     return project
-
-@app.put("/api/projects/{project_id}/output-directory", response_model=Project, tags=["projects"])
-def projects_set_output_directory(
-    project_id: str, payload: ProjectOutputDirectoryUpdate
-) -> Project:
-    """Persist the single output directory used by all files in a project."""
-    if payload.output_directory:
-        directory = Path(payload.output_directory).expanduser()
-        if not directory.exists() or not directory.is_dir():
-            raise HTTPException(status_code=422, detail="Der Ausgabeordner muss bereits existieren.")
-        if directory.is_symlink():
-            raise HTTPException(status_code=422, detail="Symbolische Links sind als Ausgabeordner nicht zulässig.")
-        normalized = str(directory.resolve())
-    else:
-        normalized = ""
-    project = update_project_output_directory(project_id, normalized)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
-    return project
-
 
 @app.get(
     "/api/projects/{project_id}/files",
@@ -638,8 +616,7 @@ def project_file_sanitize(
     user = request.state.user
     run_id = uuid.uuid4().hex
     try:
-        relative_source = _relative_project_source_path(project_id, source, row.get("relative_path", "") if hasattr(row, "get") else "")
-        work_output = _staging_output_path(project_id, run_id, relative_source.name)
+        work_output = _staging_output_path(project_id, run_id, Path(row["display_name"]).name)
         create_review_run(
             run_id, project_id, file_id, row["display_name"], work_output,
             int(user["id"]), str(user["username"]), payload.retry_of_run_id,
@@ -650,7 +627,7 @@ def project_file_sanitize(
         notify_pending_review(review_run)
         return {
             "file_id": file_id,
-            "output_name": output.name,
+            "output_name": work_output.name,
             "review_run_id": run_id,
             "review_status": review_run["status"],
             **result,
