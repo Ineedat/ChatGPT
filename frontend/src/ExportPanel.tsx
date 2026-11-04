@@ -84,6 +84,7 @@ export function ExportPanel({ projectId }: { projectId: string }) {
     setMessage("");
     try {
       const root = await picker.call(window);
+      if (!window.confirm("Bereits vorhandene Dateien mit denselben relativen Pfaden werden überschrieben. Möchtest du fortfahren?")) return;
       let completed = 0;
       for (const file of files) {
         const response = await apiFetch(`/api/reviews/projects/${encodeURIComponent(projectId)}/exports/approved/${encodeURIComponent(file.run_id)}/content`);
@@ -100,6 +101,7 @@ export function ExportPanel({ projectId }: { projectId: string }) {
       if (!audit.ok) throw new Error(auditBody.detail || "Export konnte nicht protokolliert werden.");
       setMessage(`Export abgeschlossen: ${completed} freigegebene Dateien wurden im gewählten Ordner abgelegt. Die Originaldateien wurden nicht exportiert.`);
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") return;
       setError(cause instanceof Error ? cause.message : "Ordnerexport fehlgeschlagen.");
     } finally {
       setExporting(false);
