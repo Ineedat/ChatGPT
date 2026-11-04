@@ -575,7 +575,7 @@ def test_approved_outputs_remain_internal_until_export_and_zip_contains_only_app
         run_id = response.json()["review_run_id"]
         internal_path = _stored_output_path(tmp_path, run_id)
         assert internal_path.is_file()
-        assert internal_path.read_bytes() == b"REDACTED\\n"
+        assert internal_path.read_bytes() == b"REDACTED\n"
         assert not external_path.exists()
 
         listing = client.get(f"/api/reviews/projects/{project['id']}/exports/approved")
@@ -594,13 +594,13 @@ def test_approved_outputs_remain_internal_until_export_and_zip_contains_only_app
             f"/api/reviews/projects/{project['id']}/exports/approved/{run_id}/content"
         )
         assert content.status_code == 200
-        assert content.content == b"REDACTED\\n"
+        assert content.content == b"REDACTED\n"
 
         archive = client.get(f"/api/reviews/projects/{project['id']}/exports/approved.zip")
         assert archive.status_code == 200
         with zipfile.ZipFile(io.BytesIO(archive.content)) as zipped:
             assert zipped.namelist() == ["app.log"]
-            assert zipped.read("app.log") == b"REDACTED\\n"
+            assert zipped.read("app.log") == b"REDACTED\n"
 
         events = client.get("/api/reviews/exports/audit")
         assert events.status_code == 200
