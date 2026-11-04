@@ -58,13 +58,17 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
         return value.replace("*", r"\\2a")
 
     ldap3 = types.ModuleType("ldap3")
+    ldap3.__path__ = []
     ldap3.NONE = object()
     ldap3.Connection = FakeConnection
     ldap3.Server = fake_server
     ldap3.Tls = fake_tls
     utils = types.ModuleType("ldap3.utils")
+    utils.__path__ = []
     conv = types.ModuleType("ldap3.utils.conv")
     conv.escape_filter_chars = escape_filter_chars
+    ldap3.utils = utils
+    utils.conv = conv
     monkeypatch.setitem(sys.modules, "ldap3", ldap3)
     monkeypatch.setitem(sys.modules, "ldap3.utils", utils)
     monkeypatch.setitem(sys.modules, "ldap3.utils.conv", conv)
