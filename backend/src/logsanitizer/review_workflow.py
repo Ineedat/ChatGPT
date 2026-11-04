@@ -271,7 +271,7 @@ def finish_run(run_id: str, result: dict[str, object]) -> dict:
                    comment="Pflichtvalidierung bestanden; bewusste Freigabe erforderlich.")
         else:
             _audit(db, run_id, None, "system", "failed",
-                   comment="Pflichtvalidierung fehlgeschlagen oder Ausgabe konnte nicht veröffentlicht werden.")
+                   comment="Pflichtvalidierung fehlgeschlagen oder internes Bereinigungsergebnis fehlt.")
         return _public_run(db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone())
 
 
