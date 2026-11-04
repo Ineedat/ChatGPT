@@ -907,9 +907,10 @@ def audit_folder_export(project_id: str, payload: ExportAuditRequest, request: R
 @router.get("/projects/{project_id}/exports/approved.zip")
 def download_approved_zip(project_id: str, request: Request) -> FileResponse:
     actor_id, actor_name = _require_export_role(request)
-    items = list_approved_exports(project_id, request)
-    if not items:
+    listed_items = list_approved_exports(project_id, request)
+    if not listed_items:
         raise HTTPException(status_code=404, detail="Keine freigegebenen Dateien zum Export vorhanden.")
+    items = [_exportable_run(project_id, item["run_id"]) for item in listed_items]
     relative_names = [item["relative_path"] for item in items]
     if len(set(relative_names)) != len(relative_names):
         raise HTTPException(status_code=409, detail="Mehrere freigegebene Dateien besitzen denselben relativen Pfad; bitte Dateipfade bereinigen.")
