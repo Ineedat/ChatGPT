@@ -574,15 +574,19 @@ def compare_run_preview(
     original_offset: int = Query(default=0, ge=0),
     output_offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
-    """Show bounded original/output windows for a reviewer, validating output identity."""
+    """Show bounded original/output windows for an authorized reviewer or the owning processor."""
     user = getattr(request.state, "user", None)
-    if not user or not set(user.get("roles", [])).intersection({"admin", "reviewer", "approver"}):
+    roles = set(user.get("roles", [])) if user else set()
+    reviewer_roles = {"admin", "reviewer", "approver"}
+    if not user or not roles.intersection(reviewer_roles | {"operator"}):
         raise HTTPException(status_code=403, detail="Keine Berechtigung für den Dateivergleich.")
     initialize_review_database()
     with _db() as db:
         row = db.execute("SELECT * FROM review_runs WHERE id=?", (run_id,)).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Bereinigungslauf nicht gefunden.")
+        if not roles.intersection(reviewer_roles) and int(row["actor_id"]) != int(user["id"]):
+            raise HTTPException(status_code=403, detail="Bearbeiter dürfen nur eigene Bereinigungsläufe vergleichen.")
         if row["status"] in {"queued", "running", "failed", "cancelled", "stopped"}:
             raise HTTPException(status_code=409, detail="Für diesen Lauf liegt keine prüfbare Ausgabe vor.")
         output_path = Path(row["output_path"])

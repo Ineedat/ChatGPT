@@ -23,6 +23,8 @@ describe("user management navigation", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<UserManagementPanel currentUser={currentUser} />);
     expect(await screen.findByText("admin")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Benutzerliste" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Zugewiesene Rollen" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Benutzername")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Neuen Benutzer anlegen" }));
     expect(screen.getByLabelText("Benutzername")).toBeInTheDocument();

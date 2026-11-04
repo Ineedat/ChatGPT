@@ -513,6 +513,15 @@ def test_reviewer_can_compare_bounded_original_and_sanitized_windows(tmp_path, m
         denied = client.get(f"/api/reviews/runs/{run_id}/compare-preview")
         assert denied.status_code == 403
 
+        own_response, _, _, _ = _sanitized_run(
+            client, tmp_path, name="operator.log", contents=b"secret=beta\n"
+        )
+        assert own_response.status_code == 200
+        own_run_id = own_response.json()["review_run_id"]
+        own_preview = client.get(f"/api/reviews/runs/{own_run_id}/compare-preview")
+        assert own_preview.status_code == 200
+        assert "secret=beta" in own_preview.json()["original"]["content"]
+
 
 
 def test_review_comparison_reads_large_files_in_bounded_windows(tmp_path, monkeypatch):

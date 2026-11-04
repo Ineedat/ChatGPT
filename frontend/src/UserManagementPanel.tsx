@@ -185,32 +185,31 @@ export function UserManagementPanel({ currentUser }: { currentUser: AuthUser }) 
     </section>}
     {view === "list" && <section className="user-list-section">
       <div className="section-heading"><h3>Vorhandene Benutzer ({users.length})</h3></div>
-      {loading ? <p className="muted-message">Benutzerliste wird geladen …</p> : users.length === 0 ? <p className="muted-message">Keine Benutzer vorhanden.</p> : <div className="user-list">
-        {users.map(user => {
-          const roles = roleDrafts[user.id] || [];
-          const changed = roles.length !== user.roles.length || roles.some(role => !user.roles.includes(role));
-          const isSelf = user.id === currentUser.id;
-          return <article className="user-card" key={user.id}>
-            <div className="user-card-heading">
-              <div><strong>{user.username}</strong><span className={user.enabled ? "user-status enabled" : "user-status disabled"}>{user.enabled ? "Aktiv" : "Deaktiviert"}</span>{isSelf && <span className="user-self-label">Dein Konto</span>}</div>
-              <span className="user-kind">{user.external ? "LDAP-Konto" : "Lokales Konto"}</span>
-            </div>
-            <fieldset className="role-fieldset">
-              <legend>Zugewiesene Rollen</legend>
-              <div className="role-options">
+      {loading ? <p className="muted-message">Benutzerliste wird geladen …</p> : users.length === 0 ? <p className="muted-message">Keine Benutzer vorhanden.</p> : <div className="user-table-wrap">
+        <table className="user-table" aria-label="Benutzerliste">
+          <thead><tr><th>Benutzer</th><th>Kontotyp</th><th>Status</th><th>Zugewiesene Rollen</th><th>Aktionen</th></tr></thead>
+          <tbody>{users.map(user => {
+            const roles = roleDrafts[user.id] || [];
+            const changed = roles.length !== user.roles.length || roles.some(role => !user.roles.includes(role));
+            const isSelf = user.id === currentUser.id;
+            return <tr key={user.id}>
+              <td><strong>{user.username}</strong>{isSelf && <span className="user-self-label">Dein Konto</span>}</td>
+              <td>{user.external ? "LDAP-Konto" : "Lokales Konto"}</td>
+              <td><span className={user.enabled ? "user-status enabled" : "user-status disabled"}>{user.enabled ? "Aktiv" : "Deaktiviert"}</span></td>
+              <td><fieldset className="role-fieldset user-table-roles"><legend>Rollen</legend><div className="role-options">
                 {ROLE_OPTIONS.map(role => <label key={role.id}>
                   <input type="checkbox" checked={roles.includes(role.id)} disabled={saving || (isSelf && role.id === "admin")} onChange={event => toggleRole(user.id, role.id, event.target.checked)} />
                   {role.label}
                 </label>)}
-              </div>
-            </fieldset>
-            <div className="user-actions">
-              <button className="secondary-button" type="button" onClick={() => void saveRoles(user)} disabled={saving || !changed || roles.length === 0}>Rollen speichern</button>
-              <button className="secondary-button" type="button" onClick={() => void toggleEnabled(user)} disabled={saving || isSelf}>{user.enabled ? "Deaktivieren" : "Aktivieren"}</button>
-              <button className="danger-button" type="button" onClick={() => void deleteUser(user)} disabled={saving || isSelf || user.external} title={user.external ? "LDAP-Konten werden durch den Verzeichnisdienst verwaltet; bei Bedarf deaktivieren." : undefined}>Löschen</button>
-            </div>
-          </article>;
-        })}
+              </div></fieldset></td>
+              <td><div className="user-actions">
+                <button className="secondary-button" type="button" onClick={() => void saveRoles(user)} disabled={saving || !changed || roles.length === 0}>Rollen speichern</button>
+                <button className="secondary-button" type="button" onClick={() => void toggleEnabled(user)} disabled={saving || isSelf}>{user.enabled ? "Deaktivieren" : "Aktivieren"}</button>
+                <button className="danger-button" type="button" onClick={() => void deleteUser(user)} disabled={saving || isSelf || user.external} title={user.external ? "LDAP-Konten werden durch den Verzeichnisdienst verwaltet; bei Bedarf deaktivieren." : undefined}>Löschen</button>
+              </div></td>
+            </tr>;
+          })}</tbody>
+        </table>
       </div>}
     </section>}
     {view === "list" && <p className="field-help">Schutzregeln: Das eigene Konto kann nicht deaktiviert oder gelöscht werden. Der letzte aktive Administrator kann weder seine Administratorrolle verlieren noch deaktiviert oder gelöscht werden. LDAP-Konten werden bei erfolgreicher LDAP-Anmeldung synchronisiert.</p>}

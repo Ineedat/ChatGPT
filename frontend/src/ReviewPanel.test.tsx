@@ -217,6 +217,34 @@ describe("project file comparison view", () => {
 });
 
 
+describe("processor rejected file comparison", () => {
+  it("shows a returned run as rejected and lets its processor compare both files", async () => {
+    const returnedRun = { ...run, status: "returned", last_comment: "Bitte Token-Regel korrigieren." };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/reviews/runs?limit=200") return { ok: true, json: async () => [returnedRun] } as Response;
+      if (url === "/api/projects/project-1/files") return { ok: true, json: async () => [{
+        id: "file-1", display_name: "app.log", relative_path: "logs/app.log", size_bytes: 100, state: "registered"
+      }] } as Response;
+      if (url.includes("/compare-preview")) return { ok: true, json: async () => ({
+        original: { content: "secret=alpha\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 13 },
+        sanitized: { content: "REDACTED\\n", byte_offset: 0, previous_offset: null, next_offset: null, total_bytes: 9 },
+        original_changed_lines: [1], sanitized_changed_lines: [1],
+        original_changed_spans: [{ line_number: 1, start: 0, end: 12 }],
+        sanitized_changed_spans: [{ line_number: 1, start: 0, end: 8 }]
+      }) } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewPanel roles={["operator"]} selectedProject={{ id: "project-1", name: "Testprojekt" }} />);
+    expect(await screen.findByText("Zurückgewiesen – Überarbeitung erforderlich")).toBeInTheDocument();
+    expect(screen.getByText("Rückgabegrund: Bitte Token-Regel korrigieren.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dateien vergleichen" }));
+    expect(await screen.findByRole("heading", { name: "Original" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sanitisiert" })).toBeInTheDocument();
+  });
+});
+
 describe("approved project file status", () => {
   it("marks approved project files as locked while keeping their comparison available", async () => {
     const approvedRun = { ...run, status: "approved" };
