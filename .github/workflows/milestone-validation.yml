@@ -3,6 +3,13 @@ name: Milestone validation
 on:
   workflow_dispatch:
     inputs:
+      source_branch:
+        description: Branch containing the application source to validate
+        required: true
+        type: choice
+        options:
+          - feature/project-management-sqlite
+        default: feature/project-management-sqlite
       run_5gb_benchmark:
         description: Run the full synthetic 5-GiB streaming benchmark
         required: true
@@ -13,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: milestone-validation-${{ github.ref }}
+  group: milestone-validation-${{ inputs.source_branch }}
   cancel-in-progress: false
 
 jobs:
@@ -24,6 +31,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_branch }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -45,6 +54,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_branch }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
