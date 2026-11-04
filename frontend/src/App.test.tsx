@@ -414,7 +414,7 @@ describe("multi-file project sanitization workflow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    await screen.findByText("first.log");
+    await screen.findAllByText("first.log");
     const duplicateFileChecks = screen.getAllByRole("checkbox", { name: "Für Stapel auswählen: first.log" });
     fireEvent.click(duplicateFileChecks[0]);
     fireEvent.click(duplicateFileChecks[1]);
