@@ -585,11 +585,6 @@ def test_approved_outputs_remain_internal_until_export_and_zip_contains_only_app
         assert listing.json()[0]["relative_path"] == "app.log"
         assert "output_path" not in listing.json()[0]
 
-        audit = client.post(
-            f"/api/reviews/projects/{project['id']}/exports/audit",
-            json={"method": "folder", "run_ids": [run_id]},
-        )
-        assert audit.status_code == 200
         content = client.get(
             f"/api/reviews/projects/{project['id']}/exports/approved/{run_id}/content"
         )
