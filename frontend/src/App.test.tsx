@@ -256,9 +256,6 @@ describe("JSON document sanitization UI", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response));
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
   });
 });
 
@@ -278,7 +275,6 @@ describe("source profile selection for project sanitization", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ profiles: [{ id: "nginx", name: "Nginx" }] }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "job-profile", status: "queued" }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({
@@ -290,9 +286,6 @@ describe("source profile selection for project sanitization", () => {
 
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
     const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
     fireEvent.focus(profileSelect);
     await waitFor(() => expect(profileSelect).toHaveTextContent("Nginx"));
@@ -305,7 +298,7 @@ describe("source profile selection for project sanitization", () => {
       `/api/projects/${project.id}/files/${file.id}/sanitize-jobs`,
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ output_path: "/tmp/events.log", profile_id: "nginx" })
+        body: JSON.stringify({ profile_id: "nginx" })
       })
     );
   });
@@ -355,7 +348,6 @@ describe("multi-file project sanitization workflow", () => {
       if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
       if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
       if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
-      if (method === "PUT" && url.endsWith("/output-directory")) return { ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response;
       if (method === "POST" && url.endsWith("/file-one/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-one" }) } as Response;
       if (method === "POST" && url.endsWith("/file-two/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-two" }) } as Response;
       if (url.endsWith("/file-one/sanitize-jobs/job-one") || url.endsWith("/file-two/sanitize-jobs/job-two")) {
@@ -370,9 +362,6 @@ describe("multi-file project sanitization workflow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgabeordner speichern" })).toBeDisabled());
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
@@ -387,11 +376,11 @@ describe("multi-file project sanitization workflow", () => {
     expect(secondStart).toBeGreaterThan(firstStatus);
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/projects/${project.id}/files/file-one/sanitize-jobs`,
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/first.log", profile_id: null }) })
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ profile_id: null }) })
     );
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/projects/${project.id}/files/file-two/sanitize-jobs`,
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/second.log", profile_id: null }) })
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ profile_id: null }) })
     );
   });
 
@@ -409,15 +398,11 @@ describe("multi-file project sanitization workflow", () => {
       if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
       if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
       if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
-      if (url.endsWith("/output-directory")) return { ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response;
       return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgabeordner speichern" })).toBeDisabled());
     const duplicateFileChecks = screen.getAllByRole("checkbox", { name: "Für Stapel auswählen: first.log" });
     fireEvent.click(duplicateFileChecks[0]);
     fireEvent.click(duplicateFileChecks[1]);
@@ -434,7 +419,6 @@ describe("approved file lock UI", () => {
     const project = {
       id: "project-approved", name: "Freigabeprojekt", description: "", status: "active",
       created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00",
-      output_directory: "/tmp/approved-output"
     };
     const file = {
       id: "file-approved", project_id: project.id, display_name: "service.log",
