@@ -333,7 +333,7 @@ describe("compact registered file workspace", () => {
     expect(within(row as HTMLElement).getByRole("combobox", { name: "Format für events.json" })).toBeInTheDocument();
     expect(within(row as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
     expect(within(row as HTMLElement).getByRole("button", { name: "Erkennen" })).toBeInTheDocument();
-    expect(within(row as HTMLElement).getByRole("button", { name: "Bereinigen" })).toBeDisabled();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Bereinigen" })).toBeEnabled();
     expect(screen.queryByRole("region", { name: "Projektprinzipien" })).not.toBeInTheDocument();
   });
 });
@@ -372,6 +372,7 @@ describe("multi-file project sanitization workflow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    await screen.findByText("first.log");
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
@@ -413,6 +414,7 @@ describe("multi-file project sanitization workflow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    await screen.findByText("first.log");
     const duplicateFileChecks = screen.getAllByRole("checkbox", { name: "Für Stapel auswählen: first.log" });
     fireEvent.click(duplicateFileChecks[0]);
     fireEvent.click(duplicateFileChecks[1]);
