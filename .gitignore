@@ -24,6 +24,8 @@ mappings/
 .env
 .env.*
 !.env.example
+config/deployment.json
+config/deployment.local.json
 *.log
 
 # OS/editor

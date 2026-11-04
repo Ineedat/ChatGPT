@@ -1,33 +1,270 @@
 # Roadmap
 
+> **Baseline v2.8 (2026-10-29):** Performance and usability take priority for Standalone-Laptop and defined Air-Gap operation. High-security hardening items are no longer release gates; user accounts, roles, review/approval and audit remain required. See [REQUIREMENTS.md](REQUIREMENTS.md).
+
 ## Meilenstein 0 — Grundgerüst
 - [x] Anforderungen v2.7 dokumentieren.
 - [x] FastAPI-Health-Endpunkt und Test.
 - [x] React/TypeScript-Oberfläche mit lokal eingebundener Hilfe.
+- [x] Backend-/Frontend-Tests und Frontend-Build lokal erfolgreich ausgeführt.
 - [ ] Installations- und Testbefehle unter Windows und Linux verifizieren.
 
 ## Meilenstein 1 — Sicherer lokaler Kern
-- [ ] Projektverwaltung und Metadatenschema.
-- [ ] Einzeldatei-/Ordnerimport, Originale bleiben unverändert.
-- [ ] Format-Erkennung mit explizitem Umgang mit unbekannten Formaten.
-- [ ] Versionierte Regelkonfiguration, Schema- und Konfliktprüfung.
-- [ ] Streaming für Text und JSON, begrenzter Speicherbedarf.
-- [ ] Stabile Projekt-Mappings, getrennt und geschützt gespeichert.
-- [ ] Fortschritt, Abbruch, temporäre Datenbereinigung.
-- [ ] Pflichtvalidierung und Scan nach Restmustern; Freigabe blockieren bei Fehlern.
+- [x] Projektverwaltung: Projekte anlegen, auflisten und öffnen.
+- [x] SQLite-Metadatenschema mit Schema-Versionierung.
+- [x] Einzeldatei registrieren: nur Metadaten speichern, Original unverändert lassen.
+- [x] Backend-Ordnerregistrierung mit Fehlerliste, Duplikatbehandlung und Begrenzung auf 5.000 Dateien.
+- [x] Einheitlicher UI-Ablauf für Einzeldatei- und Ordnerregistrierung mit gemeinsamer Pfadeingabe, Quelltyp-Auswahl, rekursiver Option und gemeinsamer Ergebnis-/Fehleranzeige (absolute Pfade; nativer Dateiauswahldialog bleibt offen).
+- [x] Konservativer Dateiendungs-Hinweis (`format_hint`) inklusive `unknown`; keine Inhaltsprüfung bei Registrierung.
+- [x] Explizite heuristische Formaterkennung anhand einer lokalen Stichprobe von höchstens 64 KiB; Ergebnis lokal speichern.
+- [x] Manuelle Format-Auswahl pro Datei speichern und wieder entfernen.
+- [x] Explizite vollständige Formatvalidierung für Text, JSON, JSON Lines, CSV und XML über Backend-Endpunkt und UI; unbekannte Formate werden nicht als gültig bestätigt. Die Validierung prüft Syntax, nicht die Erkennung sensibler Daten.
+- [x] Versionierte JSON-Regelkonfiguration v1 mit Schema-, Regex-, Profilreferenz- und Konfliktprüfung; lokale atomare Speicherung über API. Die Regeln werden auf unterstützte Text- und JSONL-Dateien angewendet.
+- [x] Streaming-Ausführung für UTF-8-Text, JSON Lines und vollständige JSON-Dokumente mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung. Text/JSONL-Zeilen und einzelne JSON-Strings sind auf 1 MiB begrenzt; JSON-Schlüssel und -Werte werden regelbasiert verarbeitet. XML/CSV bleiben Validierungs-, keine Bereinigungsformate.
+- [x] Neue Mapping-Speicherung auf einfache lokale SQLite-Struktur zurückgeführt; produktive Nutzung beginnt mit einer frischen Datenbank. Keine Migration von Entwicklungs-/Testbeständen.
+- [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
+- [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
+- [x] Frei wählbare absolute Ausgabepfade ohne Workspace-Allowlist; Zielordner muss existieren, bestehende Ziele werden nicht überschrieben und Quelldateien bleiben unverändert.
+- [x] LS-SEC-003 race-resistente Veröffentlichung ist nach Anforderungen v2.8 kein Produktziel mehr. Die aufwendige Race-Härtung wird nicht umgesetzt; einfache, zuverlässige Dateiausgabe mit Fehlerbereinigung bleibt erforderlich.
+- [x] Dauerhafte Lauf-/Prüfhistorie mit Ergebniskennzahlen, Status, Kommentaren, Ausnahmebegründungen und Audit-Ereignissen in einer separaten lokalen SQLite-Datenbank.
+- [x] Dauerhafte Hintergrundjob-Status-/Fortschrittsdaten in SQLite; beim Start verwaiste Läufe als `interrupted` markieren und zugehörige verwaiste Staging-Dateien sicher bereinigen.
+- [x] Pflichtvalidierung nach der Bereinigung: Ausgabe vollständig zeilenweise erneut lesen, UTF-8/JSONL-Syntax prüfen und alle aktiven konfigurierten Muster auf Resttreffer scannen; bei Fehlern Ausgabe löschen und Lauf ablehnen. Gilt nur für unterstützte Text-/JSONL-Ausgabe und ist kein Beweis vollständiger Geheimniserkennung.
 
 ## Meilenstein 2 — Prüfung und kontrollierte Freigabe
-- [ ] Lokale Anmeldung und rollenbasierte Rechte.
-- [ ] Prüfer-Warteschlange und sichere Suche.
-- [ ] Freigabe/Rückgabe mit Kommentar, Laufhistorie und Audit.
-- [ ] Begründete, eng begrenzte Ausnahmen.
+- [x] Lokale Anmeldung, serverseitige Rollenprüfungen und Login-Oberfläche; Authentifizierungs- und Regressionstests in CI erfolgreich.
+- [x] Prüfer-Warteschlange und Stichprobensuche ausschließlich in bereinigten Ausgaben; wörtliche Suche und zeitbegrenzte Regex-Suche sowie eigene gespeicherte Suchmuster inklusive Suchart.
+- [x] Freigabe, Rückgabe, Stopp und Kommentare; Laufhistorie und unveränderliche Audit-Ereignisse.
+- [x] Eng begrenzte, ausdrücklich begründete Ausnahmen; fehlgeschlagene Pflichtvalidierungen bleiben nicht freigabefähig.
+- [x] Rollen- und Berechtigungstests: Operator-/Reviewer-/Approver-/Admin-Trennung, kombinierte Rollen, Review-Entscheidungen, Such-/Kommentar-/Audit-Zugriff und Fail-closed-Verhalten bei unbekannter Prüferzuordnung; CI erfolgreich.
 
 ## Meilenstein 3 — Deployment
-- [ ] Optionale SMTP-Benachrichtigungen und Konfigurationstest.
-- [ ] Optionale LDAP/AD-Integration.
-- [ ] Geschützte Darksite-Netzwerkbindung.
-- [ ] Portable Windows-/Linux-Paketierung und Offline-Handbuch.
-- [ ] Sicherheits- und Performanceprüfung, Testdateien >= 5 GB.
+- [x] Optionale SMTP-Benachrichtigungen für ausstehende Prüffreigaben und zurückgegebene Läufe; Konfiguration über lokale Umgebungsvariablen und automatisierte Tests.
+- [x] Optionale LDAP/AD-Anmeldung im Netzwerkprofil: LDAPS oder StartTLS, explizite LDAP-Gruppen-Zuordnung zu Rollen, keine lokale Passwort-Fallback-Anmeldung; Konfiguration aus JSON plus Dienstkonto-Geheimnis aus der Umgebung. Live-Verbindung zu einer echten LDAP/AD-Instanz bleibt ein Integrationstest vor Freigabe.
+- [x] Explizite Deployment-Profile: Standalone nur Loopback/lokale Konten/SMTP aus; Netzwerkprofil benötigt eine geschützte Bind-Adresse und TLS-Zertifikat/Schlüssel und startet HTTPS; Authentifizierung ist wahlweise lokal oder über LDAP/AD möglich, SMTP bleibt optional. Netzwerk- und TLS-Betrieb muss vor Freigabe gegen die Zielumgebung geprüft werden.
+- [x] Portable Windows-/Linux-CI-Paketierung: PyInstaller-One-Folder-Build und Standalone-Health-Smoke-Test auf `windows-latest` und `ubuntu-latest` erfolgreich (GitHub Actions Lauf 40936541846, 2026-10-29). Dies bestätigt den CI-Build, ersetzt aber noch keine Installationstests auf den tatsächlich unterstützten Zielversionen.
+- [ ] Offline-Handbuch und portable Pakete auf den tatsächlichen Zielversionen von Windows/Linux prüfen; Netzwerkprofil zusätzlich separat paketiert und gegen die Zielumgebung testen.
+- [x] Streaming-Speicherregression: 64-MiB-Testdatei mit begrenztem Python-Speicherverbrauch in CI; zusätzlicher optionaler 5-GiB-End-to-End-Test über `LOGSANITIZER_RUN_5GB_TEST=1`.
+- [x] Reproduzierbares synthetisches Performance-Benchmark-Skript mit Laufzeit, CPU, Durchsatz, Python-Tracemalloc und Prozess-RSS ergänzt; kleiner Benchmark unter Windows/Linux und vollständiger 5-GiB-Lauf auf GitHub-Linux-Runner in CI vorgesehen.
+- [ ] 5-GiB-Test auf dedizierter Zielhardware ausführen und Laufzeit, RAM/CPU sowie UI-Reaktionsfähigkeit dokumentieren; Bedienbarkeit und typische Arbeitsabläufe testen. Siehe PERFORMANCE.md.
+
+## Aktueller Validierungsstand (2026-10-30)
+
+- [x] Vollständige JSON-Dokumente sind jetzt als Bereinigungsformat freigegeben und werden mit einem Streaming-Parser verarbeitet; Ausgabe wird erneut strukturell und auf Resttreffer geprüft.
+- [x] Offline-Hilfe wurde um konkrete Arbeitsabläufe, JSON-Verhalten, große Dateien und Deployment erweitert; F1 öffnet die Hilfe.
+- [x] Portable-Paket-CI prüft Standalone und HTTPS-Netzwerkprofil unter Windows und Linux; lokaler Netzwerk-Login und LDAP-Konfigurationspfad sind durch Backend-Tests abgedeckt. Echte LDAP-/SMTP-Zielintegration bleibt ein manueller Abnahmeschritt, da keine Air-Gap-Verzeichnis- oder Mailserver verfügbar sind.
+- [x] Vollständiger synthetischer 5-GiB-CI-Referenzlauf erfolgreich: 96,806 s, 52,89 MiB/s, maximaler Prozess-RSS 40.443.904 Byte; Messprotokoll in PERFORMANCE.md. Zielhardwaremessung bleibt offen.
+
+- [x] CI-Lauf 41128457176 (Commit 19f7e53): alle fünf Jobs erfolgreich; vollständiger 5-GiB-Referenzlauf auf Linux erfolgreich. Push-CI-Lauf 41128449589 ebenfalls vollständig erfolgreich.
+- [x] Backend-Windows-Job erfolgreich; dieser Job führt aktuell nur den gezielten Mapping-Test aus, nicht die vollständige Backend-Suite.
+- [x] Rollenmatrix, Review-Entscheidungen, Operator-Berechtigungsgrenzen und Rückgabe-Benachrichtigung sind durch Tests abgedeckt.
+- [x] Issue #3 zur verpflichtenden Workspace-Allowlist gemäß v2.8 als nicht mehr geplant geschlossen; dies ist keine Aussage über Race-Resistenz der bisherigen Implementierung.
 
 ## Definition of done
 Eine Funktion benötigt Tests, verständliche Offline-Hilfe, sicheres Fehlerverhalten und Dokumentation. Sicherheitsfunktionen müssen auch abgewiesene/unzulässige Pfade testen.
+
+## Umstellung auf Anforderungen v2.8
+- [x] Mapping-Verschlüsselung durch einfache lokale Mapping-Speicherung ersetzt; keine Migration von Entwicklungs-/Testdatenbanken.
+- [x] Backend-Ausgabeort ohne verpflichtende Workspace-Allowlist umgesetzt; die veraltete Deployment-Einstellung wurde entfernt.
+- [x] Deployment-Dokumentation auf v2.8 ausgerichtet: Standalone-Laptop und definiertes Air-Gap-Netz; LDAP/SMTP als optionale Netzwerkfunktionen. Die Laufzeitumstellung ist davon getrennt und noch offen.
+- [x] Rollen, Prüferworkflow, Freigabe/Rückgabe und Audit mit Regressionstests abgesichert; CI erfolgreich.
+- [ ] Performance- und Usability-Schwerpunkt: 5-GiB-Lauf auf tatsächlicher Zielhardware, CPU-/RAM-/Laufzeitprofile, UI-Reaktionszeiten und kurze Bedienwege. CI-Referenzmessung liegt vor; die Zielhardware-Abnahme ist weiterhin offen.
+
+
+## Priorisierte nächste Entwicklungsschritte
+
+### Priorität 1 — Regelverwaltung und erste fachlich nutzbare Konfiguration
+- [x] Grafischer Regeleditor: Regeln anlegen, bearbeiten, kopieren, löschen und aktivieren/deaktivieren; globale und quellprofilspezifische Regeln; Kategorien, Suchart, Ersetzung, Mapping-Präfix und Priorität.
+- [x] Quellprofile in der Oberfläche anlegen, bearbeiten und löschen; verwendete Profile vor versehentlichem Löschen schützen.
+- [x] Regelkonfiguration vor dem Speichern serverseitig validieren und Konflikte verständlich anzeigen.
+- [x] Integrierte Musterprüfung/Vorschau: einzelne Regeln (auch deaktivierte Entwürfe) und aktive Regelsets mit Profilfilter testen; Treffer/Ersetzungen, Prioritätsreihenfolge, Folgetreffer und überlappende Fundstellen anzeigen. Vorschau läuft ausschließlich im Speicher und verändert weder Quelldateien noch dauerhafte Projekt-Mappings.
+- [x] Offline-Regelbibliothek mit 20 kategorisierten, einzeln übernehmbaren und editierbaren Startvorlagen für IPv4/IPv6, FQDN/Hostnamen, Benutzer, E-Mail, ausgewählte personenbezogene Daten, Passwort-/Token-/API-Key-Felder, Windows-/Unix-Pfade und Infrastrukturwerte; Vorlagen werden zunächst deaktiviert eingefügt. Regex-Tests, API und GUI sind abgedeckt.
+- [x] GUI-Import und -Export versionierter JSON-Regelkonfigurationen inklusive Dateigrößenbegrenzung, Schema-/Regex-/Profil-/Konfliktprüfung, Importvorschau und expliziter Übernahme in einen ungespeicherten Entwurf; dauerhafte Aktivierung erst nach separatem Speichern. Exporte enthalten keine Projekt-Mappings.
+- [x] Quellprofil pro registrierter Datei in der Projektoberfläche auswählen und an den Bereinigungslauf übergeben; ohne Auswahl gelten globale Regeln. Nach erfolgreichem Lauf direkter Wechsel zu Prüfung & Verlauf.
+- [x] Projektablauf in der Oberfläche verbinden: Projekt-/Dateiübersicht führt zur Regel- und Profilverwaltung; von Regelverwaltung und Prüfung/Verlauf führt eine Rücknavigation zurück zum Projekt; nach erfolgreicher Bereinigung bleibt der direkte Einstieg in die Prüfung erhalten. Formatwahl/-prüfung, Quellprofil, Bereinigung und Ergebnisvalidierung sind im Projektkontext gebündelt.
+
+### Priorität 2 — Abnahme und Freigabe
+- [x] End-to-End-Berechtigungstests für Regelverwaltung: Administrator/Rule Owner dürfen Regeln ändern; Processor darf Regeln anwenden, aber nicht bearbeiten.
+- [x] Review-Überarbeitung in der GUI übernimmt die erneute Quellprofilwahl und übergibt sie an den neuen Bereinigungslauf; erneute Pflichtvalidierung und Prüfung bleiben erforderlich.\n- [x] Review-/Freigabe-GUI vervollständigt: Stichprobensuche (wörtlich/Regex), gespeicherte Suchmuster, Freigabe/Rückgabe/Stopp, begründete Ausnahme, Kommentare, Laufdetails, gefilterte Historie, Vorgänger-/Folgelauf-Navigation und Audit-Filter. Die App führt nach erfolgreicher Bereinigung direkt zur Prüfung & Verlauf; zurückgegebene Läufe können mit neu gewähltem Quellprofil überarbeitet werden.
+- [ ] Zielsystem-Abnahme unter unterstützten Windows-/Linux-Versionen, inklusive 5-GiB-Datei, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit.
+- [ ] LDAP/AD-Gruppenzuordnung, TLS-Zertifikate und SMTP-Versand in der tatsächlichen Air-Gap-Umgebung testen.
+- [ ] Offline-Handbuch und portable Pakete final auf Zielsystemen prüfen.
+
+### Priorität 3 — Qualität und Erweiterung
+- [ ] Zusätzliche Muster-/Formatfälle und synthetische Testkorpora (IPv6, URL-Encoding, mehrzeilige Stacktraces, überlappende Regeln).
+- [ ] CSV-/XML-Bereinigung fachlich entscheiden und bei Freigabe implementieren; derzeit nur Validierung.
+- [ ] Performance bei vielen Regeln und typischen Anwendungslogs messen und gezielt optimieren.
+- [ ] Release-Pakete, Versionierung und Changelog mit einem echten Testrelease prüfen.
+
+## UI-Gestaltungsrichtlinien (bei Umsetzung der jeweiligen UI-Roadmap-Punkte)
+
+Diese Richtlinien gelten verbindlich, werden aber schrittweise mit den jeweils anstehenden Oberflächen umgesetzt und ziehen keine späteren Roadmap-Arbeiten vor:
+
+- Eine Bildschirmseite soll die für den aktuellen Arbeitsschritt nötigen Informationen und Aktionen möglichst vollständig zeigen; unnötiges seitenweites Scrollen vermeiden.
+- Menüs und Reiter zur klaren Gliederung einsetzen.
+- Dropdowns und Select-Listen Freitextfeldern vorziehen, wenn die Auswahlmenge bekannt und begrenzt ist.
+- Pfade und Dateien über einen geeigneten Dateibrowser auswählen, nicht manuell in Textfelder eingeben.
+- Mouseover-/Fokus-Hilfen und die Offline-Hilfe sollen die Bedienung verständlich erklären.
+
+
+## Regelverwaltungs-Meilenstein — CI-Nachweis (2026-10-30)
+
+- [x] Frontend-Tests und TypeScript-/Vite-Build erfolgreich.
+- [x] Backend-Suite: 86 passed, 1 skipped; Ruff ohne Befund.
+- [x] Portable Windows- und Linux-Builds sowie Standalone-/Netzwerk-Smoke-Tests erfolgreich.
+- [x] 5-GiB-Referenzlauf erneut erfolgreich: 98,201 s, 52,14 MiB/s, CPU 95,069 s, maximaler Prozess-RSS 40.345.600 Byte; 10.485.760 Zeilen/Ersetzungen, Ausgabevalidierung erfolgreich.
+- [x] Push-CI-Lauf [41135496635](https://github.com/Ineedat/ChatGPT/actions/runs/41135496635) und PR-CI-Lauf [41135503242](https://github.com/Ineedat/ChatGPT/actions/runs/41135503242) vollständig grün (je fünf Jobs).
+
+
+## Regelbibliothek — Umsetzung (2026-10-30)
+
+- [x] 20 Startvorlagen in acht Kategorien ergänzt; alle Vorlagen werden als deaktivierte Regelkopien in die aktive Konfiguration übernommen.
+- [x] Offline-API-Endpunkt für Kategorien und Vorlagen ergänzt; Bibliothek verändert die gespeicherte Regelkonfiguration nicht.
+- [x] GUI-Reiter mit Kategorieauswahl, Musterbeschreibung, synthetischen Beispielen und fachlichen Warnhinweisen ergänzt.
+- [x] Regelkopien bleiben einzeln editierbar; Präfixe, Prioritäten und Feldmuster sind vorbereitet.
+- [x] Backend-Validierung und Regressionstests für Kategorien, Vorlagen, alle synthetischen Musterbeispiele und den read-only Bibliotheks-API-Endpunkt ergänzt.
+- [x] Offline-Hilfe und docs/RULE_LIBRARY.md ergänzt.
+- [x] CI vollständig abgewartet und erfolgreich: Push-Lauf [41139434088](https://github.com/Ineedat/ChatGPT/actions/runs/41139434088) und PR-Lauf [41139437697](https://github.com/Ineedat/ChatGPT/actions/runs/41139437697) mit allen fünf Jobs erfolgreich.
+
+
+## Regeltests und Bereinigungsvorschau — Umsetzung (2026-10-30)
+
+- [x] Backend-Endpunkt `POST /api/rules/preview` ergänzt; Konfiguration und synthetischer Beispieltext werden direkt übergeben, ohne die gespeicherte Konfiguration zu verändern.
+- [x] Einzelregeltest auch für deaktivierte oder noch nicht gespeicherte Entwürfe sowie Simulation aller aktiven Regeln in Prioritätsreihenfolge ergänzt.
+- [x] Trefferpositionen, Beispielwerte, Ersetzungen, Trefferzahlen und abgeschnittene Trefferlisten werden angezeigt.
+- [x] Überlappende Treffer im ursprünglichen Beispiel und Folgetreffer auf zuvor erzeugte Ersetzungen werden sichtbar gemacht.
+- [x] Indexierte Platzhalter werden in einem flüchtigen Vorschau-Mapping simuliert; es werden keine Projekt-Mappings angelegt oder verändert.
+- [x] Eingabe auf 65.536 Zeichen begrenzt; Regex-Ausführung hat ein Zeitlimit. Datei- und Originalpfade werden nicht angenommen oder geöffnet.
+- [x] Frontend-Reiter „Regeltest & Vorschau“, Backend-/Frontend-Tests und Offline-Hilfe ergänzt.
+- [x] CI vollständig erfolgreich: Push-Lauf [41141238296](https://github.com/Ineedat/ChatGPT/actions/runs/41141238296) und PR-Lauf [41141244600](https://github.com/Ineedat/ChatGPT/actions/runs/41141244600), jeweils alle fünf Jobs grün; einschließlich vollständigem 5-GiB-Benchmark (70,038 s, 73,10 MiB/s, 40.546.304 Byte maximaler Prozess-RSS).
+
+
+## Erweiterung Regeltest und Dateivorschau — umgesetzt (2026-10-31)
+
+- [x] Dateibasierte Vorschau registrierter Text-/JSONL-Quelldateien mit begrenzten UTF-8-Fenstern (maximal 65.536 Zeichen je Fenster); Quelldatei ausschließlich lesend öffnen.
+- [x] Navigation zum Dateianfang und -ende sowie abschnittsweise vor/zurück; keine vollständige Einlesung großer Logdateien.
+- [x] Original und bereinigte Vorschau nebeneinander mit synchronem vertikalem Scrollen, unabhängiger horizontaler Navigation und farblich markierten Treffern/Ersetzungen.
+- [x] Treffer-Navigation und klare Kennzeichnung der geladenen Dateiposition.
+- [x] Regressionstests für Anfang/Ende, UTF-8-Grenzen, ungültiges UTF-8, Symlink-Ausschluss und unveränderte Quelldateien.
+- [x] Offline-Hilfe aktualisiert; PR-CI vollständig erfolgreich: Lauf [41143691073](https://github.com/Ineedat/ChatGPT/actions/runs/41143691073), alle fünf Jobs grün (Frontend, Backend Windows/Linux, portable Windows/Linux), einschließlich 5-GiB-Benchmark.
+
+Punkt 4 (Import/Export versionierter JSON-Regelkonfigurationen) wurde nach Abschluss der Dateivorschau umgesetzt; die Umsetzung ist in der priorisierten Roadmap abgehakt.
+
+
+## Prüfer-Stichprobensuche — Erweiterung (2026-10-31)
+
+- [x] Ad-hoc-Suche wahlweise wörtlich oder als regulärer Ausdruck.
+- [x] Regex-Ausführung mit 100-ms-Zeitlimit je Zeile und maximal 1-MiB-Zeilenlänge; fehlerhafte und zeitüberschreitende Muster werden verständlich abgewiesen.
+- [x] Eigene Suchmuster speichern Suchtext und Suchart; beim Laden wird die gespeicherte Suchart wiederhergestellt.
+- [x] Suche bleibt auf validierte, unveränderte bereinigte Ausgaben beschränkt; Originaldateien sind nicht durchsuchbar.
+- [x] Backend- und Frontend-Regressionstests ergänzt; CI-Verifizierung folgt nach Abschluss der Änderung.
+
+
+## Review-/Freigabe-Meilenstein — Implementierung (2026-10-31)
+
+- [x] Ad-hoc-Stichprobensuche und eigene Suchmuster wahlweise wörtlich oder Regex; Regex-Zeitlimit und Ausgabe-/Zeilenlimits aktiv.
+- [x] Laufhistorie nach Suchtext und Status filterbar; Laufdetails verknüpfen Vorgänger und Folge-Überarbeitungen.
+- [x] Audit-Protokoll optional auf den ausgewählten Lauf einschränkbar.
+- [x] Regressionstests für History-Filter und Laufverknüpfung ergänzt.
+- [x] Backend-End-to-End-Berechtigungstest: Administrator und Rule Owner dürfen Regelkonfiguration speichern; Processor wird beim Speichern, Validieren und Vorschau-Endpunkt abgewiesen.
+- [x] Offline-Hilfe um Sucharten, Historienfilter, Laufketten und Audit-Filter ergänzt.
+- [ ] Externe Abnahme bleibt erforderlich: reale Windows-/Linux-Zielhardware (5 GiB, Abbruch/Wiederanlauf, RAM/CPU und UI-Reaktionszeit), LDAP/AD/TLS/SMTP in der Air-Gap-Umgebung sowie finale Offline-Paketprüfung.
+
+
+## CI-Strategie (2026-10-31)
+
+- [x] Schnelle CI bei jedem Push/Pull Request: Backend-Tests, Windows-Regressionslauf, Ruff sowie Frontend-Tests und Build.
+- [x] Aufwendige 5-GiB-Benchmarks und portable Windows-/Linux-Builds aus der regulären CI entfernt und in einen manuell startbaren Meilenstein-Workflow verschoben.
+- [x] Meilenstein-Workflow prüft 5-GiB-Streaming (optional abschaltbar), portable Pakete und Standalone-/HTTPS-Netzwerk-Smoke-Tests.
+- [x] Release-Workflow bleibt als zusätzliche Prüfung beim Erstellen eines Versions-Tags bestehen.
+- [ ] Neue CI-Aufteilung nach dem Commit durch Push-/PR-CI und einen manuellen Meilensteinlauf verifizieren.
+
+Details und Startanleitung: [CI.md](CI.md).
+
+
+## Projektworkflow — Navigation (2026-10-31)
+
+- [x] Aus dem geöffneten Projekt direkt zur Regel- und Quellprofilverwaltung wechseln.
+- [x] Aus der Regelverwaltung mit einer klaren Rücknavigation zum Projekt zurückkehren.
+- [x] Aus Prüfung & Verlauf zum Projekt zurückkehren; der bestehende direkte Sprung nach erfolgreicher Bereinigung bleibt bestehen.
+- [x] Frontend-Regressionstests für die Navigation ergänzt.
+- [ ] Neue Navigation durch schnelle Push-/PR-CI verifizieren.
+
+
+## UI-Designbaseline — kompakt und kontrastreich (2026-10-31)
+
+- [x] Einheitliche helle, Windows-orientierte Darstellung mit Segoe-UI-Systemschrift, dunkler Schrift auf hellen Flächen und klaren neutralen Rahmen eingeführt.
+- [x] Einheitliche Schriftgröße von 10 px festgelegt; damit liegen alle UI-Texte innerhalb der Vorgabe von mindestens 8 px und maximal 12 px.
+- [x] Fokuszustände mit gut sichtbarem Windows-Blau; Warnungen, Fehler und Erfolgsmeldungen mit kontrastreichen, semantisch unterscheidbaren Flächen.
+- [x] Grundabstände, Eingabefelder, Schaltflächen und Karten kompakter gestaltet, um mehr Arbeitsinhalt auf einer Bildschirmseite unterzubringen.
+- [ ] Kontrast und Lesbarkeit bei realen Windows-/Linux-Bildschirmauflösungen visuell prüfen; besonders Regelvorschau, Review und Login.
+- [ ] Im nächsten UI-Schritt Projektarbeitsbereich und Dateiliste weiter verdichten, ohne Funktionen oder Statusinformationen zu verstecken.
+
+
+## Projektarbeitsbereich — kompakte Dateikarten (2026-10-31)
+
+- [x] Registrierte Dateien als kompakte Karten in responsivem Raster darstellen.
+- [x] Dateiname, Registrierungsstatus, Dateigröße sowie Endungs-Hinweis und erkannter Typ auf einen Blick zusammenfassen.
+- [x] Formatauswahl, lokale Erkennung, vollständige Validierung, Quellprofil, Ausgabepfad und Bereinigungsaktion gruppieren; keine Aktionen hinter zusätzlichen Menüs verstecken.
+- [x] Bereinigungsaktion als primäre Schaltfläche kenntlich machen; weiterhin deaktivieren, wenn Format oder Ausgabepfad ungeeignet ist.
+- [x] Frontend-Regressionstest für Gruppierung und direkte Erreichbarkeit der Aktionen ergänzen.
+- [ ] Visuelle Abnahme bei typischen Desktop-Auflösungen und schmalen Fenstern; insbesondere lange Dateinamen und viele registrierte Dateien prüfen.
+
+
+- [x] Allgemeine Projektprinzipien-Karten ausblenden, sobald ein Projekt geöffnet ist; sie bleiben in der Projektübersicht ohne Auswahl sichtbar und beanspruchen nicht länger Platz im aktiven Arbeitsbereich.
+
+
+## Dateiimport — vereinheitlichte Bedienung (2026-11-01)
+
+- [x] Einzeldatei und Ordner verwenden im Projektarbeitsbereich denselben Formular- und Registrierungsablauf; der Quelltyp wird über eine kompakte Auswahlliste gewählt.
+- [x] Gemeinsame Lade-, Fehler- und Erfolgsbehandlung; registrierte Dateien werden anhand ihrer IDs zusammengeführt, Ordner-Duplikate und übersprungene Einträge bleiben sichtbar.
+- [x] Rekursive Suche wird nur bei Ordnerauswahl eingeblendet; das bestehende Limit von 5.000 Kandidaten bleibt bestehen.
+- [x] Browser-Dateiauswahl für Einzel-/Mehrfachdateien und Ordnerauswahl integriert; relative Unterordnerstruktur bleibt erhalten.
+- [x] Backend- und Frontend-Regressionstests für Upload, Pfad-Traversal und Größenlimit ergänzt.\n- [x] Automatisierte CI auf Linux und Windows sowie Frontend-Tests und Build erfolgreich; Windows prüft zusätzlich Projekt- und Upload-Endpunkte.\n- [ ] Visuelle Abnahme auf realen Windows-/Linux-Bildschirmen (externe manuelle Prüfung).
+
+
+
+## Dateiimport — Speicherplatzprüfung (2026-11-01)
+
+- [x] Vor dem Upload den verfügbaren Speicherplatz auf dem Zielvolume gegen die Gesamtgröße der ausgewählten Dateien prüfen.
+- [x] Eine Reserve von mindestens 16 MiB bzw. 5 % der Uploadgröße berücksichtigen.
+- [x] Bei unzureichendem Speicherplatz den gesamten Upload vor dem ersten Kopiervorgang mit HTTP 507 ablehnen.
+- [x] Freien Speicherplatz unmittelbar vor jeder Datei erneut prüfen, um zwischenzeitliche Änderungen zu erkennen.
+- [x] Backend-Regressionstests für unzureichenden Gesamtspeicher und zwischenzeitlich sinkenden freien Speicherplatz ergänzen.
+
+
+
+## Projektworkflow mit mehreren Dateien — Umsetzung (2026-11-01)
+
+- [x] Geeignete Projektdateien per Kontrollkästchen einzeln oder gesammelt auswählen.
+- [x] Mehrdatei-Bereinigung über einen gemeinsamen Start auslösen; Dateien werden nacheinander statt parallel verarbeitet, um CPU-, RAM- und Datenträgerlast kontrollierbar zu halten.
+- [x] Pro Datei bleiben Quellprofil, Ausgabepfad, Fortschritt, Fehler und Abbruch getrennt.
+- [x] Doppelte oder leere Ausgabeziele vor dem Start der Stapelverarbeitung abweisen; bestehende Zielkonflikte werden weiterhin serverseitig geprüft.
+- [x] Stapelabbruch beendet die aktive Datei kooperativ und startet keine weiteren ausgewählten Dateien.
+- [x] Projektweite Mapping-Konsistenz über mehrere Dateien ist durch die SQLite-Implementierung und den bestehenden Backend-Regressionstest abgesichert.
+- [x] Erfolgreiche Dateien erzeugen weiterhin eigene validierte Review-Läufe; Freigabe bleibt pro Datei getrennt.
+- [x] Offline-Hilfe und Frontend-Regressionen für Reihenfolge und doppelte Ausgabeziele ergänzt.
+- [x] Push-/PR-CI für den Mehrdateiablauf vollständig erfolgreich: Push-Lauf [41324254157](https://github.com/Ineedat/ChatGPT/actions/runs/41324254157) und PR-Lauf [41324257605](https://github.com/Ineedat/ChatGPT/actions/runs/41324257605), alle drei Jobs jeweils grün.
+
+
+## Review-Arbeitsbereich — Stabilisierung und CI-Abschluss (2026-11-03)
+
+- [x] Vergleichsansicht mit synchronem vertikalem Scrollen und unabhängigem horizontalem Scrollen wiederhergestellt.
+- [x] Veraltete Antworten asynchroner Vergleichsabfragen gegen neuere Dateiauswahlen abgesichert.
+- [x] Helle, kontrastreiche Vergleichsfenster und Eingabefelder mit dunkler Schrift verbindlich festgelegt.
+- [x] Fund- und Ersetzungsstellen auf beiden Seiten farblich hervorgehoben und durch Frontend-Regressionen abgesichert.
+- [x] Freigegebene Dateien in der Projektdateiliste deutlich als gesperrt kennzeichnen; Vergleich bleibt weiterhin möglich. Backend-Sperren gegen Formatänderung, Erkennung und erneute Bereinigung sind durch vorhandene Regressionstests abgesichert.
+- [x] Quellprofil-Anlage, Bearbeitung und Löschung einschließlich Schutz vor dem Löschen noch verwendeter Profile testen.
+- [x] Bestätigtes Verwerfen eines Regelentwurfs setzt den Entwurf tatsächlich zurück; ungespeicherte Konfiguration kann ausdrücklich verworfen und neu geladen werden.
+- [x] CI-Lauf [41677942384](https://github.com/Ineedat/ChatGPT/actions/runs/41677942384) vollständig erfolgreich: Frontend 38 Tests und Build; Backend Linux 122 passed/1 skipped; Backend Windows 23 gezielte Tests; Ruff auf beiden Plattformen.
+- [ ] Visuelle Abnahme auf realen Windows-/Linux-Bildschirmen bleibt externe manuelle Prüfung.
+
+
+
+## Bearbeiteransicht und Benutzerverwaltung — Erweiterung (2026-11-04)
+
+- [x] Zurückgewiesene Läufe werden in der Projekt-Dateiliste des Bearbeiters eindeutig als „Zurückgewiesen – Überarbeitung erforderlich“ markiert; der Rückgabegrund wird direkt angezeigt.
+- [x] Bearbeiter können eigene zurückgewiesene und noch nicht freigegebene Bereinigungsläufe im Original-/Bereinigt-Vergleich öffnen; vertikales Scrollen synchron, horizontales Scrollen unabhängig.
+- [x] Backend-Berechtigung: Bearbeiter dürfen ausschließlich eigene Läufe vergleichen; Prüfer, Freigeber und Administratoren behalten ihren rollenbasierten Prüfzugriff. Die zentrale Auth-Middleware lässt nur den Vergleichs-GET für Bearbeiter passieren; die Laufzugehörigkeit prüft der Endpunkt.
+- [x] Benutzerverwaltung von Karten auf eine kompakte Tabelle mit Kontotyp, Status, Rollen und Aktionen umgestellt.
+- [x] Frontend- und Backend-Regressionen für Rückweisungsanzeige, Vergleichszugriff und tabellarische Benutzerliste ergänzt.
+- [x] CI-Lauf [41913563076](https://github.com/Ineedat/ChatGPT/actions/runs/41913563076) vollständig erfolgreich: Frontend 39 Tests und Build; Backend Linux 122 passed/1 skipped; Backend Windows 23 Tests; Ruff auf beiden Plattformen.

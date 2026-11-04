@@ -1,14 +1,48 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App";
 
-// Vitest runs without global afterEach by default; clean up between renders.
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("LogSanitizer app shell", () => {
-  it("shows the development-only warning", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => []
+    }));
+  });
+
+  it("shows the development-only warning", async () => {
     render(<App />);
-    expect(screen.getByText(/Noch nicht für echte Logdaten freigegeben/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Projekte verwalten." })).toBeInTheDocument();
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+  });
+
+  it("navigates from the project workspace to rule management and back", async () => {
+    vi.mocked(fetch).mockImplementation(async input => {
+      if (String(input) === "/api/rules/config") {
+        return { ok: true, json: async () => ({ schema_version: 1, profiles: [], rules: [] }) } as Response;
+      }
+      return { ok: true, json: async () => [] } as Response;
+    });
+    render(<App />);
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+    fireEvent.click(screen.getByRole("button", { name: "Regeln" }));
+    expect(await screen.findByRole("heading", { name: "Bereinigungsregeln" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zum Projekt" }));
+    expect(await screen.findByRole("heading", { name: "Projekte verwalten." })).toBeInTheDocument();
+  });
+
+  it("navigates from review history back to the project workspace", async () => {
+    render(<App />);
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung & Verlauf" }));
+    expect(await screen.findByRole("heading", { name: "Prüfung & Verlauf" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zum Projekt" }));
+    expect(await screen.findByRole("heading", { name: "Projekte verwalten." })).toBeInTheDocument();
   });
 
   it("offers local help topics", async () => {
@@ -16,5 +50,412 @@ describe("LogSanitizer app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hilfe" }));
     expect(await screen.findByRole("heading", { name: "Hilfe und Grundlagen" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Erste Schritte" })).toBeInTheDocument();
+  });
+
+  it("creates a project and displays the persisted response", async () => {
+    const project = {
+      id: "project-1",
+      name: "Testprojekt",
+      description: "Testbeschreibung",
+      status: "draft",
+      created_at: "2026-10-27T10:00:00+00:00",
+      updated_at: "2026-10-27T10:00:00+00:00"
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: async () => [] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Neues Projekt" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Projektname" }), { target: { value: "Testprojekt" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /Beschreibung/ }), { target: { value: "Testbeschreibung" } });
+    fireEvent.click(screen.getByRole("button", { name: "Projekt erstellen" }));
+
+    const openedProject = await screen.findByRole("region", { name: "Geöffnetes Projekt" });
+    expect(within(openedProject).getByRole("heading", { name: "Testprojekt" })).toBeInTheDocument();
+    expect(within(openedProject).getByText("Testbeschreibung")).toBeInTheDocument();
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/projects", expect.objectContaining({ method: "POST" })));
+  });
+});
+
+
+describe("project file registration UI", () => {
+  const project = {
+    id: "project-logs",
+    name: "Logprojekt",
+    description: "",
+    status: "draft",
+    created_at: "2026-10-27T10:00:00+00:00",
+    updated_at: "2026-10-27T10:00:00+00:00"
+  };
+
+  it("registers a single absolute path and displays returned metadata", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        id: "file-1", project_id: project.id, display_name: "service.log", size_bytes: 120,
+        modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered"
+      }) } as Response);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Dateipfad" }), { target: { value: "/var/log/service.log" } });
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl übernehmen" }));
+
+    expect(await screen.findByText("Datei registriert. Der Inhalt wurde nicht verarbeitet.")).toBeInTheDocument();
+    expect(await screen.findByText("service.log")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files`, expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ path: "/var/log/service.log" })
+    }));
+  });
+
+  it("shows skipped folder-import entries without processing log contents", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        registered_count: 1,
+        skipped_count: 1,
+        registered_files: [{
+          id: "file-2", project_id: project.id, display_name: "app.log", size_bytes: 64,
+          modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered"
+        }],
+        issues: [{ file_name: "old.log", reason: "Bereits in diesem Projekt registriert." }],
+        limit_reached: false
+      }) } as Response);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    await screen.findByRole("region", { name: "Geöffnetes Projekt" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Quelle" }), { target: { value: "folder" } });
+    expect(screen.getByLabelText("Lokaler Ordner")).toHaveAttribute("webkitdirectory");
+    fireEvent.click(await screen.findByText("Alternativ: Backend-Pfad manuell registrieren"));
+    expect(screen.getByRole("checkbox", { name: "Unterordner einbeziehen" })).toBeInTheDocument();
+    fireEvent.change(await screen.findByRole("textbox", { name: "Absoluter Ordnerpfad" }), { target: { value: "/var/log/my-service" } });
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl übernehmen" }));
+
+    expect(await screen.findByText(/Registriert: 1; übersprungen: 1/)).toBeInTheDocument();
+    expect(await screen.findByText(/old.log/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/import-folder`, expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ path: "/var/log/my-service", recursive: true })
+    }));
+  });
+  it("uploads browser-selected files without exposing client filesystem paths", async () => {
+    const project = {
+      id: "project-upload", name: "Uploadprojekt", description: "", status: "draft",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
+    };
+    const uploaded = {
+      id: "file-upload", project_id: project.id, display_name: "service.log", size_bytes: 7,
+      modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered"
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        registered_count: 1, skipped_count: 0, registered_files: [uploaded], issues: [], limit_reached: false
+      }) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    const fileInput = await screen.findByLabelText("Lokale Dateien");
+    const file = new File(["logdata"], "service.log", { type: "text/plain" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl übernehmen" }));
+    expect(await screen.findByText(/Übernommen: 1; übersprungen: 0/)).toBeInTheDocument();
+    expect(await screen.findByText("service.log")).toBeInTheDocument();
+    const uploadCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/files/upload"));
+    expect(uploadCall).toBeDefined();
+    expect((uploadCall?.[1] as RequestInit).body).toBeInstanceOf(FormData);
+    expect(new Headers((uploadCall?.[1] as RequestInit).headers).has("Content-Type")).toBe(false);
+  });
+
+});
+
+
+describe("local format detection UI", () => {
+  it("requests a bounded format classification explicitly", async () => {
+    const project = { id: "project-format", name: "Format", description: "", status: "draft", created_at: "2026-10-27T10:00:00+00:00", updated_at: "2026-10-27T10:00:00+00:00" };
+    const file = { id: "file-format", project_id: project.id, display_name: "events.json", size_bytes: 25, modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered", format_hint: "json" };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, detected_format: "json", sample_limit_bytes: "65536" }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Erkennen" }));
+    expect(await screen.findByText(/Erkannt: JSON/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/detect-format`, expect.objectContaining({ method: "POST" }));
+  });
+
+  it("saves a manual format override", async () => {
+    const project = { id: "project-override", name: "Override", description: "", status: "draft", created_at: "2026-10-27T10:00:00+00:00", updated_at: "2026-10-27T10:00:00+00:00" };
+    const file = { id: "file-override", project_id: project.id, display_name: "events.log", size_bytes: 10, modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered", format_hint: "text", detected_format: "unknown", format_override: null };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...file, format_override: "json" }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("combobox", { name: "Format für events.log" }), { target: { value: "json" } });
+    expect(await screen.findByText(/Manuelles Format für events.log gespeichert: json/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/format`, expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({ format_override: "json" })
+    }));
+  });
+});
+
+
+describe("full format validation UI", () => {
+  it("validates the selected format and displays only validation metadata", async () => {
+    const project = { id: "project-validation", name: "Validierung", description: "", status: "draft", created_at: "2026-10-27T10:00:00+00:00", updated_at: "2026-10-27T10:00:00+00:00" };
+    const file = { id: "file-validation", project_id: project.id, display_name: "events.json", size_bytes: 25, modified_at: "2026-10-27T10:00:00+00:00", imported_at: "2026-10-27T10:00:00+00:00", state: "registered", format_hint: "json", detected_format: "json", format_override: null };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ file_id: file.id, format: "json", valid: true, bytes_checked: 25 }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Validieren" }));
+    expect(await screen.findByText(/Format gültig · json · 25 Byte geprüft/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(`/api/projects/${project.id}/files/${file.id}/validate-format`, expect.objectContaining({ method: "POST" }));
+  });
+});
+
+
+describe("offline help keyboard shortcut", () => {
+  it("opens local help with F1", async () => {
+    render(<App />);
+    await screen.findByText(/Noch keine Projekte vorhanden/);
+    fireEvent.keyDown(window, { key: "F1" });
+    expect(await screen.findByRole("heading", { name: "Hilfe und Grundlagen" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Große Dateien und Leistung" })).toBeInTheDocument();
+  });
+});
+
+
+describe("JSON document sanitization UI", () => {
+  it("allows a JSON document to start a sanitization job", async () => {
+    const project = { id: "project-json", name: "JSON", description: "", status: "draft", created_at: "2026-10-30T10:00:00+00:00", updated_at: "2026-10-30T10:00:00+00:00" };
+    const file = { id: "file-json", project_id: project.id, display_name: "events.json", size_bytes: 128, modified_at: "2026-10-30T10:00:00+00:00", imported_at: "2026-10-30T10:00:00+00:00", state: "registered", detected_format: "json" };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
+  });
+});
+
+
+describe("source profile selection for project sanitization", () => {
+  it("loads available source profiles and sends the selected profile with the sanitization job", async () => {
+    const project = {
+      id: "project-profile", name: "Profilprojekt", description: "", status: "draft",
+      created_at: "2026-10-31T10:00:00+00:00", updated_at: "2026-10-31T10:00:00+00:00"
+    };
+    const file = {
+      id: "file-profile", project_id: project.id, display_name: "events.log", size_bytes: 128,
+      modified_at: "2026-10-31T10:00:00+00:00", imported_at: "2026-10-31T10:00:00+00:00",
+      state: "registered", detected_format: "text"
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ profiles: [{ id: "nginx", name: "Nginx" }] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "job-profile", status: "queued" }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        id: "job-profile", status: "completed", phase: "complete", processed_bytes: 128,
+        total_bytes: 128, lines_processed: 1,
+        result: { output_name: "events.cleaned.log", output_bytes: 128, replacements: 1, validated: true }
+      }) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bereinigen" })).toBeEnabled());
+    const profileSelect = await screen.findByRole("combobox", { name: "Quellprofil für events.log" });
+    fireEvent.focus(profileSelect);
+    await waitFor(() => expect(profileSelect).toHaveTextContent("Nginx"));
+    fireEvent.change(profileSelect, { target: { value: "nginx" } });
+    fireEvent.click(screen.getByRole("button", { name: "Bereinigen" }));
+
+    expect(await screen.findByText(/Bereinigung für events.log abgeschlossen und validiert/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Prüfen" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/${file.id}/sanitize-jobs`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ output_path: "/tmp/events.log", profile_id: "nginx" })
+      })
+    );
+  });
+});
+
+
+describe("compact registered file workspace", () => {
+  it("keeps file metadata, format controls and sanitization actions grouped in a compact card", async () => {
+    const project = { id: "project-compact", name: "Kompakt", description: "", status: "active", created_at: "2026-10-31T10:00:00+00:00", updated_at: "2026-10-31T10:00:00+00:00" };
+    const file = { id: "file-compact", project_id: project.id, display_name: "events.json", size_bytes: 4096, modified_at: "2026-10-31T10:00:00+00:00", imported_at: "2026-10-31T10:00:00+00:00", state: "registered", format_hint: "json", detected_format: "json", format_override: null };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [project] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => project } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [file] } as Response));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    const fileName = await screen.findByText("events.json");
+    const row = fileName.closest("tr");
+    expect(row).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText("4.096 Byte")).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText(/Erkannt: JSON/)).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("combobox", { name: "Format für events.json" })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("combobox", { name: "Quellprofil für events.json" })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Erkennen" })).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Bereinigen" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "Projektprinzipien" })).not.toBeInTheDocument();
+  });
+});
+
+
+
+describe("multi-file project sanitization workflow", () => {
+  it("runs selected files sequentially and retains project-wide indexed mappings", async () => {
+    const project = {
+      id: "project-batch", name: "Batchprojekt", description: "", status: "draft",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
+    };
+    const files = [
+      { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
+      { id: "file-two", project_id: project.id, display_name: "second.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+    ];
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method || "GET").toUpperCase();
+      calls.push(`${method} ${url}`);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
+      if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
+      if (method === "PUT" && url.endsWith("/output-directory")) return { ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response;
+      if (method === "POST" && url.endsWith("/file-one/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-one" }) } as Response;
+      if (method === "POST" && url.endsWith("/file-two/sanitize-jobs")) return { ok: true, json: async () => ({ id: "job-two" }) } as Response;
+      if (url.endsWith("/file-one/sanitize-jobs/job-one") || url.endsWith("/file-two/sanitize-jobs/job-two")) {
+        return { ok: true, json: async () => ({
+          id: url.includes("job-one") ? "job-one" : "job-two",
+          status: "completed", phase: "completed", processed_bytes: 100, total_bytes: 100,
+          lines_processed: 10, result: { output_name: "clean.log", output_bytes: 100, replacements: 1, validated: true }
+        }) } as Response;
+      }
+      return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgabeordner speichern" })).toBeDisabled());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: first.log" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Für Stapel auswählen: second.log" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
+
+    expect(await screen.findByText(/Mehrdatei-Lauf beendet: 2 erfolgreich validiert/)).toBeInTheDocument();
+    const firstStart = calls.findIndex(call => call.endsWith("/file-one/sanitize-jobs"));
+    const firstStatus = calls.findIndex(call => call.endsWith("/file-one/sanitize-jobs/job-one"));
+    const secondStart = calls.findIndex(call => call.endsWith("/file-two/sanitize-jobs"));
+    expect(firstStart).toBeGreaterThanOrEqual(0);
+    expect(firstStatus).toBeGreaterThan(firstStart);
+    expect(secondStart).toBeGreaterThan(firstStatus);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/file-one/sanitize-jobs`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/first.log", profile_id: null }) })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/projects/${project.id}/files/file-two/sanitize-jobs`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ output_path: "/tmp/second.log", profile_id: null }) })
+    );
+  });
+
+  it("rejects duplicate output paths before starting any file", async () => {
+    const project = {
+      id: "project-batch-duplicate", name: "Batchprojekt", description: "", status: "draft",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
+    };
+    const files = [
+      { id: "file-one", project_id: project.id, display_name: "first.log", size_bytes: 100, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" },
+      { id: "file-two", project_id: project.id, display_name: "first.log", size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00", imported_at: "2026-11-01T10:00:00+00:00", state: "registered", detected_format: "text" }
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === `/api/projects/${project.id}`) return { ok: true, json: async () => project } as Response;
+      if (url === `/api/projects/${project.id}/files`) return { ok: true, json: async () => files } as Response;
+      if (url.endsWith("/output-directory")) return { ok: true, json: async () => ({ ...project, output_directory: "/tmp" }) } as Response;
+      return { ok: false, json: async () => ({ detail: "Unexpected request" }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ausgabeordner" }), { target: { value: "/tmp" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ausgabeordner speichern" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgabeordner speichern" })).toBeDisabled());
+    const duplicateFileChecks = screen.getAllByRole("checkbox", { name: "Für Stapel auswählen: first.log" });
+    fireEvent.click(duplicateFileChecks[0]);
+    fireEvent.click(duplicateFileChecks[1]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
+    expect(await screen.findByText(/denselben relativen Pfad/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
+  });
+});
+
+
+describe("approved file lock UI", () => {
+  it("shows approved files as locked and disables further editing and sanitization", async () => {
+    const project = {
+      id: "project-approved", name: "Freigabeprojekt", description: "", status: "active",
+      created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00",
+      output_directory: "/tmp/approved-output"
+    };
+    const file = {
+      id: "file-approved", project_id: project.id, display_name: "service.log",
+      size_bytes: 120, modified_at: "2026-11-01T10:00:00+00:00",
+      imported_at: "2026-11-01T10:00:00+00:00", state: "approved",
+      format_hint: "text", detected_format: "text", format_override: null
+    };
+    vi.stubGlobal("fetch", vi.fn(async input => {
+      const url = String(input);
+      if (url === "/api/projects") return { ok: true, json: async () => [project] } as Response;
+      if (url === "/api/projects/" + project.id) return { ok: true, json: async () => project } as Response;
+      if (url === "/api/projects/" + project.id + "/files") return { ok: true, json: async () => [file] } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    }));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Öffnen" }));
+    expect(await screen.findByText("Freigegeben · gesperrt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bereinigen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Für Stapel auswählen: service.log" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Format für service.log" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Quellprofil für service.log" })).toBeDisabled();
   });
 });
