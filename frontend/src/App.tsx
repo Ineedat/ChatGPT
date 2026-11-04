@@ -309,12 +309,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
       setError(`Bitte prüfe Format und Laufstatus für „${invalidFile.display_name}“.`);
       return;
     }
-    const normalizedPaths = batchFiles.map(file => (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US"));
-    if (new Set(normalizedPaths).size !== normalizedPaths.length) {
-      setError("");
-      return;
-    }
-
     setError("");
     setBatchRunning(true);
     batchStopRequestedRef.current = false;
@@ -455,9 +449,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
   );
   const selectedBatchFiles = importedFiles.filter(file => selectedFileIds.includes(file.id));
-  const batchHasDuplicateOutputs = new Set(selectedBatchFiles.map(file =>
-    (file.relative_path || file.display_name).replaceAll("\\", "/").toLocaleLowerCase("en-US")
-  )).size !== selectedBatchFiles.length;
   const batchReady = selectedBatchFiles.length > 0 && selectedBatchFiles.every(file =>
     file.state !== "approved" && ["text", "jsonl", "json"].includes(file.format_override || file.detected_format || "") &&
     !(sanitizationJobs[file.id] && ["queued", "running", "cancelling"].includes(sanitizationJobs[file.id].status))
@@ -528,7 +519,6 @@ function AppInner({ onLogout, user }: { onLogout: () => void; user: AuthUser }) 
           </div>
           <button className="primary-button" type="button" onClick={() => void startBatchSanitization()} disabled={batchRunning || !batchReady}>Ausgewählte Dateien nacheinander bereinigen</button>
           <p className="field-help">Alle Ergebnisse bleiben bis zur Freigabe im internen Projekt-Arbeitsbereich. Die relative Ordnerstruktur wird beim späteren Export wiederhergestellt.</p>
-          {batchHasDuplicateOutputs && selectedBatchFiles.length > 1 && <p className="error-message" role="alert">Mehrere Dateien besitzen denselben relativen Pfad und würden sich im Ausgabeordner überschreiben.</p>}
         </div>}
         {batchRunning && batchProgress && <div className="batch-progress" role="status">
           <strong>Mehrdatei-Lauf · Datei {batchProgress.current} von {batchProgress.total}</strong>
