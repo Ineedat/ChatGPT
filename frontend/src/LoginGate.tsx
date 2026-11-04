@@ -19,8 +19,8 @@ export function LoginGate({ onLogin }: { onLogin: (user: AuthUser) => void }) {
     finally { setBusy(false); }
   }
   return <main className="app-shell login-shell"><section className="login-card" aria-labelledby="login-title">
-    <p className="eyebrow">LOKALER ZUGANG</p><h1 id="login-title">LogSanitizer</h1>
-    <p>Melde dich mit einem lokal eingerichteten Benutzerkonto an.</p>
+    <p className="eyebrow">ANMELDUNG</p><h1 id="login-title">LogSanitizer</h1>
+    <p>Melde dich mit deinem eingerichteten lokalen oder LDAP-/Active-Directory-Konto an. Bei LDAP verwendest du dein persönliches Verzeichnispasswort.</p>
     <form onSubmit={submit}><label>Benutzername<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required /></label>
       <label>Passwort<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
       {error && <p role="alert" className="error-message">{error}</p>}<button type="submit" disabled={busy}>{busy ? "Anmeldung …" : "Anmelden"}</button>
