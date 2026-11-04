@@ -84,13 +84,6 @@ export function ExportPanel({ projectId }: { projectId: string }) {
     setMessage("");
     try {
       const root = await picker.call(window);
-      const audit = await apiFetch(`/api/reviews/projects/${encodeURIComponent(projectId)}/exports/audit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method: "folder", run_ids: files.map(file => file.run_id) })
-      });
-      const auditBody = await audit.json().catch(() => ({})) as { detail?: string };
-      if (!audit.ok) throw new Error(auditBody.detail || "Export konnte nicht protokolliert werden.");
       let completed = 0;
       for (const file of files) {
         const response = await apiFetch(`/api/reviews/projects/${encodeURIComponent(projectId)}/exports/approved/${encodeURIComponent(file.run_id)}/content`);
@@ -98,6 +91,13 @@ export function ExportPanel({ projectId }: { projectId: string }) {
         completed += 1;
         setMessage(`Export läuft: ${completed} von ${files.length} Dateien übertragen.`);
       }
+      const audit = await apiFetch(`/api/reviews/projects/${encodeURIComponent(projectId)}/exports/audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "folder", run_ids: files.map(file => file.run_id) })
+      });
+      const auditBody = await audit.json().catch(() => ({})) as { detail?: string };
+      if (!audit.ok) throw new Error(auditBody.detail || "Export konnte nicht protokolliert werden.");
       setMessage(`Export abgeschlossen: ${completed} freigegebene Dateien wurden im gewählten Ordner abgelegt. Die Originaldateien wurden nicht exportiert.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ordnerexport fehlgeschlagen.");
