@@ -384,7 +384,7 @@ describe("multi-file project sanitization workflow", () => {
     );
   });
 
-  it("rejects duplicate output paths before starting any file", async () => {
+  it("sanitizes duplicate relative names independently in the internal workspace", async () => {
     const project = {
       id: "project-batch-duplicate", name: "Batchprojekt", description: "", status: "draft",
       created_at: "2026-11-01T10:00:00+00:00", updated_at: "2026-11-01T10:00:00+00:00"
@@ -408,8 +408,7 @@ describe("multi-file project sanitization workflow", () => {
     fireEvent.click(duplicateFileChecks[1]);
     await waitFor(() => expect(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Ausgewählte Dateien nacheinander bereinigen" }));
-    expect(await screen.findByText(/denselben relativen Pfad/)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/sanitize-jobs"))).toBe(false);
+    await waitFor(() => expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith("/sanitize-jobs")).length).toBe(2));
   });
 });
 
