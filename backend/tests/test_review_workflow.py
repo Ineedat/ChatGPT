@@ -75,7 +75,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         assert queue.status_code == 200
         run = next(item for item in queue.json() if item["id"] == result["review_run_id"])
         assert run["display_name"] == "app.log"
-        assert run["output_name"] == "clean-app.log"
+        assert run["output_name"] == "app.log"
         assert "output_path" not in run
         assert str(tmp_path) not in str(run)
 
@@ -133,7 +133,7 @@ def test_successful_sanitization_enters_persistent_review_queue_and_searches_onl
         audit_db.close()
         assert stored[0] == "pending_review"
         assert stored[1] == str(work_output)
-        assert stored[2] == str(output)
+        assert stored[2] == str(work_output)
         assert client.get("/api/reviews/audit").status_code == 200
 
 
@@ -170,23 +170,15 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
         events = client.get("/api/reviews/audit").json()
         assert any(event["action"] == "return" and event["comment"] for event in events)
 
-        retry_output_dir = tmp_path / "retry-output"
-        retry_output_dir.mkdir()
-        client.put(
-            f"/api/projects/{project['id']}/output-directory",
-            json={"output_directory": str(retry_output_dir)},
-        )
-        retry_output = retry_output_dir / file["relative_path"]
-        retried = client.post(
+         retried = client.post(
             f"/api/projects/{project['id']}/files/{file['id']}/sanitize-jobs",
-            json={"output_path": str(retry_output), "retry_of_run_id": run_id},
+            json={"retry_of_run_id": run_id},
         )
         assert retried.status_code == 202
         latest = client.get("/api/reviews/runs").json()[0]
         retry_work_output = _stored_output_path(tmp_path, latest["id"])
         assert retry_work_output.read_bytes() == b"REDACTED\n"
-        assert not retry_output.exists()
-        assert latest["parent_run_id"] == run_id
+         assert latest["parent_run_id"] == run_id
         assert latest["status"] == "pending_review"
 
 
@@ -208,8 +200,10 @@ def test_review_exception_requires_reason_and_is_explicitly_audited(tmp_path, mo
         )
         assert approved.status_code == 200
         assert approved.json()["status"] == "approved_with_exception"
-        assert output.read_bytes() == b"REDACTED\n"
-        assert _stored_output_path(tmp_path, run_id) == output
+        internal_output = _stored_output_path(tmp_path, run_id)
+        assert internal_output.read_bytes() == b"REDACTED\n"
+        assert internal_output != output
+        assert not output.exists()
         events = client.get("/api/reviews/audit").json()
         event = next(item for item in events if item["action"] == "approve")
         assert event["exception_reason"] == "Manuell geprüft; dokumentierte fachliche Ausnahme."
@@ -231,7 +225,9 @@ def test_operator_without_reviewer_assignment_auto_approves_only_validated_run(t
         assert response.status_code == 200
         assert response.json()["review_status"] == "approved"
         assert client.get("/api/reviews/runs").json()[0]["status"] == "approved"
-        assert output.exists() and output.read_bytes() == b"REDACTED\n"
+        internal_output = _stored_output_path(tmp_path, response.json()["review_run_id"])
+        assert internal_output.exists() and internal_output.read_bytes() == b"REDACTED\n"
+        assert not output.exists()
         assert client.get("/api/reviews/queue").status_code == 403
 
 
@@ -250,7 +246,9 @@ def test_approved_file_is_visible_and_locked_against_further_sanitization(tmp_pa
         response, project, file, output = _sanitized_run(client, tmp_path)
         assert response.status_code == 200
         assert response.json()["review_status"] == "approved"
-        assert output.exists()
+        internal_output = _stored_output_path(tmp_path, response.json()["review_run_id"])
+        assert internal_output.exists()
+        assert not output.exists()
 
         files = client.get(f"/api/projects/{project['id']}/files")
         assert files.status_code == 200
@@ -265,7 +263,7 @@ def test_approved_file_is_visible_and_locked_against_further_sanitization(tmp_pa
 
         retry = client.post(
             f"/api/projects/{project['id']}/files/{file['id']}/sanitize",
-            json={"output_path": str(tmp_path / "second-output.log")},
+            json={},
         )
         assert retry.status_code == 409
         queued_retry = client.post(
@@ -273,8 +271,7 @@ def test_approved_file_is_visible_and_locked_against_further_sanitization(tmp_pa
             json={"output_path": str(tmp_path / "second-output.log")},
         )
         assert queued_retry.status_code == 409
-        assert not (tmp_path / "second-output.log").exists()
-
+ 
 
 def test_failed_sanitization_is_persisted_but_never_queued_for_approval(tmp_path, monkeypatch):
     monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
