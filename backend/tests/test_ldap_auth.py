@@ -59,7 +59,7 @@ def _fake_ldap3(monkeypatch, *, accepted_user_password="personal-password"):
         return kwargs
 
     def escape_filter_chars(value):
-        replacements = {"\\\\": r"\${code}", "*": r"\${code}", "(": r"\${code}", ")": r"\${code}", "\x00": r"\${code}"}
+        replacements = {"\\": r"\5c", "*": r"\2a", "(": r"\28", ")": r"\29", "\x00": r"\00"}
         return "".join(replacements.get(character, character) for character in value)
 
     ldap3 = types.ModuleType("ldap3")
