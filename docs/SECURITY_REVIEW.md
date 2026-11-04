@@ -1,74 +1,81 @@
-# Security review — development branch
+# Sicherheits- und Betriebsbewertung — LogSanitizer v2.8
 
-**Review date:** 2026-10-28  
-**Scope:** Static review of the current development branch, focusing on authentication, authorization, local file handling, regex execution, sensitive mapping storage, deployment profiles, LDAP/TLS, and portable build readiness. This is not a penetration test or a production approval.
+**Stand:** 2026-11-04  
+**Geltungsbereich:** Eigenständiger Windows-/Linux-Laptop oder ein ausdrücklich definiertes, internetgetrenntes Air-Gap-Netz. Kein Betrieb im öffentlichen Internet oder in nicht vertrauenswürdigen Netzen.  
+**Einordnung:** Technische Bestandsaufnahme des Entwicklungsstands, keine Penetrationsprüfung, Zertifizierung oder unabhängige Sicherheitsfreigabe.
 
-## Changes made during this review
+## Verbindliche Produktgrenzen
 
-- Login attempts are throttled per normalized username and direct client address: five failed attempts in a five-minute window trigger a five-minute lock. The key is hashed; stale throttle records are pruned.
-- The API documentation and OpenAPI schema now pass through authentication middleware instead of being public. The health endpoint and login endpoint remain public by design.
-- Regex substitutions and residual scans now use the timeout-capable `regex` engine with a 100 ms per-operation limit; timeout failures reject the run and remove partial output.
-- Regression tests cover lockout behavior, unauthenticated access to the docs/schema, and pathological regex timeout cleanup.
+Mit Anforderungsstand v2.8 wurden frühere High-Security-Sonderanforderungen ausdrücklich zurückgenommen. Die folgenden Entscheidungen sind daher kein versehentlich offener Implementierungsstand:
 
-These controls reduce risk but do not establish production readiness. Verify the CI run for the current commit before relying on the changes.
+- Mapping-Zuordnungen werden projektbezogen in der lokalen SQLite-Datenbank gespeichert; eine zusätzliche Verschlüsselung mit separater Schlüsseldatei ist nicht Bestandteil der Produktanforderung.
+- Es gibt keine verpflichtende Workspace-Allowlist für Ausgabeziele. Der Bearbeiter wählt den absoluten Ausgabepfad; vorhandene Zieldateien werden nicht überschrieben.
+- Eine besondere Absicherung gegen einen absichtlich parallel manipulierenden lokalen Prozess und plattformspezifische ACL-Sonderlogik sind nicht Teil des vereinbarten Umfangs.
+- Eine Migration von Entwicklungs-Mappings ist nicht vorgesehen. Der Produktivbetrieb beginnt mit einer frischen Datenbank.
 
-## Findings still open
+Diese Vereinfachungen gelten nur innerhalb des festgelegten Einsatzmodells. Sie sind keine Empfehlung, die Anwendung öffentlich oder in einem nicht vertrauenswürdigen Netzwerk bereitzustellen.
 
-### LS-SEC-001 — Original-value mapping encryption
+## Umgesetzte technische Kontrollen
 
-- **Status:** Implemented; automated CI passed on Linux and Windows mapping-specific tests. This is not a penetration test or independent verification on every supported Windows/Linux release.
-- **Location:** `backend/src/logsanitizer/mapping_store.py`.
-- **Change:** Original values are encrypted with AES-256-GCM. A separate 32-byte random key file is created locally; HKDF-SHA-256 derives distinct encryption and keyed-lookup keys. A keyed HMAC fingerprint preserves stable lookup without storing the source value in plaintext. POSIX data-directory permissions are set to `0700` and key-file permissions to `0600`; on Windows the application removes inherited ACLs and grants the current user access to the mapping data directory and key file, failing closed if ACL application fails. Windows ACL checks are exercised in CI. A key-check record prevents silently using a wrong replacement key. Missing keys for an already encrypted database fail closed.
-- **Migration:** Existing plaintext mappings are migrated on first use, the old table is dropped, and SQLite `VACUUM` is run to compact the database. This cannot guarantee erasure of SSD blocks, filesystem snapshots, or old backups.
-- **Backup limitation:** Database and key must be backed up together for recovery. Anyone who obtains both can recover mappings; protect the key separately and keep a secure offline recovery copy. Losing the key makes mapping recovery impossible.
-- **Residual release gate:** Perform a documented restore drill on the actual target Windows/Linux versions and review key custody, backups, and filesystem/SSD remnants before confidential-data use.
+### Anmeldung und Sitzungen
 
-### LS-SEC-002 — User-configured regex execution timeout
+- Lokale Passwörter werden mit scrypt und individuellem Salt gespeichert.
+- Sitzungen verwenden zufällige Tokens; in der Datenbank liegt nur deren SHA-256-Hash.
+- Sitzungsdauer ist begrenzt; deaktivierte Benutzer verlieren ihre Sitzungen.
+- Fehlversuche werden je normalisiertem Benutzernamen und Client-Adresse begrenzt: fünf Fehlversuche innerhalb von fünf Minuten führen zu einer fünfminütigen Sperre.
+- Zustandsändernde API-Aufrufe erfordern ein CSRF-Token.
+- Die Login-Oberfläche unterstützt lokale Konten oder — im entsprechend konfigurierten Netzwerkprofil — LDAP/AD. Bei LDAP gibt es keinen lokalen Passwort-Fallback.
 
-- **Status:** Mitigated in the current branch; regression-tested, pending final CI confirmation.
-- **Location:** `backend/src/logsanitizer/sanitizer.py`, rule substitution and residual scanning.
-- **Change:** Runtime execution now uses the `regex` package with a 100 ms timeout for each substitution/search operation. A timeout raises a sanitization error, and partial output is removed. A pathological-pattern regression test exercises this behavior.
-- **Residual caution:** This is a per-operation limit, not a global job deadline or concurrency limit. Keep pattern/input limits and add a global resource budget before network deployment.
+### Rollen und Review
 
-### LS-SEC-003 — Output destination is selected as an arbitrary absolute path
+- Rollen: Administrator, Regelverantwortlicher, Bearbeiter, Prüfer und Freigeber.
+- Die Middleware prüft Anmeldung, CSRF und zentrale Rollenbereiche; zusätzliche Endpunktprüfungen sichern insbesondere Eigentümerschaft und Dateivergleich.
+- Die Benutzerverwaltung verhindert das Entfernen des letzten aktiven Administrators.
+- Zurückgewiesene Läufe, Kommentare, Freigaben und Prüfentscheidungen werden im Review-/Audit-Ablauf nachvollziehbar geführt.
 
-- **Severity:** Medium
-- **Location:** `backend/src/logsanitizer/main.py`, sanitization request handling; `backend/src/logsanitizer/sanitizer.py`, staging and publication
-- **Evidence:** The request accepts an absolute `output_path`; the worker creates a staging file in that destination's parent directory. Existing targets and final-component symlinks are rejected, but there is no configured workspace allowlist.
-- **Impact:** An authenticated operator can ask the service to create a new file in any directory writable by the service account. This increases accidental disclosure and path-confusion risk.
-- **Status (2026-10-29):** Partially mitigated in the development branch. A configurable `output_workspace` is resolved relative to the deployment JSON (default: `data_dir/outputs`). Both synchronous and background API routes reject destinations outside it, path traversal, symlinked workspace/parent components, missing target directories, and existing targets. The sanitizer repeats the workspace check immediately before staging/publication. Regression tests cover outside-workspace requests, traversal, and symlinked directories.
-- **Remaining gap:** This is not yet race-resistant against a hostile concurrent local process replacing directory entries between validation and file creation/publication. The current path-based staging and hard-link publication still require OS-level directory-handle / reparse-point-safe handling on Linux and Windows. Do not mark this finding closed.
-- **Required fix:** Complete race-resistant publication on both supported operating systems, test parent-directory replacement and final-component races, and define explicit import/export locations and permissions.
-- **Release gate:** Complete controlled output/release workflow and the race-hardening tests before production use.
+**Verbleibende Einschränkung:** Es liegt keine vollständige tabellarische Negativprüfung jeder API-Route gegen jede Rolle einschließlich aller kodierten Pfadvarianten vor. Vor einem Einsatz mit besonders hohen Schutzanforderungen ist diese Matrix zu ergänzen und unabhängig zu prüfen.
 
-### LS-SEC-004 — Network transport and secure-cookie configuration
+### Regelverarbeitung und große Dateien
 
-- **Status:** Mitigated in the current branch; CI and target-environment verification pending.
-- **Location:** `backend/src/logsanitizer/deployment.py`, `backend/src/logsanitizer/__main__.py`, `backend/src/logsanitizer/auth.py`.
-- **Change:** Standalone mode rejects non-loopback binds. Network mode requires LDAP, a configured network bind, existing TLS certificate/key files, and an LDAP service secret; the launcher starts Uvicorn with HTTPS and the login route sets Secure cookies. LDAP requires LDAPS or StartTLS and validates the server certificate and hostname. SMTP in network configuration must use STARTTLS or SSL.
-- **Residual caution:** The configuration can verify the presence of TLS files but cannot establish that a certificate is issued by the expected organization or that firewall rules are correct. Verify the actual certificate, service-account permissions, interface exposure, and real LDAP/SMTP integration before production use.
+- Regelbasierte Regex-Operationen verwenden die Timeout-fähige `regex`-Bibliothek mit 100 ms je Substitutions-/Suchoperation. Ein Timeout lässt den Lauf fehlschlagen; unvollständige Ausgabe wird entfernt.
+- Dies ist kein globales Job-, CPU- oder Parallelitätsbudget.
+- Die Erkennung und Restprüfung können nur die konfigurierten Regeln berücksichtigen. Sie stellen keine vollständige automatische Erkennung sämtlicher personenbezogener oder vertraulicher Daten dar.
+- Streaming und synthetische große-Datei-Prüfungen sind implementiert; Zielhardwaremessungen bleiben separat durchzuführen.
 
-### LS-SEC-005 — Authentication and role enforcement need broader integration testing
+### Netzwerkprofil, LDAP und SMTP
 
-- **Severity:** Medium
-- **Location:** `backend/src/logsanitizer/auth.py`, `AuthMiddleware`; route handlers in `backend/src/logsanitizer/main.py` and `review_workflow.py`
-- **Evidence:** Authorization is implemented with path/method checks in middleware plus per-handler ownership checks. Existing tests cover key login, CSRF, role, review, and output-integrity cases, but the full route/role matrix and hostile path variants have not been exhaustively verified.
-- **Impact:** A future route or path variation could accidentally bypass a role boundary, or disclose project/review metadata to an unintended role.
-- **Required fix:** Add a table-driven authorization test for every API route and each role, including unauthenticated access, CSRF on every state-changing route, ownership boundaries, and route normalization/encoded path variants. Prefer explicit route-level dependencies or router-level deny-by-default policies over relying only on substring/prefix matching.
+- Standalone ist auf Loopback beschränkt.
+- Das Netzwerkprofil verlangt eine konkrete Bind-Adresse und HTTPS-Zertifikat/Schlüsseldatei; Sitzungs-Cookies werden mit Secure gesetzt.
+- LDAP muss LDAPS oder StartTLS verwenden. Das Serverzertifikat wird geprüft; Benutzername und Gruppenmitgliedschaften werden über das konfigurierte Suchkonto ermittelt, danach wird das persönliche LDAP-Passwort mit dem gefundenen Benutzer-DN geprüft.
+- SMTP muss STARTTLS oder SSL verwenden. Zustellfehler blockieren die Bereinigung nicht.
 
-## Additional release blockers (not a complete security finding list)
+**Verbleibende Einschränkung:** Die Konfigurationsprüfung ersetzt keine Prüfung der echten Zertifikatskette, Firewall-/Netzwerkgrenzen oder Verzeichnisrechte. LDAP/AD-Anmeldung, Gruppenabbildung, Zertifikate und SMTP-Zustellung müssen in der konkreten Air-Gap-Umgebung abgenommen werden. SMTP besitzt keine persistente Wiederholungswarteschlange.
 
-- No comprehensive sensitive-data detection; residual scanning only checks configured rules.
-- No verified 5 GB performance/integration test or large-file resource budget.
-- A PyInstaller one-folder build specification and Windows/Linux CI build/smoke-test job have been added; successful artifact builds and installation-hardening verification are still release gates.
-- No controlled, auditable release/export workflow.
-- SMTP delivery is best-effort and has no persistent retry queue.
-- CI tests are not a substitute for security testing on supported operating systems and realistic data.
+### Dateiziele und lokale Daten
 
-## Exit criteria before network or confidential-data use
+- Quelldateien bleiben unverändert.
+- Ausgabeziele werden vom Bearbeiter gewählt; vorhandene Zieldateien werden nicht überschrieben.
+- Mapping-Daten und Projektmetadaten liegen lokal in SQLite. Es gibt keine zusätzliche Verschlüsselung der Mapping-Datenbank.
+- Wer Zugriff auf das lokale Datenverzeichnis erhält, kann je nach Betriebssystemrechten auch auf die dort gespeicherten Mapping-Zuordnungen zugreifen. Das lokale Benutzerkonto und der physische Zugriff auf das Gerät bleiben deshalb Teil des vereinbarten Schutzmodells.
 
-1. Keep LS-SEC-001 and LS-SEC-002 regression-tested and complete a documented restore drill.
-2. Close or explicitly accept LS-SEC-003 and LS-SEC-004 with enforced deployment safeguards.
-3. Complete the route/role authorization matrix and independent security review.
-4. Verify large-file behavior, dependency advisories, Windows/Linux file permissions, and packaging in isolated test environments.
-5. Keep the application loopback-only until all applicable gates are closed.
+## CI-Nachweis
+
+Für Branch-Head `d257153f37213c2aa41ecbcfb02f59a3d9baac1c` wurde GitHub-Actions-Lauf [#41917675532](https://github.com/Ineedat/ChatGPT/actions/runs/41917675532) vollständig erfolgreich abgeschlossen:
+
+- Linux-Backend: vollständige Pytest-Suite und Ruff erfolgreich.
+- Windows-Backend: gezielte Projekt-/Mapping-Regressionen und Ruff erfolgreich.
+- Frontend: Vitest-Tests und TypeScript-/Vite-Produktionsbuild erfolgreich.
+
+Der reguläre CI-Lauf führt keinen vollständigen 5-GiB-Zielhardwaretest und keinen realen LDAP-/SMTP-Test durch. Der separate manuelle Meilenstein-Workflow für portable Windows-/Linux-Pakete und den 5-GiB-Benchmark ist davon unabhängig. CI-Erfolg ist kein Ersatz für die nachfolgende Systemabnahme.
+
+## Vor dem produktiven Einsatz weiterhin erforderlich
+
+1. Anwendung ausschließlich im vereinbarten Standalone-/Air-Gap-Einsatzmodell betreiben und Netzwerkzugriffe auf die vorgesehenen Clients begrenzen.
+2. Auf realen Windows-/Linux-Zielsystemen portable Pakete, Dateirechte, UI-Verhalten und Ressourcenverbrauch prüfen.
+3. Den manuellen Meilenstein-Workflow mit portablem Paket-Smoke-Test und synthetischem 5-GiB-Benchmark ausführen.
+4. Im echten Air-Gap-Netz LDAP-/AD-Anmeldung für alle benötigten Rollen, Benutzer ohne passende Gruppe, Zertifikatsprüfung sowie SMTP-Benachrichtigungen für Review und Rückgabe testen.
+5. Datenverzeichnis und Mapping-Datenbank in die lokale Backup-/Wiederherstellungsroutine aufnehmen und eine Wiederherstellung praktisch prüfen.
+
+## Zusammenfassung
+
+Die automatisierte Code-CI auf dem aktuellen Branch-Head ist grün. Die im Anforderungsstand v2.8 bewusst entfernten High-Security-Funktionen sind keine Merge-Blocker. Offen bleiben reale Zielsystem- und Air-Gap-Abnahmen sowie die ausdrücklich benannten Grenzen (keine Mapping-Verschlüsselung, keine vollständige automatische Datenerkennung, kein globales Ressourcenbudget und keine unabhängige Sicherheitszertifizierung).
