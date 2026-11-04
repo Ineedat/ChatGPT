@@ -843,13 +843,13 @@ def _exportable_run(project_id: str, run_id: str) -> dict:
     }
 
 
-def _record_export(project_id: str, actor_id: int, actor_name: str, method: str, run_ids: list[str]) -> None:
+def _record_export(project_id: str, actor_id: int, actor_name: str, method: str, file_ids: list[str]) -> None:
     with _db() as db:
         db.execute(
             """INSERT INTO export_events
                (project_id, actor_user_id, actor_username, method, file_ids, file_count, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (project_id, actor_id, actor_name, method, json.dumps(run_ids), len(run_ids), _now()),
+            (project_id, actor_id, actor_name, method, json.dumps(file_ids), len(file_ids), _now()),
         )
 
 
@@ -898,7 +898,7 @@ def audit_folder_export(project_id: str, payload: ExportAuditRequest, request: R
     if len({item["run_id"] for item in items}) != len(items):
         raise HTTPException(status_code=422, detail="Doppelte Dateien in der Exportauswahl.")
     if payload.method == "folder":
-        _record_export(project_id, actor_id, actor_name, "folder", payload.run_ids)
+        _record_export(project_id, actor_id, actor_name, "folder", [item["file_id"] for item in items])
     else:
         raise HTTPException(status_code=422, detail="ZIP-Exporte werden direkt protokolliert.")
     return {"recorded": True, "file_count": len(items)}
@@ -922,7 +922,7 @@ def download_approved_zip(project_id: str, request: Request) -> FileResponse:
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1, allowZip64=True) as archive:
             for item in items:
                 archive.write(item["output_path"], arcname=item["relative_path"])
-        _record_export(project_id, actor_id, actor_name, "zip", [item["run_id"] for item in items])
+        _record_export(project_id, actor_id, actor_name, "zip", [item["file_id"] for item in items])
     except Exception:
         archive_path.unlink(missing_ok=True)
         raise
