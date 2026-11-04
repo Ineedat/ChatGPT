@@ -6,17 +6,20 @@ are never returned by review metadata endpoints.
 from __future__ import annotations
 
 import difflib
+import json
 import os
-import shutil
 import sqlite3
 import tempfile
+import zipfile
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 import regex as re
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field, field_validator
 
 from logsanitizer.database import connect_database
@@ -141,6 +144,18 @@ def initialize_review_database() -> None:
             created_at TEXT NOT NULL,
             UNIQUE(owner_user_id, name)
         );
+        CREATE TABLE IF NOT EXISTS export_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL,
+            actor_user_id INTEGER NOT NULL,
+            actor_username TEXT NOT NULL,
+            method TEXT NOT NULL CHECK (method IN ('folder', 'zip')),
+            file_ids TEXT NOT NULL,
+            file_count INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_export_events_project_created
+            ON export_events(project_id, created_at DESC);
         """)
         columns = {row["name"] for row in db.execute("PRAGMA table_info(review_runs)")}
         if "publish_path" not in columns:
@@ -295,11 +310,6 @@ def finish_run(run_id: str, result: dict[str, object]) -> dict:
         )
         if not validated:
             status = "failed"
-        elif status == "approved":
-            try:
-                signature = _publish_approved_output(db, row)
-            except HTTPException:
-                status = "failed"
         db.execute(
             """UPDATE review_runs SET status=?, completed_at=?, input_bytes=?, output_bytes=?,
                lines_processed=?, replacements=?, validated=?, residual_matches=?, validation_scope=?,
@@ -784,8 +794,6 @@ def _decide(run_id: str, action: str, payload: ReviewDecision, request: Request)
             "return": "returned",
             "stop": "stopped",
         }[action]
-        if action == "approve":
-            _publish_approved_output(db, row)
         db.execute(
             """UPDATE review_runs SET status=?, reviewer_user_id=?,
                last_comment=?, exception_reason=? WHERE id=? AND status='pending_review'""",
@@ -828,6 +836,167 @@ def add_review_comment(run_id: str, payload: ReviewComment, request: Request) ->
         db.execute("UPDATE review_runs SET last_comment=? WHERE id=?", (payload.comment, run_id))
         _audit(db, run_id, actor_id, actor_name, "commented", comment=payload.comment)
     return {"run_id": run_id, "comment": payload.comment}
+
+
+
+class ExportAuditRequest(BaseModel):
+    method: str
+    run_ids: list[str] = Field(min_length=1, max_length=500)
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, value: str) -> str:
+        if value not in {"folder", "zip"}:
+            raise ValueError("Exportart muss folder oder zip sein.")
+        return value
+
+
+def _require_export_role(request: Request) -> tuple[int, str]:
+    actor_id, actor_name = _actor(request)
+    user = request.state.user
+    if not set(user.get("roles", [])).intersection({"admin", "operator"}):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Exportieren freigegebener Dateien.")
+    return actor_id, actor_name
+
+
+def _exportable_run(project_id: str, run_id: str) -> dict:
+    initialize_review_database()
+    with _db() as db:
+        row = db.execute(
+            """SELECT id, project_id, file_id, output_name, output_path, output_signature,
+                      status, validated, residual_matches, output_bytes, completed_at
+               FROM review_runs WHERE id=? AND project_id=?""",
+            (run_id, project_id),
+        ).fetchone()
+    if row is None or row["status"] not in {"approved", "approved_with_exception"}:
+        raise HTTPException(status_code=404, detail="Freigegebene Datei nicht gefunden.")
+    if not row["validated"] or row["residual_matches"] != 0 or not row["output_signature"]:
+        raise HTTPException(status_code=409, detail="Die Datei besitzt keine gültige Freigabe.")
+    output_path = Path(row["output_path"])
+    work_root = (Path(os.environ.get("LOGSANITIZER_DATA_DIR", str(Path.home() / ".logsanitizer"))).expanduser()
+                 / "projects" / project_id / "work").resolve()
+    try:
+        if output_path.is_symlink() or not output_path.resolve(strict=True).is_relative_to(work_root):
+            raise HTTPException(status_code=409, detail="Die Arbeitsdatei liegt nicht mehr im internen Projektbereich.")
+    except OSError as exc:
+        raise HTTPException(status_code=410, detail="Die freigegebene Arbeitsdatei ist nicht mehr verfügbar.") from exc
+    if _file_signature(output_path) != row["output_signature"]:
+        raise HTTPException(status_code=409, detail="Die freigegebene Arbeitsdatei wurde verändert.")
+    with connect_database() as db:
+        source = db.execute(
+            "SELECT relative_path, display_name FROM imported_files WHERE project_id=? AND id=?",
+            (project_id, row["file_id"]),
+        ).fetchone()
+    if source is None:
+        raise HTTPException(status_code=410, detail="Die zugehörige Quelldatei ist nicht mehr registriert.")
+    relative = PurePosixPath((source["relative_path"] or source["display_name"]).replace("\\", "/"))
+    if relative.is_absolute() or not relative.parts or any(part in {"", ".", ".."} or ":" in part for part in relative.parts):
+        relative = PurePosixPath(row["output_name"])
+    return {
+        "run_id": row["id"], "file_id": row["file_id"], "relative_path": relative.as_posix(),
+        "output_path": output_path, "output_bytes": int(row["output_bytes"]),
+        "completed_at": row["completed_at"], "status": row["status"],
+    }
+
+
+def _record_export(project_id: str, actor_id: int, actor_name: str, method: str, run_ids: list[str]) -> None:
+    with _db() as db:
+        db.execute(
+            """INSERT INTO export_events
+               (project_id, actor_user_id, actor_username, method, file_ids, file_count, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (project_id, actor_id, actor_name, method, json.dumps(run_ids), len(run_ids), _now()),
+        )
+
+
+@router.get("/projects/{project_id}/exports/approved")
+def list_approved_exports(project_id: str, request: Request) -> list[dict]:
+    _require_export_role(request)
+    initialize_review_database()
+    with _db() as db:
+        rows = db.execute(
+            """SELECT r.id FROM review_runs r
+               WHERE r.project_id=? AND r.status IN ('approved','approved_with_exception')
+                 AND r.validated=1 AND r.residual_matches=0
+                 AND NOT EXISTS (
+                    SELECT 1 FROM review_runs newer
+                    WHERE newer.project_id=r.project_id AND newer.file_id=r.file_id
+                      AND newer.status IN ('approved','approved_with_exception')
+                      AND newer.created_at > r.created_at
+                 )
+               ORDER BY r.completed_at, r.output_name""",
+            (project_id,),
+        ).fetchall()
+    results = []
+    for row in rows:
+        try:
+            results.append(_exportable_run(project_id, row["id"]) | {"download_url": f"/api/reviews/projects/{project_id}/exports/approved/{row['id']}/content"})
+        except HTTPException:
+            continue
+    return results
+
+
+@router.get("/projects/{project_id}/exports/approved/{run_id}/content")
+def download_approved_content(project_id: str, run_id: str, request: Request) -> FileResponse:
+    _require_export_role(request)
+    item = _exportable_run(project_id, run_id)
+    return FileResponse(item["output_path"], filename=Path(item["relative_path"]).name, media_type="application/octet-stream")
+
+
+@router.post("/projects/{project_id}/exports/audit")
+def audit_folder_export(project_id: str, payload: ExportAuditRequest, request: Request) -> dict:
+    actor_id, actor_name = _require_export_role(request)
+    items = [_exportable_run(project_id, run_id) for run_id in payload.run_ids]
+    if len({item["run_id"] for item in items}) != len(items):
+        raise HTTPException(status_code=422, detail="Doppelte Dateien in der Exportauswahl.")
+    if payload.method == "folder":
+        _record_export(project_id, actor_id, actor_name, "folder", payload.run_ids)
+    else:
+        raise HTTPException(status_code=422, detail="ZIP-Exporte werden direkt protokolliert.")
+    return {"recorded": True, "file_count": len(items)}
+
+
+@router.get("/projects/{project_id}/exports/approved.zip")
+def download_approved_zip(project_id: str, request: Request) -> FileResponse:
+    actor_id, actor_name = _require_export_role(request)
+    items = list_approved_exports(project_id, request)
+    if not items:
+        raise HTTPException(status_code=404, detail="Keine freigegebenen Dateien zum Export vorhanden.")
+    relative_names = [item["relative_path"] for item in items]
+    if len(set(relative_names)) != len(relative_names):
+        raise HTTPException(status_code=409, detail="Mehrere freigegebene Dateien besitzen denselben relativen Pfad; bitte Dateipfade bereinigen.")
+    export_root = Path(os.environ.get("LOGSANITIZER_DATA_DIR", str(Path.home() / ".logsanitizer"))).expanduser() / "projects" / project_id / "exports"
+    export_root.mkdir(parents=True, exist_ok=True)
+    descriptor, archive_name = tempfile.mkstemp(prefix="approved-", suffix=".zip", dir=export_root)
+    os.close(descriptor)
+    archive_path = Path(archive_name)
+    try:
+        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1, allowZip64=True) as archive:
+            for item in items:
+                archive.write(item["output_path"], arcname=item["relative_path"])
+        _record_export(project_id, actor_id, actor_name, "zip", [item["run_id"] for item in items])
+    except Exception:
+        archive_path.unlink(missing_ok=True)
+        raise
+    return FileResponse(
+        archive_path, filename=f"{project_id}-freigegebene-dateien.zip",
+        media_type="application/zip",
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
+    )
+
+
+@router.get("/exports/audit")
+def export_audit_log(request: Request, limit: int = Query(default=100, ge=1, le=200)) -> list[dict]:
+    _require_export_role(request)
+    initialize_review_database()
+    with _db() as db:
+        rows = db.execute(
+            """SELECT id, project_id, actor_user_id, actor_username, method, file_ids,
+                      file_count, created_at
+               FROM export_events ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [dict(row) | {"file_ids": json.loads(row["file_ids"])} for row in rows]
 
 
 @router.get("/audit")
