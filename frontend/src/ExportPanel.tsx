@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type ApprovedExport = {
   run_id: string;
@@ -58,6 +58,13 @@ export function ExportPanel({ projectId }: { projectId: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const canPickFolder = typeof (window as PickerWindow).showDirectoryPicker === "function";
+
+  useEffect(() => {
+    setFiles([]);
+    setLoaded(false);
+    setError("");
+    setMessage("");
+  }, [projectId]);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
