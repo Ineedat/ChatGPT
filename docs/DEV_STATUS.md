@@ -1,11 +1,11 @@
 # Entwicklungsstand — Übergabe für den nächsten Chat
 
-Stand: 2026-11-03
+Stand: 2026-11-04
 Repository: `Ineedat/ChatGPT`
 Arbeitsbranch: `feature/project-management-sqlite`
 Pull Request: [#2](https://github.com/Ineedat/ChatGPT/pull/2) — offen, nicht gemergt
-Letzter Code-Commit: `f6af8fc9bae42a85fe37cec7b6b756034c4679a6`
-Letzter Übergabe-/Dokumentationsstand: Review-Arbeitsbereich und Quellprofilverwaltung stabilisiert; CI vollständig erfolgreich
+Letzter Code-Commit: `04047487e17a2aa6fe889771d65ef0516ee6b4c1`
+Letzter Übergabe-/Dokumentationsstand: Bearbeitervergleich, Rückweisungsstatus und tabellarische Benutzerverwaltung umgesetzt; CI vollständig erfolgreich
 
 ## Projektleitplanken
 
@@ -252,3 +252,14 @@ Letzter Übergabe-/Dokumentationsstand: Review-Arbeitsbereich und Quellprofilver
   - Backend Linux: 122 passed, 1 skipped; Ruff ohne Befund.
   - Backend Windows: 23 gezielte Projekt-/Mappingtests passed; Ruff ohne Befund.
 - PR #2 bleibt offen und ungemergt. Die visuelle Abnahme auf echter Windows-/Linux-Zielhardware sowie die Air-Gap-Integration mit LDAP/AD, TLS und SMTP bleiben externe Abnahmepunkte.
+
+
+## Bearbeitervergleich und tabellarische Benutzerverwaltung (2026-11-04)
+
+- Bearbeiter sehen zurückgewiesene Läufe in der Projektdateiliste ausdrücklich als „Zurückgewiesen – Überarbeitung erforderlich“ einschließlich Rückgabegrund.
+- Der Dateivergleich steht Bearbeitern für eigene Läufe zur Verfügung. Die Backend-Route prüft die Laufzugehörigkeit; Vergleiche fremder Läufe bleiben für Bearbeiter gesperrt. Die zentrale Auth-Middleware gibt ausschließlich GET-Anfragen auf den Vergleichsendpunkt frei.
+- Vergleichsfenster verwenden die bestehende begrenzte Original-/Ausgabeansicht mit synchronem vertikalem und unabhängigem horizontalem Scrollen sowie farbigen Fund-/Ersetzungsmarkierungen.
+- Die Benutzerverwaltung zeigt vorhandene Konten tabellarisch mit Benutzername, Kontotyp, Aktivstatus, Rollen und Aktionen; Anlage bleibt eine separate Ansicht.
+- Regressionen ergänzen Backend-Berechtigungsprüfung und Frontend-Anzeige/Interaktion.
+- CI-Lauf [41913563076](https://github.com/Ineedat/ChatGPT/actions/runs/41913563076) vollständig erfolgreich: Frontend 39 Tests und Produktionsbuild; Backend Linux 122 passed, 1 skipped; Backend Windows 23 Tests; Ruff auf beiden Plattformen.
+- PR #2 bleibt offen und ungemergt. Zielsystem-Abnahme sowie LDAP/AD, TLS und SMTP in der tatsächlichen Air-Gap-Umgebung sind weiterhin offen.

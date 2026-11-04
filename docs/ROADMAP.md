@@ -258,3 +258,13 @@ Details und Startanleitung: [CI.md](CI.md).
 - [x] CI-Lauf [41677942384](https://github.com/Ineedat/ChatGPT/actions/runs/41677942384) vollständig erfolgreich: Frontend 38 Tests und Build; Backend Linux 122 passed/1 skipped; Backend Windows 23 gezielte Tests; Ruff auf beiden Plattformen.
 - [ ] Visuelle Abnahme auf realen Windows-/Linux-Bildschirmen bleibt externe manuelle Prüfung.
 
+
+
+## Bearbeiteransicht und Benutzerverwaltung — Erweiterung (2026-11-04)
+
+- [x] Zurückgewiesene Läufe werden in der Projekt-Dateiliste des Bearbeiters eindeutig als „Zurückgewiesen – Überarbeitung erforderlich“ markiert; der Rückgabegrund wird direkt angezeigt.
+- [x] Bearbeiter können eigene zurückgewiesene und noch nicht freigegebene Bereinigungsläufe im Original-/Bereinigt-Vergleich öffnen; vertikales Scrollen synchron, horizontales Scrollen unabhängig.
+- [x] Backend-Berechtigung: Bearbeiter dürfen ausschließlich eigene Läufe vergleichen; Prüfer, Freigeber und Administratoren behalten ihren rollenbasierten Prüfzugriff. Die zentrale Auth-Middleware lässt nur den Vergleichs-GET für Bearbeiter passieren; die Laufzugehörigkeit prüft der Endpunkt.
+- [x] Benutzerverwaltung von Karten auf eine kompakte Tabelle mit Kontotyp, Status, Rollen und Aktionen umgestellt.
+- [x] Frontend- und Backend-Regressionen für Rückweisungsanzeige, Vergleichszugriff und tabellarische Benutzerliste ergänzt.
+- [x] CI-Lauf [41913563076](https://github.com/Ineedat/ChatGPT/actions/runs/41913563076) vollständig erfolgreich: Frontend 39 Tests und Build; Backend Linux 122 passed/1 skipped; Backend Windows 23 Tests; Ruff auf beiden Plattformen.
