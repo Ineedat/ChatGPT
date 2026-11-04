@@ -1,4 +1,6 @@
+import io
 import sqlite3
+import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient as BaseTestClient
@@ -178,7 +180,7 @@ def test_review_requires_justified_exception_and_return_is_audited(tmp_path, mon
         latest = client.get("/api/reviews/runs").json()[0]
         retry_work_output = _stored_output_path(tmp_path, latest["id"])
         assert retry_work_output.read_bytes() == b"REDACTED\n"
-         assert latest["parent_run_id"] == run_id
+        assert latest["parent_run_id"] == run_id
         assert latest["status"] == "pending_review"
 
 
@@ -554,3 +556,52 @@ def test_review_comparison_reads_large_files_in_bounded_windows(tmp_path, monkey
         assert second.json()["original"]["byte_offset"] == first["original"]["next_offset"]
         assert second.json()["original"]["content"].startswith("safe application log line")
 
+
+
+def test_approved_outputs_remain_internal_until_export_and_zip_contains_only_approved_files(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(_config())
+    create_user("export-operator", "export-operator-password-123", ["operator"])
+
+    with BaseTestClient(app) as client:
+        login = client.post("/api/auth/login", json={
+            "username": "export-operator", "password": "export-operator-password-123"
+        })
+        assert login.status_code == 200
+        client.headers.update({"X-CSRF-Token": client.cookies.get("logsanitizer_csrf")})
+        response, project, _, external_path = _sanitized_run(client, tmp_path)
+        assert response.status_code == 200
+        run_id = response.json()["review_run_id"]
+        internal_path = _stored_output_path(tmp_path, run_id)
+        assert internal_path.is_file()
+        assert internal_path.read_bytes() == b"REDACTED\\n"
+        assert not external_path.exists()
+
+        listing = client.get(f"/api/reviews/projects/{project['id']}/exports/approved")
+        assert listing.status_code == 200
+        assert len(listing.json()) == 1
+        assert listing.json()[0]["run_id"] == run_id
+        assert listing.json()[0]["relative_path"] == "app.log"
+        assert "output_path" not in listing.json()[0]
+
+        audit = client.post(
+            f"/api/reviews/projects/{project['id']}/exports/audit",
+            json={"method": "folder", "run_ids": [run_id]},
+        )
+        assert audit.status_code == 200
+        content = client.get(
+            f"/api/reviews/projects/{project['id']}/exports/approved/{run_id}/content"
+        )
+        assert content.status_code == 200
+        assert content.content == b"REDACTED\\n"
+
+        archive = client.get(f"/api/reviews/projects/{project['id']}/exports/approved.zip")
+        assert archive.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(archive.content)) as zipped:
+            assert zipped.namelist() == ["app.log"]
+            assert zipped.read("app.log") == b"REDACTED\\n"
+
+        events = client.get("/api/reviews/exports/audit")
+        assert events.status_code == 200
+        assert {event["method"] for event in events.json()} == {"folder", "zip"}
