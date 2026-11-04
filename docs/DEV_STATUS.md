@@ -263,3 +263,16 @@ Letzter Übergabe-/Dokumentationsstand: Bearbeitervergleich, Rückweisungsstatus
 - Regressionen ergänzen Backend-Berechtigungsprüfung und Frontend-Anzeige/Interaktion.
 - CI-Lauf [41913563076](https://github.com/Ineedat/ChatGPT/actions/runs/41913563076) vollständig erfolgreich: Frontend 39 Tests und Produktionsbuild; Backend Linux 122 passed, 1 skipped; Backend Windows 23 Tests; Ruff auf beiden Plattformen.
 - PR #2 bleibt offen und ungemergt. Zielsystem-Abnahme sowie LDAP/AD, TLS und SMTP in der tatsächlichen Air-Gap-Umgebung sind weiterhin offen.
+
+## LDAP-Anmeldung und Backend-Konfigurationshilfe (2026-11-04)
+
+- Tatsächlichen PR-Branch-Stand zu Beginn geprüft: PR #2 offen, Branch `feature/project-management-sqlite`; die Übergabe vom 04.11. bleibt die maßgebliche Projektbasis.
+- LDAP-Passwortanmeldung im vorhandenen Backend geprüft: Das Passwort aus dem normalen LogSanitizer-Anmeldeformular wird bereits als persönliches LDAP-/AD-Benutzerpasswort für den Bind mit dem gefundenen Benutzer-DN verwendet. Ein persönliches Client-Zertifikat ist dafür nicht erforderlich.
+- Das bisherige Konfigurationsverständnis wurde in der Oberfläche korrigiert: Die Loginseite spricht nun ausdrücklich lokale Konten und LDAP-/Active-Directory-Konten an und weist auf das persönliche Verzeichnispasswort hin.
+- Neue ausführliche Offline-Hilfe `Backend-Konfiguration: LDAP/AD, TLS und SMTP` ergänzt. Sie erklärt den LDAP-Anmeldeablauf, den Unterschied zwischen persönlichem Benutzerpasswort und technischem Suchkonto-Passwort, LDAPS/StartTLS, CA- und HTTPS-Zertifikate, Benutzerfilter, Suchbasis, Gruppenattribute, Rollen-DNs, SMTP und die relevanten Umgebungsvariablen.
+- `docs/DEPLOYMENT.md` um eine ausführliche Backend-Konfigurationsreferenz mit LDAP-/AD-Beispielprofil, SMTP-Beispiel, Feldtabelle und Inbetriebnahme-/Fehlersuchcheckliste erweitert.
+- Wichtige Klarstellung: `LOGSANITIZER_LDAP_BIND_PASSWORD` ist das Passwort des technischen Suchkontos (`ldap.bind_dn`), nicht das Passwort des Mitarbeiters. Das persönliche LDAP-Passwort wird bei jeder Anmeldung im Passwortfeld eingegeben. `ldap.ca_certs_file` ist eine CA-Datei zur Serverzertifikatsprüfung, kein persönliches Benutzerzertifikat.
+- Die bestehende LDAP-Implementierung bindet nach der Benutzersuche separat mit dem eingegebenen Benutzerpasswort. Der bestehende Regressionstest `test_network_login_uses_ldap_only_and_sets_secure_cookie` deckt den Passwortpfad auf API-Ebene mit simuliertem LDAP ab.
+- Neue Commits auf dem Arbeitsbranch: `d9261c4` (Offline-Hilfe), `d2003e1` (Deployment-Dokumentation), `e48905b` (Login-Hinweis) und `b647727` (Korrektur eines Help-Text-Syntaxdetails).
+- CI-Verifizierung dieser Dokumentations-/UI-Änderungen steht noch aus. GitHub lieferte für den zuletzt geprüften Commit keine Statuschecks bzw. Workflow-Runs zurück; die Änderungen dürfen daher noch nicht als CI-grün bezeichnet werden.
+- PR #2 bleibt offen und ungemergt. Reale LDAP-/AD-, TLS- und SMTP-Abnahme im Air-Gap-Netz bleibt weiterhin erforderlich.
