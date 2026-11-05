@@ -497,7 +497,8 @@ def test_project_creation_does_not_require_or_expose_an_output_directory(tmp_pat
         reopened = client.get(f"/api/projects/{project.json()['id']}")
         assert reopened.status_code == 200
         assert "output_directory" not in reopened.json()
+        # Unregistered API paths are denied by the middleware before routing.
         assert client.put(
             f"/api/projects/{project.json()['id']}/output-directory",
             json={"output_directory": str(tmp_path)},
-        ).status_code == 404
+        ).status_code == 403
