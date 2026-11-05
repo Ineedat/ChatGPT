@@ -401,22 +401,44 @@ class AuthMiddleware(BaseHTTPMiddleware):
             a,b=request.cookies.get(CSRF,""),request.headers.get("x-csrf-token","")
             if not a or not b or not hmac.compare_digest(a,b) or not hmac.compare_digest(a,user["csrf_token"]):
                 return JSONResponse({"detail":"CSRF-Prüfung fehlgeschlagen."},status_code=403)
-        roles=set(user["roles"])
-        if path.startswith("/api/auth/users") and "admin" not in roles:
-            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if path.startswith("/api/rules/config") and method!="GET" and not roles.intersection({"admin","rule_owner"}):
-            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if path == "/api/rules/preview" and not roles.intersection({"admin","rule_owner"}):
-            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if "/sanitize" in path and not roles.intersection({"admin","operator"}):
-            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if method in {"POST","PUT","PATCH","DELETE"} and path.startswith("/api/projects") and not roles.intersection({"admin","operator"}) and not (path.endswith("/preview") and "rule_owner" in roles):
-            return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
-        if path.startswith("/api/reviews"):
-            review_reader = path == "/api/reviews/runs" and method == "GET"
-            processor_compare = method == "GET" and path.endswith("/compare-preview") and "operator" in roles
-            processor_export = method == "GET" and path.startswith("/api/reviews/projects/") and "/exports/" in path and "operator" in roles
-            export_audit = path == "/api/reviews/exports/audit" and "operator" in roles
-            if not (review_reader or processor_compare or processor_export or export_audit) and not roles.intersection({"admin","reviewer","approver"}):
-                return JSONResponse({"detail":"Unzureichende Berechtigung."},status_code=403)
+        roles = set(user["roles"])
+        if not _role_access_allowed(path, method, roles):
+            return JSONResponse({"detail": "Unzureichende Berechtigung."}, status_code=403)
         return await call_next(request)
+
+
+def _role_access_allowed(path: str, method: str, roles: set[str]) -> bool:
+    """Apply a deny-by-default role policy to every authenticated API route."""
+    if "admin" in roles:
+        return True
+
+    if path in {"/api/docs", "/api/openapi.json", "/api/auth/me", "/api/auth/logout"}:
+        return True
+    if path == "/api/auth/login" or path == "/api/health":
+        return True
+    if path == "/api/auth/users" or path.startswith("/api/auth/users/"):
+        return False
+    if path.startswith("/api/auth/"):
+        return False
+
+    if path.startswith("/api/rules/"):
+        return bool(roles.intersection({"rule_owner"}))
+
+    if path == "/api/projects" or path.startswith("/api/projects/"):
+        if path.endswith("/preview") and method == "POST":
+            return bool(roles.intersection({"operator", "rule_owner"}))
+        return "operator" in roles
+
+    if path.startswith("/api/reviews/"):
+        if roles.intersection({"reviewer", "approver"}):
+            return True
+        if "operator" in roles and method == "GET":
+            return (
+                path.endswith("/compare-preview")
+                or (path.startswith("/api/reviews/projects/") and "/exports/" in path)
+                or path == "/api/reviews/exports/audit"
+            )
+        return False
+
+    # New API routes must be assigned an explicit policy before use.
+    return False
