@@ -151,7 +151,7 @@ Die Anwendung sieht folgende Rollen vor. Eine Person darf bei geringer Personals
 | Reviewer / Prüfer | Bereinigte Ergebnisse prüfen, suchen, vergleichen, freigeben, zurückgeben oder stoppen | Keine Freigabe bei ungeklärten Auffälligkeiten; Kommentare bei Rückgabe/Stop dokumentieren. |
 | Approver / Freigeber | Formale Freigabe gemäß zugewiesener Berechtigung | Nur nach Prüfung der Pflichtstatus und der fachlichen Entscheidung freigeben. |
 
-**Soll-Regel:** Kritische Änderungen an Regeln, Rollen, LDAP-Gruppenzuordnungen und Deployment-Einstellungen sind nur autorisierten Personen gestattet. Die konkrete Berechtigungsmatrix ist vor Produktivbetrieb gegen sämtliche API-Endpunkte zu prüfen.
+**Umsetzung und Nachweis:** Die serverseitige Rollenprüfung ist als explizite Methoden-/Routenmatrix mit 46 Policies implementiert. Die vollständige Zuordnung je API-Route und Rolle ist in [LS-SEC-003 – API-Autorisierungsmatrix](API-AUTORISIERUNGSMATRIX.md) dokumentiert. Ein automatisierter Test gleicht alle registrierten API-Routen mit dieser Policy ab; nicht klassifizierte Routen werden standardmäßig verweigert. Rollenänderungen wirken unmittelbar auf bestehende Sitzungen. Eine projektbezogene Mandanten-/Eigentümertrennung besteht nicht; die Berechtigungen gelten innerhalb des jeweiligen Funktionsbereichs projektübergreifend.
 
 ## 7. Bedrohungs- und Risikoanalyse
 
@@ -179,7 +179,7 @@ Bewertungsskala: Eintrittswahrscheinlichkeit (E) und Schadensausmaß (S) jeweils
 3. **Lokaler Host als Vertrauensanker:** Ein kompromittiertes Betriebssystem, lokaler Administrator oder physischer Angreifer kann auf Daten zugreifen oder Prozesse manipulieren.
 4. **Kein allgemeiner Netzwerkbetrieb:** Das Sicherheitskonzept gilt nicht für öffentliche oder nicht vertrauenswürdige Netze.
 5. **Kein vollständiges Ressourcenlimit:** Regex-Timeouts und Streaming verhindern nicht jede Form von Ressourcenerschöpfung oder Überlastung.
-6. **Keine unabhängige Sicherheitsprüfung:** Die vorliegenden CI- und Smoke-Tests sind keine Penetrationsprüfung, kein vollständiger API-Autorisierungstest und keine Zertifizierung.
+6. **Keine unabhängige Sicherheitsprüfung:** Die API-Autorisierung wird inzwischen durch eine vollständige automatisierte Methoden-/Routenmatrix geprüft. CI- und Smoke-Tests sind dennoch keine unabhängige Penetrationsprüfung, keine organisationsbezogene BSI-Grundschutzprüfung und keine Zertifizierung.
 
 ## 8. Sicherheitsmaßnahmen und Soll-Anforderungen
 
@@ -280,7 +280,7 @@ Die nachfolgende Tabelle trennt implementierte bzw. dokumentierte Funktionen von
 |---|---|---|
 | Standalone Loopback-Bindung | implementiert und konfigurationsseitig validiert | Test auf Windows und Linux; Zugriff von anderem Host muss scheitern. |
 | Netzwerkprofil mit TLS-Pflicht | implementiert | Zertifikats- und Firewall-Abnahme im Zielnetz. |
-| Lokale Anmeldung / Rollen | implementiert | vollständige Negativtests für jede API-Route und jede Rolle. |
+| Lokale Anmeldung / Rollen | implementiert; vollständige API-Methoden-/Routenmatrix automatisiert geprüft (LS-SEC-003) | CI-Nachweis für Linux-Backend, Windows-Regressionsauswahl und Rollen-/Negativtests; reale Konten- und Rollenabnahme im Zielbetrieb. |
 | LDAP/AD und Gruppenzuordnung | implementiert | Tests mit realem Zielverzeichnis, Rollen und Zertifikatskette. |
 | SMTP-Benachrichtigung | optional implementiert | Zustelltest und organisatorischer Ersatzprozess bei Ausfall. |
 | Streaming und große Dateien | implementiert; synthetischer 5-GiB-CI-Lauf dokumentiert | repräsentative Logs auf Zielhardware, Laufzeit/RAM und Ergebnisqualität bewerten. |
@@ -362,7 +362,7 @@ Das Konzept ist mindestens jährlich sowie anlassbezogen zu überprüfen, insbes
 1. Bundesamt für Sicherheit in der Informationstechnik (BSI), **BSI-Standard 200-2 – IT-Grundschutz-Methodik**: https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Grundschutz/BSI_Standards/standard_200_2.pdf
 2. Bundesamt für Sicherheit in der Informationstechnik (BSI), **BSI-Standard 200-3 – Risikoanalyse auf der Basis von IT-Grundschutz**: https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Grundschutz/BSI_Standards/standard_200_3.pdf
 3. BSI, **IT-Grundschutz-Kompendium**: https://www.bsi.bund.de/grundschutz
-4. Projektinterne Referenzen: `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECURITY_REVIEW.md`, `SECURITY.md`.
+4. Projektinterne Referenzen: `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/SECURITY_REVIEW.md`, `SECURITY.md`, [LS-SEC-002 – technische Abnahmematrix](ABNAHMEMATRIX.md) und [LS-SEC-003 – API-Autorisierungsmatrix](API-AUTORISIERUNGSMATRIX.md).
 
 ---
 
@@ -391,3 +391,4 @@ Das Konzept ist mindestens jährlich sowie anlassbezogen zu überprüfen, insbes
 |---|---|---|
 | 1.0 | 05.11.2026 | Erster anwendungsspezifischer Entwurf auf Basis der Anforderungen v2.8 und der dokumentierten Sicherheitsbewertung. |
 | 1.1 | 05.11.2026 | Verknüpfung mit der technischen Sicherheits- und Abnahmematrix LS-SEC-002. |
+| 1.2 | 05.11.2026 | Ergänzung der vollständigen API-Methoden-/Rollenmatrix LS-SEC-003 und Aktualisierung des Nachweisstands nach erfolgreicher CI-Prüfung. |
