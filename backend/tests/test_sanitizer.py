@@ -313,16 +313,8 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
     original = b"secret=alpha\\n"
     source.write_bytes(original)
 
-    first_output_dir = tmp_path / "first-output"
-    first_output_dir.mkdir()
-    second_output_dir = tmp_path / "second-output"
-    second_output_dir.mkdir()
     with TestClient(app) as client:
         project_id = client.post("/api/projects", json={"name": "Background sanitize"}).json()["id"]
-        client.put(
-            f"/api/projects/{project_id}/output-directory",
-            json={"output_directory": str(first_output_dir)},
-        )
         file = client.post(
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
@@ -330,10 +322,10 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
             f"/api/projects/{project_id}/files/{file['id']}/format",
             json={"format_override": "text"},
         )
-        outside_output = first_output_dir / "service.log"
+        outside_output = tmp_path / "outside-service.log"
         outside_start = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
-            json={"output_path": str(outside_output)},
+            json={},
         )
         assert outside_start.status_code == 202
         outside_job_id = outside_start.json()["id"]
@@ -345,14 +337,10 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
         assert outside_work_output.read_bytes() == b"hidden=REDACTED\\n"
         assert not outside_output.exists()
 
-        client.put(
-            f"/api/projects/{project_id}/output-directory",
-            json={"output_directory": str(second_output_dir)},
-        )
-        output = second_output_dir / "service.log"
+        output = tmp_path / "second-service.log"
         started = client.post(
             f"/api/projects/{project_id}/files/{file['id']}/sanitize-jobs",
-            json={"output_path": str(output)},
+            json={},
         )
         assert started.status_code == 202
         job_id = started.json()["id"]
@@ -373,7 +361,6 @@ def test_sanitization_job_api_reports_progress_and_completed_result(tmp_path: Pa
     assert work_output.read_bytes() == b"hidden=REDACTED\\n"
     assert not output.exists()
     assert source.read_bytes() == original
-    assert list(second_output_dir.glob(".service.log.logsanitizer-*.tmp")) == []
 
 
 def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Path) -> None:
@@ -400,38 +387,6 @@ def test_pathological_regex_times_out_and_partial_output_is_removed(tmp_path: Pa
     assert list(tmp_path.glob(".clean.log.logsanitizer-*.tmp")) == []
 
 
-
-def test_sanitization_api_allows_user_selected_output_directory(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
-    save_rule_config(config())
-    source = tmp_path / "outside-source.log"
-    original = b"secret=value\\n"
-    source.write_bytes(original)
-    output_dir = tmp_path / "chosen-output"
-    output_dir.mkdir()
-    outside = output_dir / "outside.log"
-
-    with TestClient(app) as client:
-        project_id = client.post("/api/projects", json={"name": "Chosen output"}).json()["id"]
-        imported = client.post(
-            f"/api/projects/{project_id}/files", json={"path": str(source)}
-        ).json()
-        client.put(
-            f"/api/projects/{project_id}/files/{imported['id']}/format",
-            json={"format_override": "text"},
-        )
-        response = client.post(
-            f"/api/projects/{project_id}/files/{imported['id']}/sanitize",
-            json={"output_path": str(outside)},
-        )
-        assert response.status_code == 200
-        assert response.json()["status"] == "completed"
-
-    work_output = _stored_output_path(tmp_path, response.json()["review_run_id"])
-    assert work_output.read_bytes() == b"hidden=REDACTED\\n"
-    assert not outside.exists()
-    assert source.read_bytes() == original
 
 
 def test_sanitizer_rejects_source_as_output(tmp_path: Path) -> None:
@@ -501,16 +456,10 @@ def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path,
     source = tmp_path / "events.json"
     original = b'{"message":"secret=alpha"}'
     source.write_bytes(original)
-    output_dir = tmp_path / "json-output"
-    output_dir.mkdir()
-    output = output_dir / "events.json"
+    output = tmp_path / "outside-events.json"
 
     with TestClient(app) as client:
         project_id = client.post("/api/projects", json={"name": "JSON document"}).json()["id"]
-        client.put(
-            f"/api/projects/{project_id}/output-directory",
-            json={"output_directory": str(output_dir)},
-        )
         imported = client.post(
             f"/api/projects/{project_id}/files", json={"path": str(source)}
         ).json()
@@ -521,7 +470,7 @@ def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path,
         assert changed.status_code == 200
         started = client.post(
             f"/api/projects/{project_id}/files/{imported['id']}/sanitize-jobs",
-            json={"output_path": str(output)},
+            json={},
         )
         assert started.status_code == 202
         job_id = started.json()["id"]
@@ -534,4 +483,35 @@ def test_json_document_sanitization_job_is_available_through_api(tmp_path: Path,
     work_output = _stored_output_path(tmp_path, job_id)
     assert work_output.read_bytes() == b'{"message":"hidden=REDACTED"}'
     assert not output.exists()
+    assert source.read_bytes() == original
+
+
+def test_sanitization_api_ignores_any_client_output_path_and_keeps_result_internal(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("LOGSANITIZER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LOGSANITIZER_RULES_DIR", str(tmp_path / "rules"))
+    save_rule_config(config())
+    source = tmp_path / "outside-source.log"
+    original = b"secret=value\\n"
+    source.write_bytes(original)
+    outside = tmp_path / "client-selected.log"
+
+    with TestClient(app) as client:
+        project_id = client.post("/api/projects", json={"name": "Internal staging"}).json()["id"]
+        imported = client.post(
+            f"/api/projects/{project_id}/files", json={"path": str(source)}
+        ).json()
+        client.put(
+            f"/api/projects/{project_id}/files/{imported['id']}/format",
+            json={"format_override": "text"},
+        )
+        response = client.post(
+            f"/api/projects/{project_id}/files/{imported['id']}/sanitize",
+            json={"output_path": str(outside)},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "completed"
+
+    work_output = _stored_output_path(tmp_path, response.json()["review_run_id"])
+    assert work_output.read_bytes() == b"hidden=REDACTED\\n"
+    assert not outside.exists()
     assert source.read_bytes() == original

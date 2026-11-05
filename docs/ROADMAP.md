@@ -23,8 +23,8 @@
 - [x] Streaming-Ausführung für UTF-8-Text, JSON Lines und vollständige JSON-Dokumente mit Regelpriorität, optionalem Quellprofil, separater Ausgabe und Fehlerbereinigung. Text/JSONL-Zeilen und einzelne JSON-Strings sind auf 1 MiB begrenzt; JSON-Schlüssel und -Werte werden regelbasiert verarbeitet. XML/CSV bleiben Validierungs-, keine Bereinigungsformate.
 - [x] Neue Mapping-Speicherung auf einfache lokale SQLite-Struktur zurückgeführt; produktive Nutzung beginnt mit einer frischen Datenbank. Keine Migration von Entwicklungs-/Testbeständen.
 - [x] Fortschrittsanzeige und kooperativer Abbruch für Hintergrundläufe; Verarbeitung meldet Phase, Bytes und Zeilen.
-- [x] Ausgabe wird in einer temporären Datei im Zielordner erzeugt, validiert und erst danach ohne Überschreiben veröffentlicht; temporäre Datei wird bei regulärem Erfolg, Fehler oder Abbruch entfernt.
-- [x] Frei wählbare absolute Ausgabepfade ohne Workspace-Allowlist; Zielordner muss existieren, bestehende Ziele werden nicht überschrieben und Quelldateien bleiben unverändert.
+- [x] Bereinigungsergebnisse werden ausschließlich in einem internen, laufbezogenen Projekt-Arbeitsbereich erzeugt und validiert; fehlgeschlagene oder abgebrochene temporäre Ergebnisse werden entfernt. Freigegebene Ergebnisse bleiben intern gespeichert.
+- [x] Ausgabeziel ist vollständig aus dem Bereinigungsablauf entfernt; Projektanlage und Bereinigung benötigen keinen externen Ausgabeordner.
 - [x] LS-SEC-003 race-resistente Veröffentlichung ist nach Anforderungen v2.8 kein Produktziel mehr. Die aufwendige Race-Härtung wird nicht umgesetzt; einfache, zuverlässige Dateiausgabe mit Fehlerbereinigung bleibt erforderlich.
 - [x] Dauerhafte Lauf-/Prüfhistorie mit Ergebniskennzahlen, Status, Kommentaren, Ausnahmebegründungen und Audit-Ereignissen in einer separaten lokalen SQLite-Datenbank.
 - [x] Dauerhafte Hintergrundjob-Status-/Fortschrittsdaten in SQLite; beim Start verwaiste Läufe als `interrupted` markieren und zugehörige verwaiste Staging-Dateien sicher bereinigen.
@@ -35,7 +35,7 @@
 - [x] Prüfer-Warteschlange und Stichprobensuche ausschließlich in bereinigten Ausgaben; wörtliche Suche und zeitbegrenzte Regex-Suche sowie eigene gespeicherte Suchmuster inklusive Suchart.
 - [x] Freigabe, Rückgabe, Stopp und Kommentare; Laufhistorie und unveränderliche Audit-Ereignisse.
 - [x] Eng begrenzte, ausdrücklich begründete Ausnahmen; fehlgeschlagene Pflichtvalidierungen bleiben nicht freigabefähig.
-- [x] Rollen- und Berechtigungstests: Operator-/Reviewer-/Approver-/Admin-Trennung, kombinierte Rollen, Review-Entscheidungen, Such-/Kommentar-/Audit-Zugriff und Fail-closed-Verhalten bei unbekannter Prüferzuordnung; CI erfolgreich.
+- [x] Rollen- und Berechtigungstests: Operator-/Reviewer-/Approver-/Admin-Trennung, kombinierte Rollen, Review-Entscheidungen, Such-/Kommentar-/Audit-Zugriff und Fail-closed-Verhalten bei unbekannter Prüferzuordnung; CI erfolgreich.\n- [x] Freigabe löst keine automatische Veröffentlichung aus; auch automatisch freigegebene Dateien bleiben intern, bis der Bearbeiter den Export ausdrücklich startet.\n- [x] Exportübersicht bietet nur validierte freigegebene Dateien; Ordnerexport auf dem Arbeitsplatz über File System Access API und ZIP-Download mit temporärem serverseitigem Archiv. Relative Pfade bleiben erhalten; Exportereignisse werden auditiert.
 
 ## Meilenstein 3 — Deployment
 - [x] Optionale SMTP-Benachrichtigungen für ausstehende Prüffreigaben und zurückgegebene Läufe; Konfiguration über lokale Umgebungsvariablen und automatisierte Tests.

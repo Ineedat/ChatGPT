@@ -131,9 +131,8 @@ def initialize_database() -> None:
             current_version = 3
 
         if current_version < 4:
-            connection.execute(
-                "ALTER TABLE projects ADD COLUMN output_directory TEXT NOT NULL DEFAULT ''"
-            )
+            # Version 4 previously introduced a project output directory. New installations
+            # no longer create it; existing legacy columns remain ignored for compatibility.
             connection.execute("UPDATE schema_metadata SET version = 4")
 
         if current_version < 5:
@@ -168,21 +167,6 @@ class Project(BaseModel):
     status: str
     created_at: str
     updated_at: str
-    output_directory: str = ""
-
-
-class ProjectOutputDirectoryUpdate(BaseModel):
-    output_directory: str = Field(default="", max_length=4096)
-
-    @field_validator("output_directory")
-    @classmethod
-    def normalize_output_directory(cls, value: str) -> str:
-        value = value.strip()
-        if value and not Path(value).expanduser().is_absolute():
-            raise ValueError("Bitte einen absoluten Ausgabeordner angeben.")
-        return value
-
-
 class FileImportRequest(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
 
@@ -271,7 +255,7 @@ def list_projects() -> list[Project]:
     with connect_database() as connection:
         rows = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at, output_directory
+            SELECT id, name, description, status, created_at, updated_at
             FROM projects ORDER BY updated_at DESC, name COLLATE NOCASE ASC
             """
         ).fetchall()
@@ -282,23 +266,9 @@ def get_project(project_id: str) -> Project | None:
     with connect_database() as connection:
         row = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at, output_directory
+            SELECT id, name, description, status, created_at, updated_at
             FROM projects WHERE id = ?
             """,
-            (project_id,),
-        ).fetchone()
-    return _project_from_row(row) if row is not None else None
-
-
-def update_project_output_directory(project_id: str, output_directory: str) -> Project | None:
-    with connect_database() as connection:
-        connection.execute(
-            "UPDATE projects SET output_directory = ?, updated_at = ? WHERE id = ?",
-            (output_directory, datetime.now(UTC).isoformat(timespec="seconds"), project_id),
-        )
-        row = connection.execute(
-            "SELECT id, name, description, status, created_at, updated_at, output_directory "
-            "FROM projects WHERE id = ?",
             (project_id,),
         ).fetchone()
     return _project_from_row(row) if row is not None else None
@@ -317,7 +287,7 @@ def create_project(payload: ProjectCreate) -> Project:
         )
         row = connection.execute(
             """
-            SELECT id, name, description, status, created_at, updated_at, output_directory
+            SELECT id, name, description, status, created_at, updated_at
             FROM projects WHERE id = ?
             """,
             (project_id,),

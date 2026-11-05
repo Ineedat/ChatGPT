@@ -34,7 +34,6 @@ from logsanitizer.database import (
     ImportedFile,
     Project,
     ProjectCreate,
-    ProjectOutputDirectoryUpdate,
     connect_database,
     create_project,
     database_path,
@@ -45,7 +44,6 @@ from logsanitizer.database import (
     register_imported_file,
     update_detected_format,
     update_format_override,
-    update_project_output_directory,
 )
 from logsanitizer.deployment import load_settings
 from logsanitizer.format_validation import validate_file
@@ -132,26 +130,6 @@ def projects_get(project_id: str) -> Project:
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Projekt nicht gefunden.")
     return project
-
-@app.put("/api/projects/{project_id}/output-directory", response_model=Project, tags=["projects"])
-def projects_set_output_directory(
-    project_id: str, payload: ProjectOutputDirectoryUpdate
-) -> Project:
-    """Persist the single output directory used by all files in a project."""
-    if payload.output_directory:
-        directory = Path(payload.output_directory).expanduser()
-        if not directory.exists() or not directory.is_dir():
-            raise HTTPException(status_code=422, detail="Der Ausgabeordner muss bereits existieren.")
-        if directory.is_symlink():
-            raise HTTPException(status_code=422, detail="Symbolische Links sind als Ausgabeordner nicht zulässig.")
-        normalized = str(directory.resolve())
-    else:
-        normalized = ""
-    project = update_project_output_directory(project_id, normalized)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Projekt nicht gefunden.")
-    return project
-
 
 @app.get(
     "/api/projects/{project_id}/files",
@@ -464,7 +442,6 @@ def rules_config_put(payload: RuleConfig) -> RuleConfig:
 
 
 class SanitizationRequest(BaseModel):
-    output_path: str = Field(min_length=1, max_length=4096)
     profile_id: str | None = Field(default=None, max_length=64)
     retry_of_run_id: str | None = Field(default=None, max_length=80)
 
@@ -523,29 +500,10 @@ def project_file_sanitize_start(
     if is_file_approved(project_id, file_id):
         raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist für weitere Bereinigungen gesperrt.")
     source = Path(row["source_path"])
-    output = Path(payload.output_path).expanduser()
-    if not output.is_absolute():
-        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
-    output_root = Path(project.output_directory).expanduser()
-    if not project.output_directory or not output_root.is_dir():
-        raise HTTPException(status_code=422, detail="Der Projekt-Ausgabeordner muss festgelegt werden und existieren.")
-    try:
-        resolved_root = output_root.resolve(strict=True)
-        relative_source = _relative_project_source_path(project_id, source, row["relative_path"])
-        expected_output = (resolved_root / relative_source).resolve(strict=False)
-        if output.resolve(strict=False) != expected_output:
-            raise HTTPException(status_code=422, detail="Die Ausgabedatei muss die relative Quellpfadstruktur im Projekt-Ausgabeordner beibehalten.")
-        expected_output.parent.mkdir(parents=True, exist_ok=True)
-        resolved_parent = expected_output.parent.resolve(strict=True)
-        if not resolved_parent.is_relative_to(resolved_root):
-            raise HTTPException(status_code=422, detail="Der Ausgabepfad liegt außerhalb des Projekt-Ausgabeordners.")
-        output = resolved_parent / expected_output.name
-    except OSError as exc:
-        raise HTTPException(status_code=422, detail="Die Ausgabeverzeichnisstruktur konnte nicht angelegt werden.") from exc
-    if output.resolve(strict=False) == source.resolve(strict=False):
-        raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
-    if output.is_symlink() or output.exists():
-        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
+    relative_source = _relative_project_source_path(project_id, source, row["relative_path"])
+    output_name = relative_source.name
+    if not output_name or output_name in {".", ".."}:
+        raise HTTPException(status_code=422, detail="Ungültiger relativer Dateiname.")
     selected_format = row["format_override"] or row["detected_format"]
     if source.is_symlink() or not source.is_file():
         raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
@@ -561,9 +519,8 @@ def project_file_sanitize_start(
         raise HTTPException(status_code=422, detail="Das angegebene Quellprofil ist nicht definiert.")
 
     job_id = uuid.uuid4().hex
-    publish_output = output
     try:
-        work_output = _staging_output_path(project_id, job_id, output.name)
+        work_output = _staging_output_path(project_id, job_id, output_name)
     except OSError as exc:
         raise HTTPException(status_code=500, detail="Arbeitsordner konnte nicht angelegt werden.") from exc
     user = request.state.user
@@ -571,7 +528,6 @@ def project_file_sanitize_start(
         create_review_run(
             job_id, project_id, file_id, row["display_name"], work_output,
             int(user["id"]), str(user["username"]), payload.retry_of_run_id,
-            publish_path=publish_output,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -643,23 +599,14 @@ def project_file_sanitize(
         raise HTTPException(status_code=409, detail="Diese Datei wurde bereits freigegeben und ist für weitere Bereinigungen gesperrt.")
 
     source = Path(row["source_path"])
-    output = Path(payload.output_path).expanduser()
-    if not output.is_absolute():
-        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
-    if not output.parent.is_dir():
-        raise HTTPException(status_code=422, detail="Der Zielordner muss bereits existieren.")
-    if output.resolve(strict=False) == source.resolve(strict=False):
-        raise HTTPException(status_code=422, detail="Quell- und Zieldatei dürfen nicht identisch sein.")
-    if output.exists():
-        raise HTTPException(status_code=409, detail="Die Zieldatei existiert bereits.")
+    if source.is_symlink() or not source.is_file():
+        raise HTTPException(status_code=422, detail="Quelldatei ist nicht mehr verfügbar oder nicht regulär.")
     selected_format = row["format_override"] or row["detected_format"]
     if selected_format not in {"text", "jsonl", "json"}:
         raise HTTPException(
             status_code=422,
             detail="Vor der Bereinigung muss das Format als Text, JSON oder JSON Lines ausgewählt bzw. erkannt sein.",
         )
-    if not output.is_absolute():
-        raise HTTPException(status_code=422, detail="Bitte einen absoluten Zielpfad angeben.")
     try:
         config = load_rule_config()
         if find_rule_conflicts(config):
@@ -669,11 +616,10 @@ def project_file_sanitize(
     user = request.state.user
     run_id = uuid.uuid4().hex
     try:
-        work_output = _staging_output_path(project_id, run_id, output.name)
+        work_output = _staging_output_path(project_id, run_id, Path(row["display_name"]).name)
         create_review_run(
             run_id, project_id, file_id, row["display_name"], work_output,
             int(user["id"]), str(user["username"]), payload.retry_of_run_id,
-            publish_path=output,
         )
         set_review_run_running(run_id)
         result = sanitize_file(source, work_output, config, payload.profile_id, selected_format, project_id)
@@ -681,7 +627,7 @@ def project_file_sanitize(
         notify_pending_review(review_run)
         return {
             "file_id": file_id,
-            "output_name": output.name,
+            "output_name": work_output.name,
             "review_run_id": run_id,
             "review_status": review_run["status"],
             **result,

@@ -23,7 +23,12 @@ Das Projekt ist ausdrücklich keine Hochsicherheitsplattform. Zusätzliche Schut
 - Netzwerkzugriff nur nach ausdrücklicher Konfiguration der Bind-Adresse und mit Anmeldung/Rollenprüfung; keine Internet- oder öffentliche Netzwerkbereitstellung.
 - Primär Anwendungslogs; einzelne Dateien und Ordner importieren, optional rekursiv. Import startet keine Verarbeitung.
 - Quelldateien niemals automatisch ändern, verschieben oder löschen.
-- Ausgabepfad und Arbeitsverzeichnis sollen für den Anwender verständlich und flexibel wählbar sein; keine verpflichtende zentrale Workspace-Allowlist.
+- Die Verarbeitung erfolgt vollständig in einem internen, projektbezogenen Arbeitsbereich. Ein externer Ausgabeordner wird vor oder während der Bereinigung nicht benötigt.
+- Erst nach erfolgreicher Pflichtvalidierung und Freigabe kann der Bearbeiter freigegebene Bereinigungsergebnisse exportieren: in einen auf dem Arbeitsplatz gewählten Ordner oder als ZIP-Download. Die relative Ordnerstruktur bleibt erhalten.
+- Automatische Freigabe ohne Prüferzuweisung ist eine Freigabe für den Export, aber keine automatische Veröffentlichung. Der Export wird immer ausdrücklich vom Bearbeiter gestartet.
+- Export darf ausschließlich freigegebene und erfolgreich validierte Bereinigungsergebnisse enthalten; Originale, zurückgewiesene, gestoppte und fehlgeschlagene Läufe sind ausgeschlossen. Wiederholter Export ohne erneute Bereinigung muss möglich sein.
+- Ordnerexport erfolgt im Browser auf dem Gerät des angemeldeten Bearbeiters (File System Access API, sofern unterstützt), nicht durch Angabe eines absoluten Serverpfads. ZIP-Download ist der browserübergreifende Fallback.
+- ZIP-Erstellung und Dateiübertragung müssen streaming-/speicherschonend ausgelegt sein und große Dateien unterstützen. Exportvorgänge werden mit Benutzer, Zeitpunkt, Methode und Dateiliste auditiert.
 - Portable Datenhaltung mit möglichst wenigen Dateien und einfacher Sicherung/Wiederherstellung.
 
 ## Stack und Skalierung
@@ -58,7 +63,7 @@ Das Projekt ist ausdrücklich keine Hochsicherheitsplattform. Zusätzliche Schut
 - Rückgabe mit optionalem Kommentar sperrt regulären Export; erneute Verarbeitung erzeugt verknüpften Lauf.
 - Ausnahmen nur mit Begründung; sie übergehen keine unabhängigen fehlgeschlagenen Pflichtprüfungen.
 
-## Benutzer, Audit, Integration und Hilfe
+## Export und Freigabe\n\nDie interne Arbeitsdatei bleibt nach der Freigabe im Projekt-Arbeitsbereich erhalten. Eine Freigabe darf keine automatische Dateiveröffentlichung in ein externes Verzeichnis auslösen. Der Bearbeiter wählt anschließend den Zielordner auf seinem eigenen Arbeitsplatz oder startet einen ZIP-Download. Die Export-API prüft Status, Pflichtvalidierung und Integrität der internen Datei erneut. Exportereignisse sind separat nachvollziehbar.\n\n## Benutzer, Audit, Integration und Hilfe
 
 - Lokale Benutzerkonten im Standalone-Modus.
 - Im Air-Gap-Netzwerk optional LDAP/Active Directory; Rollen werden aus der konfigurierten Gruppenzuordnung abgeleitet. Keine unnötig komplexe Authentifizierungsarchitektur.
