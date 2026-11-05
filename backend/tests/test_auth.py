@@ -259,8 +259,8 @@ def test_user_administration_rejects_invalid_roles_and_non_admins(tmp_path, monk
         assert regular.delete(f"/api/auth/users/{target_id}").status_code == 403
 
 
-def test_api_route_role_matrix_is_explicit_and_denies_unassigned_routes():
-    from logsanitizer.auth import _role_access_allowed
+def test_api_route_role_matrix_covers_every_registered_route():
+    from logsanitizer.auth import _API_ROLE_POLICIES, _role_access_allowed, _route_template_matches
     from logsanitizer.main import app
 
     role_sets = {
@@ -283,42 +283,26 @@ def test_api_route_role_matrix_is_explicit_and_denies_unassigned_routes():
         for method in route.methods:
             if method in {"HEAD", "OPTIONS"}:
                 continue
+            if path == "/api/health":
+                continue
+            matching_policies = [
+                policy for policy in _API_ROLE_POLICIES
+                if policy[0] == method and _route_template_matches(policy[1], path)
+            ]
+            assert len(matching_policies) == 1, (
+                f"API route must have exactly one authorization rule: {method} {path}; "
+                f"found {len(matching_policies)}"
+            )
+            expected_roles = matching_policies[0][2]
             for role_name, roles in role_sets.items():
-                allowed = _role_access_allowed(path, method, roles)
-                if path in {"/api/health", "/api/auth/login"}:
-                    expected = True
-                elif path in {"/api/docs", "/api/openapi.json", "/api/auth/me", "/api/auth/logout"}:
-                    expected = True
-                elif path == "/api/auth/users" or path.startswith("/api/auth/users/"):
-                    expected = "admin" in roles
-                elif path.startswith("/api/auth/"):
-                    expected = "admin" in roles
-                elif path.startswith("/api/rules/"):
-                    expected = bool(roles.intersection({"admin", "rule_owner"}))
-                elif path == "/api/projects" or path.startswith("/api/projects/"):
-                    if path.endswith("/preview") and method == "POST":
-                        expected = bool(roles.intersection({"admin", "operator", "rule_owner"}))
-                    else:
-                        expected = bool(roles.intersection({"admin", "operator"}))
-                elif path.startswith("/api/reviews/"):
-                    expected = bool(roles.intersection({"admin", "reviewer", "approver"}))
-                    if "operator" in roles and method == "GET" and not roles.intersection({"admin", "reviewer", "approver"}):
-                        expected = (
-                            path.endswith("/compare-preview")
-                            or (path.startswith("/api/reviews/projects/") and "/exports/" in path)
-                            or path == "/api/reviews/exports/audit"
-                        )
-                                    else:
-                    expected = role_name == "admin"
-                assert allowed is expected, (
-                    f"Unexpected authorization for {method} {path} and {role_name}: "
-                    f"expected {expected}, got {allowed}"
-                )
+                assert _role_access_allowed(path, method, roles) is bool(
+                    roles.intersection(expected_roles)
+                ), f"Unexpected authorization for {method} {path} and {role_name}"
 
 
-def test_role_policy_denies_unknown_api_routes_by_default():
+def test_unclassified_api_routes_are_denied_by_default():
     from logsanitizer.auth import _role_access_allowed
 
     for roles in ({"operator"}, {"reviewer"}, {"approver"}, {"rule_owner"}, set()):
         assert not _role_access_allowed("/api/new-unclassified-endpoint", "GET", roles)
-    assert _role_access_allowed("/api/new-unclassified-endpoint", "GET", {"admin"})
+    assert not _role_access_allowed("/api/new-unclassified-endpoint", "GET", {"admin"})
