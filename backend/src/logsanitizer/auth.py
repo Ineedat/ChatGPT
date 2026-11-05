@@ -410,6 +410,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 # Exact method/path policies. Route templates use FastAPI's {parameter} notation.
 _API_ROLE_POLICIES = (
     ("GET", "/api/docs", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
+    ("GET", "/api/docs/oauth2-redirect", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("GET", "/api/openapi.json", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("POST", "/api/auth/login", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("GET", "/api/auth/me", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
