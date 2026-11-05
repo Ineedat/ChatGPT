@@ -444,7 +444,7 @@ _API_ROLE_POLICIES = (
 
     ("GET", "/api/reviews/runs/{run_id}/compare-preview", frozenset({"admin", "operator", "reviewer", "approver"})),
     ("GET", "/api/reviews/queue", frozenset({"admin", "reviewer", "approver"})),
-    ("GET", "/api/reviews/runs", frozenset({"admin", "reviewer", "approver"})),
+    ("GET", "/api/reviews/runs", frozenset({"admin", "operator", "reviewer", "approver"})),
     ("GET", "/api/reviews/runs/{run_id}/search", frozenset({"admin", "reviewer", "approver"})),
     ("GET", "/api/reviews/saved-searches", frozenset({"admin", "reviewer", "approver"})),
     ("POST", "/api/reviews/saved-searches", frozenset({"admin", "reviewer", "approver"})),
