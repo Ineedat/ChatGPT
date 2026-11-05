@@ -313,15 +313,15 @@ def test_role_changes_take_effect_for_existing_sessions_immediately(tmp_path, mo
     create_user("role-admin", "role-admin-password-123", ["admin"])
     target_id = create_user("role-target", "role-target-password-123", ["operator"])
 
-    with _admin_client("role-admin", "role-admin-password-123") as admin, \\
-         _admin_client("role-target", "role-target-password-123") as target:
-        assert target.post("/api/projects", json={"name": "Before role change"}).status_code == 201
+    with _admin_client("role-admin", "role-admin-password-123") as admin:
+        with _admin_client("role-target", "role-target-password-123") as target:
+            assert target.post("/api/projects", json={"name": "Before role change"}).status_code == 201
 
-        changed = admin.put(
-            f"/api/auth/users/{target_id}",
-            json={"roles": ["reviewer"]},
-        )
-        assert changed.status_code == 200
-        assert target.get("/api/projects").status_code == 403
-        assert target.get("/api/reviews/queue").status_code == 200
-        assert target.get("/api/auth/me").json()["roles"] == ["reviewer"]
+            changed = admin.put(
+                f"/api/auth/users/{target_id}",
+                json={"roles": ["reviewer"]},
+            )
+            assert changed.status_code == 200
+            assert target.get("/api/projects").status_code == 403
+            assert target.get("/api/reviews/queue").status_code == 200
+            assert target.get("/api/auth/me").json()["roles"] == ["reviewer"]
