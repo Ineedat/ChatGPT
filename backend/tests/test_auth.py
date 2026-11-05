@@ -290,27 +290,25 @@ def test_api_route_role_matrix_is_explicit_and_denies_unassigned_routes():
                 elif path in {"/api/docs", "/api/openapi.json", "/api/auth/me", "/api/auth/logout"}:
                     expected = True
                 elif path == "/api/auth/users" or path.startswith("/api/auth/users/"):
-                    expected = role_name == "admin"
+                    expected = "admin" in roles
                 elif path.startswith("/api/auth/"):
-                    expected = role_name == "admin"
+                    expected = "admin" in roles
                 elif path.startswith("/api/rules/"):
-                    expected = role_name in {"admin", "rule_owner"}
+                    expected = bool(roles.intersection({"admin", "rule_owner"}))
                 elif path == "/api/projects" or path.startswith("/api/projects/"):
                     if path.endswith("/preview") and method == "POST":
-                        expected = role_name in {"admin", "operator", "rule_owner"}
+                        expected = bool(roles.intersection({"admin", "operator", "rule_owner"}))
                     else:
-                        expected = role_name in {"admin", "operator"}
+                        expected = bool(roles.intersection({"admin", "operator"}))
                 elif path.startswith("/api/reviews/"):
-                    expected = role_name in {"admin", "reviewer", "approver"}
-                    if role_name == "operator" and method == "GET":
+                    expected = bool(roles.intersection({"admin", "reviewer", "approver"}))
+                    if "operator" in roles and method == "GET" and not roles.intersection({"admin", "reviewer", "approver"}):
                         expected = (
                             path.endswith("/compare-preview")
                             or (path.startswith("/api/reviews/projects/") and "/exports/" in path)
                             or path == "/api/reviews/exports/audit"
                         )
-                    if role_name == "combined":
-                        expected = True
-                else:
+                                    else:
                     expected = role_name == "admin"
                 assert allowed is expected, (
                     f"Unexpected authorization for {method} {path} and {role_name}: "
