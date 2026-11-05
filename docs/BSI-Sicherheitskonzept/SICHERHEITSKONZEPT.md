@@ -1,7 +1,7 @@
 # Sicherheitskonzept nach BSI-Methodik – LogSanitizer
 
 **Dokument-ID:** LS-SEC-001  
-**Version:** 1.0  
+**Version:** 1.1  
 **Stand:** 05.11.2026  
 **Status:** Entwurf zur organisatorischen Prüfung und Freigabe  
 **Gültige Produktbaseline:** LogSanitizer Anforderungen v2.8  
@@ -272,6 +272,8 @@ Bewertungsskala: Eintrittswahrscheinlichkeit (E) und Schadensausmaß (S) jeweils
 
 ## 9. Entwicklungsstand und Nachweisstatus
 
+Die konkrete Zuordnung von Sicherheitszielen zu Testfällen, erwarteten Ergebnissen, Nachweisen und Abnahmestatus ist in der ergänzenden [Technischen Sicherheits- und Abnahmematrix LS-SEC-002](ABNAHMEMATRIX.md) festgelegt. Diese Matrix ist Bestandteil dieses Sicherheitskonzepts und bei jeder sicherheitsrelevanten Änderung mitzuführen.
+
 Die nachfolgende Tabelle trennt implementierte bzw. dokumentierte Funktionen von offenen Abnahmen. Ein Eintrag „vorhanden“ ersetzt keine unabhängige Prüfung.
 
 | Kontrolle | Stand laut Projektunterlagen | Erforderlicher Nachweis vor Produktivbetrieb |
@@ -388,3 +390,4 @@ Das Konzept ist mindestens jährlich sowie anlassbezogen zu überprüfen, insbes
 | Version | Datum | Änderung |
 |---|---|---|
 | 1.0 | 05.11.2026 | Erster anwendungsspezifischer Entwurf auf Basis der Anforderungen v2.8 und der dokumentierten Sicherheitsbewertung. |
+| 1.1 | 05.11.2026 | Verknüpfung mit der technischen Sicherheits- und Abnahmematrix LS-SEC-002. |
