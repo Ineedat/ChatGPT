@@ -411,6 +411,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 _API_ROLE_POLICIES = (
     ("GET", "/api/docs", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("GET", "/api/openapi.json", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
+    ("POST", "/api/auth/login", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("GET", "/api/auth/me", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("POST", "/api/auth/logout", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
     ("GET", "/api/auth/users", frozenset({"admin"})),
