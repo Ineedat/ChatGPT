@@ -407,38 +407,74 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# Exact method/path policies. Route templates use FastAPI's {parameter} notation.
+_API_ROLE_POLICIES = (
+    ("GET", "/api/docs", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
+    ("GET", "/api/openapi.json", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
+    ("GET", "/api/auth/me", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
+    ("POST", "/api/auth/logout", frozenset({"admin", "operator", "reviewer", "approver", "rule_owner"})),
+    ("GET", "/api/auth/users", frozenset({"admin"})),
+    ("POST", "/api/auth/users", frozenset({"admin"})),
+    ("PUT", "/api/auth/users/{user_id}", frozenset({"admin"})),
+    ("DELETE", "/api/auth/users/{user_id}", frozenset({"admin"})),
+
+    ("GET", "/api/projects", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects", frozenset({"admin", "operator"})),
+    ("GET", "/api/projects/{project_id}", frozenset({"admin", "operator"})),
+    ("GET", "/api/projects/{project_id}/files", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/{file_id}/detect-format", frozenset({"admin", "operator"})),
+    ("PUT", "/api/projects/{project_id}/files/{file_id}/format", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/{file_id}/validate-format", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/{file_id}/preview", frozenset({"admin", "operator", "rule_owner"})),
+    ("POST", "/api/projects/{project_id}/files/{file_id}/sanitize-jobs", frozenset({"admin", "operator"})),
+    ("GET", "/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/{file_id}/sanitize-jobs/{job_id}/cancel", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/{file_id}/sanitize", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/import-folder", frozenset({"admin", "operator"})),
+    ("POST", "/api/projects/{project_id}/files/upload", frozenset({"admin", "operator"})),
+
+    ("GET", "/api/rules/library", frozenset({"admin", "rule_owner"})),
+    ("POST", "/api/rules/preview", frozenset({"admin", "rule_owner"})),
+    ("GET", "/api/rules/config", frozenset({"admin", "rule_owner"})),
+    ("POST", "/api/rules/config/validate", frozenset({"admin", "rule_owner"})),
+    ("PUT", "/api/rules/config", frozenset({"admin", "rule_owner"})),
+
+    ("GET", "/api/reviews/runs/{run_id}/compare-preview", frozenset({"admin", "operator", "reviewer", "approver"})),
+    ("GET", "/api/reviews/queue", frozenset({"admin", "reviewer", "approver"})),
+    ("GET", "/api/reviews/runs", frozenset({"admin", "reviewer", "approver"})),
+    ("GET", "/api/reviews/runs/{run_id}/search", frozenset({"admin", "reviewer", "approver"})),
+    ("GET", "/api/reviews/saved-searches", frozenset({"admin", "reviewer", "approver"})),
+    ("POST", "/api/reviews/saved-searches", frozenset({"admin", "reviewer", "approver"})),
+    ("DELETE", "/api/reviews/saved-searches/{search_id}", frozenset({"admin", "reviewer", "approver"})),
+    ("POST", "/api/reviews/runs/{run_id}/approve", frozenset({"admin", "reviewer", "approver"})),
+    ("POST", "/api/reviews/runs/{run_id}/return", frozenset({"admin", "reviewer", "approver"})),
+    ("POST", "/api/reviews/runs/{run_id}/stop", frozenset({"admin", "reviewer", "approver"})),
+    ("POST", "/api/reviews/runs/{run_id}/comments", frozenset({"admin", "reviewer", "approver"})),
+    ("GET", "/api/reviews/projects/{project_id}/exports/approved", frozenset({"admin", "operator", "reviewer", "approver"})),
+    ("GET", "/api/reviews/projects/{project_id}/exports/approved/{run_id}/content", frozenset({"admin", "operator", "reviewer", "approver"})),
+    ("GET", "/api/reviews/projects/{project_id}/exports/approved.zip", frozenset({"admin", "operator", "reviewer", "approver"})),
+    ("GET", "/api/reviews/exports/audit", frozenset({"admin", "operator", "reviewer", "approver"})),
+    ("GET", "/api/reviews/audit", frozenset({"admin", "reviewer", "approver"})),
+)
+
+
+def _route_template_matches(template: str, path: str) -> bool:
+    expected = template.strip("/").split("/")
+    actual = path.strip("/").split("/")
+    if len(expected) != len(actual):
+        return False
+    return all(
+        (part.startswith("{") and part.endswith("}")) or part == value
+        for part, value in zip(expected, actual)
+    )
+
+
 def _role_access_allowed(path: str, method: str, roles: set[str]) -> bool:
-    """Apply a deny-by-default role policy to every authenticated API route."""
-    if "admin" in roles:
+    """Apply the explicit method/path role matrix; unknown routes fail closed."""
+    if path == "/api/health":
         return True
-
-    if path in {"/api/docs", "/api/openapi.json", "/api/auth/me", "/api/auth/logout"}:
-        return True
-    if path == "/api/auth/login" or path == "/api/health":
-        return True
-    if path == "/api/auth/users" or path.startswith("/api/auth/users/"):
-        return False
-    if path.startswith("/api/auth/"):
-        return False
-
-    if path.startswith("/api/rules/"):
-        return bool(roles.intersection({"rule_owner"}))
-
-    if path == "/api/projects" or path.startswith("/api/projects/"):
-        if path.endswith("/preview") and method == "POST":
-            return bool(roles.intersection({"operator", "rule_owner"}))
-        return "operator" in roles
-
-    if path.startswith("/api/reviews/"):
-        if roles.intersection({"reviewer", "approver"}):
-            return True
-        if "operator" in roles and method == "GET":
-            return (
-                path.endswith("/compare-preview")
-                or (path.startswith("/api/reviews/projects/") and "/exports/" in path)
-                or path == "/api/reviews/exports/audit"
-            )
-        return False
-
-    # New API routes must be assigned an explicit policy before use.
+    for allowed_method, template, allowed_roles in _API_ROLE_POLICIES:
+        if method == allowed_method and _route_template_matches(template, path):
+            return bool(roles.intersection(allowed_roles))
     return False
